@@ -2,7 +2,7 @@
 //  ACADEMIA DEL BUEN CAFÉ · App del empleado + enrutador
 // =====================================================================
 import { datos, MODO, enviarAvance, vaciarCola, pendientesCola } from "./datos.js";
-import { icono, esc, num, duracion, reloj, fechaCorta, hoyISO, haceCuanto, iniciales, saludo, aviso, modal, confirmar, nombreArea } from "./ui.js";
+import { icono, esc, num, duracion, reloj, fechaCorta, hoyISO, haceCuanto, iniciales, saludo, aviso, modal, confirmar, nombreArea, nombreCategoria, fijarCategorias } from "./ui.js";
 import { vistaAdmin } from "./admin.js";
 
 const app = document.getElementById("app");
@@ -26,6 +26,10 @@ async function enrutar() {
     } else return pintarLogin();
   }
 
+  if (!estado.catCargadas) {
+    try { fijarCategorias(await datos.categorias()); } catch (_) { /* usa las de base */ }
+    estado.catCargadas = true;
+  }
   const esAdmin = estado.perfil.rol === "admin";
   if (esAdmin && ruta !== "admin") return ir("/admin");
   if (!esAdmin && ruta === "admin") return ir("/inicio");
@@ -245,6 +249,7 @@ async function pintarInicio() {
   const recientes = [...mias].sort((a, b) => String(b.otorgada_en).localeCompare(String(a.otorgada_en))).slice(0, 3)
     .map((m) => catalogo.find((c) => c.id === m.insignia_id)).filter(Boolean);
   const nombreCorto = String(r.nombre || "").split(" ")[0];
+  const cats = [...new Set(cursos.map((c) => c.categoria || "general"))];
 
   conNav(`
   <main class="vista">
@@ -292,7 +297,9 @@ async function pintarInicio() {
 
     <section class="pila">
       <div class="etiqueta">Asignados a ti</div>
-      ${cursos.length ? cursos.map(tarjetaCurso).join("") : `<div class="vacio"><strong>Aún no tienes cursos</strong>Cuando Gustavo te asigne uno, aparecerá aquí.</div>`}
+      ${cats.length > 1 ? `<div class="chips" id="filtro-cat" role="group" aria-label="Filtrar por categoría">
+        <button class="chip activo" data-cat="">Todos</button>${cats.map((c) => `<button class="chip" data-cat="${esc(c)}">${esc(nombreCategoria(c))}</button>`).join("")}</div>` : ""}
+      <div class="pila" id="lista-cursos">${cursos.length ? cursos.map(tarjetaCurso).join("") : `<div class="vacio"><strong>Aún no tienes cursos</strong>Cuando Gustavo te asigne uno, aparecerá aquí.</div>`}</div>
     </section>
 
     <section class="pila">
@@ -308,6 +315,15 @@ async function pintarInicio() {
 
   app.querySelectorAll("[data-ir]").forEach((b) => (b.onclick = () => ir(b.dataset.ir)));
   app.querySelector("#perfil").onclick = () => abrirPerfil(r);
+  const filtro = app.querySelector("#filtro-cat");
+  if (filtro) filtro.onclick = (e) => {
+    const b = e.target.closest("[data-cat]"); if (!b) return;
+    filtro.querySelectorAll(".chip").forEach((c) => c.classList.toggle("activo", c === b));
+    const lista = cursos.filter((c) => !b.dataset.cat || (c.categoria || "general") === b.dataset.cat);
+    const caja = app.querySelector("#lista-cursos");
+    caja.innerHTML = lista.map(tarjetaCurso).join("");
+    caja.querySelectorAll("[data-ir]").forEach((x) => (x.onclick = () => ir(x.dataset.ir)));
+  };
   if (r.insignias_sin_ver?.length) celebrar(r.insignias_sin_ver);
 }
 
@@ -321,7 +337,7 @@ function tarjetaCurso(c) {
   <button class="tarjeta-borde pila" data-ir="/curso/${c.id}" style="gap:10px">
     <div class="fila-entre" style="align-items:flex-start">
       <div><b style="font-size:15px">${esc(c.titulo)}</b>
-        <div class="texto-tenue" style="font-size:12px">${c.lecciones} lecciones · ${duracion(c.duracion_seg)}${c.obligatorio ? " · obligatorio" : ""}</div></div>
+        <div class="texto-tenue" style="font-size:12px">${esc(nombreCategoria(c.categoria))} · ${c.lecciones} lecciones · ${duracion(c.duracion_seg)}${c.obligatorio ? " · obligatorio" : ""}</div></div>
       ${pildora}
     </div>
     <div class="fila"><div class="barra fina ${c.terminado ? "ok" : ""}" style="flex:1"><i style="width:${pct}%"></i></div>
@@ -377,7 +393,7 @@ async function pintarCurso(id) {
   <main class="vista vista-completa">
     <header class="curso-cabeza">
       <button class="btn-icono" id="volver" aria-label="Volver">${icono("back")}</button>
-      <div class="etiqueta" style="color:var(--oro)">${esc(nombreArea(d.curso.categoria))}${d.curso.quiz_obligatorio ? " · con quiz" : ""}</div>
+      <div class="etiqueta" style="color:var(--oro)">${esc(nombreCategoria(d.curso.categoria))}${d.curso.quiz_obligatorio ? " · con quiz" : ""}</div>
       <h1>${esc(d.curso.titulo)}</h1>
       ${d.curso.descripcion ? `<p style="margin:0;color:var(--crema-2)">${esc(d.curso.descripcion)}</p>` : ""}
       <div class="texto-tenue" style="color:var(--crema-2)">${caps.length} ${caps.length === 1 ? "capítulo" : "capítulos"} · ${total} lecciones · ${duracion(durTotal)}</div>

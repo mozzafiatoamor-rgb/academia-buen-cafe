@@ -11,7 +11,7 @@
 //  Los videos se suben directo de tu computadora a Bunny (subida reanudable).
 // =====================================================================
 import { datos } from "./datos.js";
-import { icono, esc, modal, aviso, AREAS } from "./ui.js";
+import { icono, esc, modal, aviso, opcionesCategoria } from "./ui.js";
 
 const EXT = /\.(mp4|mov|m4v|webm|mkv|avi)$/i;
 const MIME = { mp4: "video/mp4", mov: "video/quicktime", m4v: "video/x-m4v", webm: "video/webm", mkv: "video/x-matroska", avi: "video/x-msvideo" };
@@ -87,7 +87,7 @@ export async function subirCursoDesdeCarpeta({ alTerminar }) {
   const p = modal(`
     <h2 class="modal-titulo">Subir curso desde carpeta</h2>
     <label class="campo">Nombre del curso<input id="sc-nombre" value="${esc(plan.curso)}"></label>
-    <label class="campo">Categoría<select id="sc-cat">${AREAS.map(([v, t]) => `<option value="${v}" ${v === "barra" ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+    <label class="campo">Categoría<select id="sc-cat">${opcionesCategoria().map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("")}</select></label>
     <div class="pila" style="gap:8px">
       <div class="etiqueta">${plan.capitulos.length} ${plan.capitulos.length === 1 ? "capítulo" : "capítulos"} · ${plan.total} videos · ${tamano(plan.bytes)}</div>
       ${plan.capitulos.map((c, i) => `

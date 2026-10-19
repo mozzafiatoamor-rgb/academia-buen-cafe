@@ -333,6 +333,9 @@ export function crearDemo() {
       guardar(); return { disponibles: disp - p.costo };
     },
     async niveles() { return NIVELES; },
+    async categorias() { return db.categorias || null; },
+    async guardarCategorias(lista) { exigirAdmin(); db.categorias = lista; guardar(); },
+    async crearInsignia(ins) { exigirAdmin(); if (!INSIGNIAS.some((i) => i.id === ins.id)) INSIGNIAS.push({ activa: true, secreta: false, nivel: null, ...ins }); },
 
     // ---------- Admin ----------
     async adminAvance() {

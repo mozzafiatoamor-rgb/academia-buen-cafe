@@ -126,6 +126,12 @@ function crearNube() {
     },
 
     async niveles() { return q(sb.from("academia_niveles").select("*").order("orden")); },
+    async categorias() {
+      const r = await q(sb.from("academia_config").select("valor").eq("clave", "categorias").maybeSingle());
+      return Array.isArray(r?.valor) ? r.valor : null;
+    },
+    guardarCategorias: (lista) => q(sb.from("academia_config").upsert({ clave: "categorias", valor: lista })),
+    crearInsignia: (ins) => q(sb.from("academia_insignias").upsert(ins, { onConflict: "id", ignoreDuplicates: true })),
 
     // ---------- Admin ----------
     adminAvance: () => rpc("academia_admin_avance"),

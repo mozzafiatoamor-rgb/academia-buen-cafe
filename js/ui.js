@@ -218,3 +218,24 @@ function campoHTML(c) {
 export const AREAS = [["piso", "Piso"], ["barra", "Barra"], ["cocina", "Cocina"], ["casa_regina", "Casa Regina"], ["general", "General"]];
 export const SEDES = [["Mozzafiato", "Mozzafiato"], ["Casa Regina", "Casa Regina"]];
 export const nombreArea = (a) => (AREAS.find(([v]) => v === a) || [a, a || "—"])[1];
+
+// ---------- Categorías de cursos (tema del curso, configurables por el admin) ----------
+export const CATEGORIAS_BASE = [
+  { id: "barra", nombre: "Barismo y barra" },
+  { id: "cocina", nombre: "Cocina" },
+  { id: "piso", nombre: "Servicio en piso" },
+  { id: "liderazgo", nombre: "Liderazgo" },
+  { id: "casa_regina", nombre: "Hospitalidad Casa Regina" },
+  { id: "general", nombre: "General" },
+];
+let categoriasActuales = CATEGORIAS_BASE;
+export const categorias = () => categoriasActuales;
+export function fijarCategorias(lista) {
+  categoriasActuales = Array.isArray(lista) && lista.length ? lista : CATEGORIAS_BASE;
+}
+export const opcionesCategoria = () => categoriasActuales.map((c) => [c.id, c.nombre]);
+export function nombreCategoria(id) {
+  return categoriasActuales.find((c) => c.id === id)?.nombre || nombreArea(id) || "General";
+}
+export const slug = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+  .replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 30) || "categoria";

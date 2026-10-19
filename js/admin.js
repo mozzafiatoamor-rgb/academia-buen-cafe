@@ -2,7 +2,7 @@
 //  ACADEMIA DEL BUEN CAFÉ · Panel de administración
 // =====================================================================
 import { datos, MODO } from "./datos.js";
-import { icono, esc, num, duracion, fechaCorta, hoyISO, haceCuanto, aviso, modal, confirmar, formulario, AREAS, SEDES, nombreArea } from "./ui.js";
+import { icono, esc, num, duracion, fechaCorta, hoyISO, haceCuanto, aviso, modal, confirmar, formulario, AREAS, SEDES, nombreArea, nombreCategoria, opcionesCategoria, categorias, fijarCategorias, slug } from "./ui.js";
 import { subirCursoDesdeCarpeta } from "./subir.js";
 
 const LOGO = "img/logo.png";
@@ -394,27 +394,37 @@ async function altaEnLote(equipo) {
 // ---------------------------------------------------------------------
 async function pintarCursos(main) {
   const cursos = await datos.adminCursos();
+  const grupos = categorias().map((cat) => ({ ...cat, cursos: cursos.filter((c) => (c.categoria || "general") === cat.id) }));
+  const huerfanos = cursos.filter((c) => !categorias().some((cat) => cat.id === (c.categoria || "general")));
+  if (huerfanos.length) grupos.push({ id: "_otros", nombre: "Sin categoría", cursos: huerfanos });
+  const tarjeta = (c) => `
+      <a class="tarjeta-borde pila" href="#/admin/curso/${c.id}" style="gap:8px">
+        <div class="fila-entre" style="align-items:flex-start"><b style="font-size:16px">${esc(c.titulo)}</b>
+          <span class="pildora ${c.publicado ? "pildora-ok" : ""}">${c.publicado ? "Publicado" : "Borrador"}</span></div>
+        <span class="texto-tenue">${c.lecciones} lecciones · ${duracion(c.duracion_seg)}</span>
+        <span class="texto-tenue" style="font-size:12px">${c.asignaciones ? `${c.asignaciones} asignación(es)` : "Sin asignar todavía"}</span>
+      </a>`;
   main.innerHTML = `
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-end">
       <h1 class="titulo-pagina" style="font-size:38px">Cursos</h1>
       <div class="fila" style="flex-wrap:wrap">
+        <button class="btn btn-sec" id="categorias">${icono("book", 18)}Categorías</button>
         <button class="btn btn-sec" id="nuevo">${icono("plus", 18)}Curso vacío</button>
         <button class="btn" id="carpeta">${icono("video", 18)}Subir curso desde carpeta</button>
       </div>
     </div>
     <p class="texto-tenue" style="margin:0">Tip: organiza en tu computadora <b>Curso / Capítulos / videos</b> y súbelo de una vez. Cada subcarpeta se vuelve un capítulo y cada video una lección, en orden por nombre (usa 01, 02, 03…).</p>
-    ${cursos.length ? `<div class="rejilla">${cursos.map((c) => `
-      <a class="tarjeta-borde pila" href="#/admin/curso/${c.id}" style="gap:8px">
-        <div class="fila-entre" style="align-items:flex-start"><b style="font-size:16px">${esc(c.titulo)}</b>
-          <span class="pildora ${c.publicado ? "pildora-ok" : ""}">${c.publicado ? "Publicado" : "Borrador"}</span></div>
-        <span class="texto-tenue">${esc(nombreArea(c.categoria))} · ${c.lecciones} lecciones · ${duracion(c.duracion_seg)}</span>
-        <span class="texto-tenue" style="font-size:12px">${c.asignaciones ? `${c.asignaciones} asignación(es)` : "Sin asignar todavía"}</span>
-      </a>`).join("")}</div>`
-      : `<div class="vacio"><strong>Crea tu primer curso</strong>Luego le agregas capítulos y eliges los videos de tu biblioteca de Bunny.</div>`}`;
+    ${cursos.length ? grupos.filter((g) => g.cursos.length).map((g) => `
+      <section class="pila" style="gap:10px">
+        <div class="fila-entre"><h2 style="font-size:18px">${esc(g.nombre)}</h2><span class="texto-tenue">${g.cursos.length} curso(s)</span></div>
+        <div class="rejilla">${g.cursos.map(tarjeta).join("")}</div>
+      </section>`).join("")
+      : `<div class="vacio"><strong>Crea tu primer curso</strong>Súbelo desde una carpeta o empieza uno vacío y elige los videos de tu biblioteca de Bunny.</div>`}`;
+  main.querySelector("#categorias").onclick = () => editarCategorias(cursos);
   main.querySelector("#nuevo").onclick = async () => {
     const d = await formulario("Nuevo curso", [
       { nombre: "titulo", etiqueta: "Título", requerido: true, autofocus: true, placeholder: "Barismo nivel 1" },
-      { nombre: "categoria", etiqueta: "Categoría", tipo: "select", opciones: AREAS, valor: "barra" },
+      { nombre: "categoria", etiqueta: "Categoría", tipo: "select", opciones: opcionesCategoria() },
       { nombre: "descripcion", etiqueta: "Descripción (opcional)", tipo: "area" },
     ], "Crear curso");
     if (!d) return;
@@ -422,6 +432,67 @@ async function pintarCursos(main) {
     catch (e) { aviso(e.message, "error"); }
   };
   main.querySelector("#carpeta").onclick = () => subirCursoDesdeCarpeta({ alTerminar: (id) => ctx.ir(`/admin/curso/${id}`) });
+}
+
+// Crear, renombrar y quitar categorías (se guardan en Supabase para todos).
+async function editarCategorias(cursos) {
+  let lista = categorias().map((c) => ({ ...c }));
+  const uso = (id) => cursos.filter((c) => (c.categoria || "general") === id).length;
+  const p = modal(`<h2 class="modal-titulo">Categorías de cursos</h2>
+    <p class="modal-texto" style="font-size:14px">El tema del curso (Cocina, Liderazgo, Barismo…). Quién lo toma se define al asignarlo.</p>
+    <div id="cat-lista" class="pila" style="gap:8px"></div>
+    <form id="cat-nueva" class="fila" style="gap:8px">
+      <label class="campo" style="flex:1"><span class="oculto">Nueva categoría</span><input id="cat-nombre" placeholder="Nueva categoría, ej. Atención al cliente"></label>
+      <button class="btn btn-chico" type="submit" style="min-height:48px">${icono("plus", 16)}Agregar</button>
+    </form>
+    <label class="check"><input type="checkbox" id="cat-insignia" checked><span>Crear insignia "Experto en…" para las categorías nuevas</span></label>
+    <p class="error-form" id="cat-err" hidden></p>
+    <div class="fila-botones"><button class="btn btn-sec" data-cerrar>Cancelar</button><button class="btn" id="cat-ok">Guardar</button></div>`);
+  const capa = modal.actual;
+  const err = capa.querySelector("#cat-err");
+  const nuevas = new Set();
+  const pintar = () => {
+    capa.querySelector("#cat-lista").innerHTML = lista.map((c, i) => `
+      <div class="fila tarjeta" style="padding:8px 10px;gap:8px">
+        <input class="cat-nom" data-i="${i}" value="${esc(c.nombre)}" aria-label="Nombre de la categoría" style="flex:1;min-height:40px;border-radius:10px;border:1px solid var(--linea);background:var(--tarjeta-2);color:var(--crema);padding:0 10px">
+        <span class="texto-tenue" style="font-size:12px;white-space:nowrap">${uso(c.id)} curso(s)</span>
+        <button class="mini-btn" aria-label="Subir" data-sub="${i}" ${i === 0 ? "disabled" : ""}>${icono("up", 18)}</button>
+        <button class="mini-btn" aria-label="Quitar ${esc(c.nombre)}" data-quitar="${i}">${icono("trash", 18)}</button>
+      </div>`).join("");
+    capa.querySelectorAll(".cat-nom").forEach((inp) => (inp.oninput = () => { lista[Number(inp.dataset.i)].nombre = inp.value; }));
+    capa.querySelectorAll("[data-sub]").forEach((b) => (b.onclick = () => { const i = Number(b.dataset.sub); [lista[i - 1], lista[i]] = [lista[i], lista[i - 1]]; pintar(); }));
+    capa.querySelectorAll("[data-quitar]").forEach((b) => (b.onclick = () => {
+      const c = lista[Number(b.dataset.quitar)];
+      if (uso(c.id)) { err.textContent = `"${c.nombre}" tiene ${uso(c.id)} curso(s). Cámbialos de categoría antes de quitarla.`; err.hidden = false; return; }
+      lista = lista.filter((x) => x !== c); pintar();
+    }));
+  };
+  pintar();
+  capa.querySelector("#cat-nueva").onsubmit = (e) => {
+    e.preventDefault();
+    const inp = capa.querySelector("#cat-nombre");
+    const nombre = inp.value.trim(); if (!nombre) return;
+    let id = slug(nombre), n = 2;
+    while (lista.some((c) => c.id === id)) id = `${slug(nombre)}_${n++}`;
+    lista.push({ id, nombre }); nuevas.add(id); inp.value = ""; err.hidden = true; pintar();
+  };
+  capa.querySelector("#cat-ok").onclick = async () => {
+    lista = lista.map((c) => ({ id: c.id, nombre: c.nombre.trim() })).filter((c) => c.nombre);
+    if (!lista.length) { err.textContent = "Deja al menos una categoría"; err.hidden = false; return; }
+    const btn = capa.querySelector("#cat-ok"); btn.disabled = true; btn.textContent = "Guardando…";
+    try {
+      await datos.guardarCategorias(lista);
+      if (capa.querySelector("#cat-insignia").checked) {
+        for (const c of lista.filter((x) => nuevas.has(x.id))) {
+          await datos.crearInsignia({ id: `experto_${c.id}`.slice(0, 60), nombre: `Experto en ${c.nombre}`, descripcion: `Completaste todos los cursos de ${c.nombre}`,
+            categoria: "especialidad", icono: "trophy", puntos: 150, regla: { tipo: "categoria", categoria: c.id }, orden: 85 });
+        }
+      }
+      fijarCategorias(lista);
+      capa.cerrar(true); aviso("Categorías guardadas", "ok"); recargar();
+    } catch (e) { err.textContent = e.message; err.hidden = false; btn.disabled = false; btn.textContent = "Guardar"; }
+  };
+  return p;
 }
 
 // Completa duraciones de lecciones recién subidas cuando Bunny termina de procesarlas.
@@ -460,7 +531,7 @@ async function pintarEditorCurso(main, id) {
     <a href="#/admin/cursos" class="btn-texto" style="display:inline-flex;align-items:center;gap:4px;align-self:flex-start">${icono("back", 16)}Cursos</a>
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-start">
       <div class="pila" style="gap:4px;flex:1 1 320px">
-        <span class="etiqueta">${esc(nombreArea(c.categoria))} · ${c.publicado ? "Publicado" : "Borrador"}</span>
+        <span class="etiqueta">${esc(nombreCategoria(c.categoria))} · ${c.publicado ? "Publicado" : "Borrador"}</span>
         <h1 class="titulo-pagina" style="font-size:38px">${esc(c.titulo)}</h1>
         <span class="texto-tenue">${caps.length} capítulos · ${d.lecciones.length} lecciones · ${duracion(durTotal)}${c.quiz_obligatorio ? ` · quiz obligatorio (${c.quiz_minimo}%)` : ""}</span>
       </div>
@@ -517,7 +588,7 @@ async function pintarEditorCurso(main, id) {
   main.querySelector("#editar").onclick = async () => {
     const v = await formulario("Datos del curso", [
       { nombre: "titulo", etiqueta: "Título", valor: c.titulo, requerido: true },
-      { nombre: "categoria", etiqueta: "Categoría", tipo: "select", opciones: AREAS, valor: c.categoria },
+      { nombre: "categoria", etiqueta: "Categoría", tipo: "select", opciones: opcionesCategoria(), valor: c.categoria },
       { nombre: "descripcion", etiqueta: "Descripción", tipo: "area", valor: c.descripcion },
       { nombre: "quiz_obligatorio", etiqueta: "Quiz obligatorio para terminar", tipo: "check", valor: c.quiz_obligatorio },
       { nombre: "quiz_minimo", etiqueta: "Calificación mínima del quiz (%)", tipo: "numero", valor: c.quiz_minimo },
