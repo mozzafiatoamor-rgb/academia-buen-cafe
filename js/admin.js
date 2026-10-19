@@ -351,7 +351,7 @@ async function pintarEditorCurso(main, id) {
       <div class="nombre"><b style="font-weight:600">${esc(l.titulo)}</b><small>${l.duracion_seg ? duracion(l.duracion_seg) : l.bunny_video_id ? "Bunny lo está procesando…" : ""}${l.bunny_video_id ? "" : "sin video"}</small></div>
       <button class="mini-btn" aria-label="Subir" data-mover-l="${l.id}" data-dir="-1" ${i === 0 ? "disabled" : ""}>${icono("up", 18)}</button>
       <button class="mini-btn" aria-label="Bajar" data-mover-l="${l.id}" data-dir="1" ${i === lista.length - 1 ? "disabled" : ""}>${icono("down", 18)}</button>
-      <button class="mini-btn" aria-label="Renombrar" data-renombrar-l="${l.id}">${icono("edit", 18)}</button>
+      <button class="mini-btn" aria-label="Editar, mover o renombrar" title="Renombrar o cambiar posición" data-renombrar-l="${l.id}">${icono("edit", 18)}</button>
       <button class="mini-btn" aria-label="Quitar" data-borrar-l="${l.id}">${icono("trash", 18)}</button>
     </div>`;
 
@@ -467,18 +467,32 @@ async function pintarEditorCurso(main, id) {
   }));
   main.querySelectorAll("[data-renombrar-l]").forEach((b) => (b.onclick = async () => {
     const l = d.lecciones.find((x) => x.id === b.dataset.renombrarL);
+    const lista = listaDe(l.id);
+    const posActual = lista.findIndex((x) => x.id === l.id) + 1;
     const opciones = [["", "Sin capítulo"], ...caps.map((m, i) => [m.id, `Capítulo ${i + 1} · ${m.titulo}`])];
+    const posiciones = lista.map((x, i) => [String(i + 1), i + 1 === posActual ? `${i + 1} (actual)` : i === 0 ? "1 · al inicio" : i === lista.length - 1 ? `${i + 1} · al final` : String(i + 1)]);
     const v = await formulario("Editar lección", [
       { nombre: "titulo", etiqueta: "Título que verán los empleados", valor: l.titulo, requerido: true },
+      { nombre: "posicion", etiqueta: "Posición dentro del capítulo", tipo: "select", opciones: posiciones, valor: String(posActual) },
       { nombre: "modulo_id", etiqueta: "Capítulo", tipo: "select", opciones, valor: l.modulo_id || "" },
     ]);
     if (!v) return;
-    const cambios = { titulo: v.titulo };
-    if ((v.modulo_id || null) !== (l.modulo_id || null)) {
-      cambios.modulo_id = v.modulo_id || null;
-      cambios.orden = (d.lecciones.filter((x) => (x.modulo_id || null) === cambios.modulo_id).reduce((a, x) => Math.max(a, x.orden), 0)) + 1;
-    }
-    conError(() => datos.actualizarLeccion(l.id, cambios));
+    const cambiaCap = (v.modulo_id || null) !== (l.modulo_id || null);
+    conError(async () => {
+      if (cambiaCap) {
+        // Se manda al final del otro capítulo
+        const orden = (d.lecciones.filter((x) => (x.modulo_id || null) === (v.modulo_id || null)).reduce((a, x) => Math.max(a, x.orden), 0)) + 1;
+        return datos.actualizarLeccion(l.id, { titulo: v.titulo, modulo_id: v.modulo_id || null, orden });
+      }
+      const nueva = lista.filter((x) => x.id !== l.id);
+      nueva.splice(Number(v.posicion) - 1, 0, l);
+      await Promise.all(nueva.map((x, i) => {
+        const c = {};
+        if (x.orden !== i + 1) c.orden = i + 1;
+        if (x.id === l.id && v.titulo !== l.titulo) c.titulo = v.titulo;
+        return Object.keys(c).length ? datos.actualizarLeccion(x.id, c) : null;
+      }));
+    });
   }));
   main.querySelectorAll("[data-borrar-l]").forEach((b) => (b.onclick = async () => {
     if (!(await confirmar("¿Quitar lección?", "Se quita del curso (y el avance de esa lección). El video sigue en Bunny.", "Quitar"))) return;
