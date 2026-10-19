@@ -364,6 +364,7 @@ async function pintarEditorCurso(main, id) {
         <span class="texto-tenue">${caps.length} capítulos · ${d.lecciones.length} lecciones · ${duracion(durTotal)}${c.quiz_obligatorio ? ` · quiz obligatorio (${c.quiz_minimo}%)` : ""}</span>
       </div>
       <div class="fila" style="flex-wrap:wrap">
+        <a class="btn btn-sec" href="#/admin/ver/curso/${c.id}">${icono("eye", 18)}Ver como empleado</a>
         <button class="btn btn-sec" id="editar">${icono("edit", 18)}Datos del curso</button>
         <button class="btn ${c.publicado ? "btn-sec" : ""}" id="publicar">${c.publicado ? "Pasar a borrador" : "Publicar"}</button>
       </div>

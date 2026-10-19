@@ -31,7 +31,12 @@ async function enrutar() {
   if (!esAdmin && ruta === "admin") return ir("/inicio");
   window.scrollTo(0, 0);
 
+  estado.preview = esAdmin && ruta === "admin" && a === "ver";
   try {
+    if (estado.preview) {
+      if (b === "leccion") return await pintarLeccion(partes[3], partes[4]);
+      return await pintarCurso(partes[3]);
+    }
     switch (ruta) {
       case "admin": return await vistaAdmin(app, partes.slice(1), { ir, salir });
       case "curso": return await pintarCurso(a);
@@ -78,6 +83,8 @@ function conNav(html, activa) {
     </nav>`;
 }
 function sinNav(html) { app.className = ""; app.innerHTML = bandaDemo() + html; }
+const base = () => (estado.preview ? "/admin/ver" : "");
+const bandaVista = () => `<div class="banda-demo">VISTA PREVIA COMO EMPLEADO · tu avance no se guarda</div>`;
 const bandaDemo = () => (MODO === "demo" ? `<div class="banda-demo">MODO DEMO · datos de ejemplo</div>` : "");
 
 function pintarError(e) {
@@ -351,6 +358,7 @@ export function armarCapitulos(modulos, lecciones) {
 
 async function pintarCurso(id) {
   cargando();
+  const B = base(), vp = !!estado.preview;
   const d = await datos.curso(id);
   const hechas = new Set(d.progreso.filter((p) => p.completado).map((p) => p.leccion_id));
   const caps = armarCapitulos(d.modulos, d.lecciones);
@@ -365,7 +373,7 @@ async function pintarCurso(id) {
   const durTotal = orden.reduce((a, l) => a + (l.duracion_seg || 0), 0);
 
   let n = 0;
-  sinNav(`
+  sinNav(`${vp ? bandaVista() : ""}
   <main class="vista vista-completa">
     <header class="curso-cabeza">
       <button class="btn-icono" id="volver" aria-label="Volver">${icono("back")}</button>
@@ -374,7 +382,7 @@ async function pintarCurso(id) {
       ${d.curso.descripcion ? `<p style="margin:0;color:var(--crema-2)">${esc(d.curso.descripcion)}</p>` : ""}
       <div class="texto-tenue" style="color:var(--crema-2)">${caps.length} ${caps.length === 1 ? "capítulo" : "capítulos"} · ${total} lecciones · ${duracion(durTotal)}</div>
       <div class="fila"><div class="barra" style="flex:1;background:var(--tarjeta)"><i style="width:${pct}%"></i></div><b style="color:var(--oro)">${pct}%</b></div>
-      ${siguiente ? `<button class="btn" data-ir="/leccion/${id}/${siguiente.id}">${icono("play", 18)}${listas ? "Continuar" : "Empezar curso"}</button>` : ""}
+      ${siguiente ? `<button class="btn" data-ir="${B}/leccion/${id}/${siguiente.id}">${icono("play", 18)}${listas ? "Continuar" : "Empezar curso"}</button>` : ""}
     </header>
 
     ${terminado ? `<div class="tarjeta fila" style="border:1px solid var(--verde)">${icono("trophy", 28)}<div><b>¡Curso completado!</b><div class="texto-tenue">Buen trabajo. Tus puntos ya están en tu cuenta.</div></div></div>` : ""}
@@ -385,9 +393,9 @@ async function pintarCurso(id) {
           <span class="texto-tenue">${c.lecciones.filter((l) => hechas.has(l.id)).length} de ${c.lecciones.length}</span></div>
         ${c.lecciones.map((l) => {
           n++;
-          const hecho = hechas.has(l.id), ahora = siguiente?.id === l.id, bloq = !hecho && !ahora;
-          return `<button class="leccion ${ahora ? "actual" : ""} ${bloq ? "bloq" : ""}" ${bloq ? 'aria-disabled="true"' : `data-ir="/leccion/${id}/${l.id}"`}>
-            <span class="leccion-estado ${hecho ? "hecho" : ahora ? "ahora" : "pend"}">${icono(hecho ? "check" : ahora ? "play" : "lock", hecho ? 16 : 14)}</span>
+          const hecho = hechas.has(l.id), ahora = siguiente?.id === l.id, bloq = !vp && !hecho && !ahora;
+          return `<button class="leccion ${ahora ? "actual" : ""} ${bloq ? "bloq" : ""}" ${bloq ? 'aria-disabled="true"' : `data-ir="${B}/leccion/${id}/${l.id}"`}>
+            <span class="leccion-estado ${hecho ? "hecho" : ahora ? "ahora" : "pend"}">${icono(hecho ? "check" : ahora || vp ? "play" : "lock", hecho ? 16 : 14)}</span>
             <span style="flex:1;min-width:0"><b>${n}. ${esc(l.titulo)}</b><small>${l.duracion_seg ? duracion(l.duracion_seg) : "video"}</small></span>
           </button>`;
         }).join("")}
@@ -410,7 +418,7 @@ async function pintarCurso(id) {
       </section>` : ""}
   </main>`);
 
-  app.querySelector("#volver").onclick = () => ir("/inicio");
+  app.querySelector("#volver").onclick = () => ir(vp ? `/admin/curso/${id}` : "/inicio");
   app.querySelectorAll("[data-ir]").forEach((b) => (b.onclick = () => ir(b.dataset.ir)));
   app.querySelectorAll(".leccion.bloq").forEach((b) => (b.onclick = () => aviso("Termina la lección anterior para desbloquear esta")));
   app.querySelectorAll("[data-material]").forEach((b) => (b.onclick = async () => {
@@ -426,6 +434,7 @@ async function pintarCurso(id) {
 // ---------------------------------------------------------------------
 async function pintarLeccion(cursoId, leccionId) {
   cargando();
+  const B = base(), vp = !!estado.preview;
   const [d, v] = await Promise.all([datos.curso(cursoId), datos.video(leccionId).catch((e) => ({ error: e.message }))]);
   const caps = armarCapitulos(d.modulos, d.lecciones);
   const orden = caps.flatMap((c) => c.lecciones);
@@ -434,10 +443,10 @@ async function pintarLeccion(cursoId, leccionId) {
   if (!leccion) throw new Error("Lección no encontrada");
   const cap = caps.find((c) => c.lecciones.some((l) => l.id === leccionId));
   const prog = d.progreso.find((p) => p.leccion_id === leccionId);
-  let completado = !!prog?.completado;
+  let completado = vp || !!prog?.completado;
   const siguiente = orden[idx + 1];
 
-  sinNav(`
+  sinNav(`${vp ? bandaVista() : ""}
   <main class="vista vista-completa vista-video">
     <div class="barra-sup">
       <button class="btn-icono" id="volver" aria-label="Volver al curso">${icono("back")}</button>
@@ -458,14 +467,14 @@ async function pintarLeccion(cursoId, leccionId) {
     </div>
     <div class="tarjeta fila" id="estado-leccion">${estadoLeccionHTML(completado)}</div>
     <div class="fila-botones" style="justify-content:stretch">
-      ${idx > 0 ? `<button class="btn btn-sec" data-ir="/leccion/${cursoId}/${orden[idx - 1].id}">${icono("back", 18)}Anterior</button>` : ""}
-      ${siguiente ? `<button class="btn" id="btn-siguiente" ${completado ? "" : "disabled"} data-sig="/leccion/${cursoId}/${siguiente.id}">Siguiente ${icono("next", 18)}</button>`
-        : `<button class="btn" id="btn-siguiente" ${completado ? "" : "disabled"} data-sig="/curso/${cursoId}">Terminar ${icono("check", 18)}</button>`}
+      ${idx > 0 ? `<button class="btn btn-sec" data-ir="${B}/leccion/${cursoId}/${orden[idx - 1].id}">${icono("back", 18)}Anterior</button>` : ""}
+      ${siguiente ? `<button class="btn" id="btn-siguiente" ${completado ? "" : "disabled"} data-sig="${B}/leccion/${cursoId}/${siguiente.id}">Siguiente ${icono("next", 18)}</button>`
+        : `<button class="btn" id="btn-siguiente" ${completado ? "" : "disabled"} data-sig="${B}/curso/${cursoId}">Terminar ${icono("check", 18)}</button>`}
     </div>
-    <button class="btn btn-sec" data-ir="/curso/${cursoId}">Ver temario</button>
+    <button class="btn btn-sec" data-ir="${B}/curso/${cursoId}">Ver temario</button>
   </main>`);
 
-  app.querySelector("#volver").onclick = () => ir(`/curso/${cursoId}`);
+  app.querySelector("#volver").onclick = () => ir(`${B}/curso/${cursoId}`);
   app.querySelectorAll("[data-ir]").forEach((b) => (b.onclick = () => ir(b.dataset.ir)));
   const btnSig = app.querySelector("#btn-siguiente");
   btnSig.onclick = () => ir(btnSig.dataset.sig);
@@ -475,7 +484,7 @@ async function pintarLeccion(cursoId, leccionId) {
   // ---- Seguimiento de avance ----
   let ultimoSeg = v.segundo_inicio || 0, ultimaDur = leccion.duracion_seg || 0, ultimoEnvio = 0, enviando = false, ultimoEnviado = -1;
   const reportar = async (forzar = false) => {
-    if (enviando) return;
+    if (vp || enviando) return;
     if (!forzar && Date.now() - ultimoEnvio < 10000) return;
     if (Math.floor(ultimoSeg) === ultimoEnviado && !forzar) return;
     enviando = true; ultimoEnvio = Date.now(); ultimoEnviado = Math.floor(ultimoSeg);
