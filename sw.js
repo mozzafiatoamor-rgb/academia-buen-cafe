@@ -1,6 +1,6 @@
 // Service worker: la app abre al instante y funciona con señal débil.
 // Sube el número de VERSION cada vez que publiques cambios.
-const VERSION = "academia-v1.4.0";
+const VERSION = "academia-v1.4.1";
 const NUCLEO = [
   "./", "index.html", "style.css", "config.js", "manifest.webmanifest",
   "js/app.js", "js/admin.js", "js/datos.js", "js/demo.js", "js/ui.js", "js/subir.js",

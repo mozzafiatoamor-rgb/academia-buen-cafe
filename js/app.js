@@ -354,6 +354,13 @@ async function pintarInicio() {
     caja.innerHTML = lista.map(tarjetaCurso).join("");
     caja.querySelectorAll("[data-ir]").forEach((x) => (x.onclick = () => ir(x.dataset.ir)));
   };
+  const llaveBienvenida = `academia-bienvenida-${r.usuario}`;
+  let vista = true;
+  try { vista = localStorage.getItem(llaveBienvenida) === "1"; } catch (_) { /* sin almacenamiento */ }
+  if (!vista) {
+    await mostrarBienvenida(r);
+    try { localStorage.setItem(llaveBienvenida, "1"); } catch (_) { /* nada */ }
+  }
   if (r.insignias_sin_ver?.length) celebrar(r.insignias_sin_ver);
 }
 
@@ -387,9 +394,93 @@ function abrirPerfil(r) {
       <div><b>${r.racha_maxima}</b><small>mejor racha</small></div>
     </div>
     ${pendientesCola() ? `<p class="texto-tenue">${pendientesCola()} avance(s) esperando señal para enviarse.</p>` : ""}
+    <button class="btn btn-sec btn-bloque" data-cerrar="bienvenida">${icono("book", 18)}Cómo funciona la Academia</button>
     <button class="btn btn-peligro btn-bloque" data-cerrar="salir">${icono("logout", 18)}Cerrar sesión</button>
     <button class="btn btn-sec btn-bloque" data-cerrar>Cerrar</button>
-  `).then((v) => { if (v === "salir") salir(); });
+  `).then((v) => { if (v === "salir") salir(); if (v === "bienvenida") mostrarBienvenida(r); });
+}
+
+// ---------------------------------------------------------------------
+//  BIENVENIDA · qué es la Academia, cómo funciona y qué ganan
+// ---------------------------------------------------------------------
+function mostrarBienvenida(r) {
+  const nombre = esc(String(r.nombre || "").split(" ")[0] || "");
+  const punto = (ic, titulo, texto) => `
+    <div class="fila" style="align-items:flex-start;gap:12px">
+      <span class="medalla chica medalla-cobre" style="width:38px;height:38px;flex:none">${icono(ic, 18)}</span>
+      <div><b style="display:block;font-size:15px">${titulo}</b><span class="texto-tenue" style="font-size:13.5px;color:var(--crema-2)">${texto}</span></div>
+    </div>`;
+  const pasos = [
+    {
+      icono: "coffee", titulo: `Bienvenido a tu Academia${nombre ? ", " + nombre : ""}`,
+      cuerpo: `<p class="modal-texto" style="font-size:16px;line-height:1.55">En Mozzafiato creemos que el buen café empieza con buenas manos. Las tuyas.</p>
+        <p class="modal-texto" style="line-height:1.55">Por eso creamos la <b>Academia del Buen Café</b>: un lugar para aprender a tu ritmo, crecer junto con el equipo y que se note en cada taza, en cada plato y en cada mesa que atendemos.</p>`,
+    },
+    {
+      icono: "play", titulo: "Así funciona",
+      cuerpo: `<div class="pila" style="gap:14px">
+        ${punto("book", "Tus cursos te esperan en Inicio", "Cada curso tiene capítulos con videos cortos, pensados para verlos en tus ratos libres.")}
+        ${punto("video", "Aprende cuando y donde quieras", "En tu celular, la tablet o la compu. Tu avance se guarda solo, aunque se vaya la señal.")}
+        ${punto("lock", "Paso a paso", "Las lecciones se abren en orden: terminas una y se desbloquea la siguiente.")}
+        ${punto("target", "Demuestra lo que aprendiste", "Algunos cursos cierran con un quiz corto. Si no sale a la primera, lo vuelves a intentar.")}
+      </div>`,
+    },
+    {
+      icono: "star", titulo: "¿Para qué hacemos esto?",
+      cuerpo: `<div class="pila" style="gap:14px">
+        ${punto("users", "Para ser un gran equipo", "Que en cualquier turno, con cualquiera de nosotros, el cliente reciba la misma calidad.")}
+        ${punto("chef", "Para que crezcas tú", "Lo que aprendas aquí te sirve en Mozzafiato y en cualquier lugar al que te lleve la vida.")}
+        ${punto("eye", "Para que tu esfuerzo se vea", "Cada curso que terminas queda registrado y cuenta. Aquí el que le echa ganas, se nota.")}
+      </div>`,
+    },
+    {
+      icono: "gift", titulo: "Lo que ganas",
+      cuerpo: `<div class="pila" style="gap:14px">
+        ${punto("coffee", "Puntos", "Por cada lección, cada curso terminado, cada quiz perfecto y por entregar a tiempo.")}
+        ${punto("medal", "Insignias", "Llénalas en tu vitrina. Algunas son secretas… a ver quién las descubre primero.")}
+        ${punto("flame", "Niveles", "Empiezas como Grano verde y puedes llegar a Maestro tostador.")}
+        ${punto("gift", "Premios reales", "Canjea tus puntos por los premios del catálogo: comida, días libres y más.")}
+        ${punto("trophy", "Ranking", "Cada semana, mes y en total. ¿Quién lleva la delantera?")}
+      </div>`,
+    },
+    {
+      icono: "key", titulo: "Las reglas del juego",
+      cuerpo: `<div class="pila" style="gap:14px">
+        ${punto("key", "Tu PIN es solo tuyo", "No lo compartas. Si alguien entra con tu cuenta en otro celular, la tuya se cierra y ese avance no cuenta.")}
+        ${punto("eye", "De vez en cuando: “¿Sigues ahí?”", "Te lo preguntaremos mientras ves un video, para que cada minuto cuente de verdad.")}
+        ${punto("heart", "Lo importante es aprender", "No se trata de terminar rápido, sino de que lo apliques en tu día a día.")}
+      </div>
+      <p class="modal-texto serif" style="font-size:19px;text-align:center;margin-top:6px">Gracias por ser parte de Mozzafiato.<br>¡Vamos por ese primer curso!</p>
+      <p class="texto-tenue" style="text-align:center;margin:0">— Gustavo y el equipo Mozzafiato</p>`,
+    },
+  ];
+  return new Promise((resolver) => {
+    let i = 0;
+    modal(`<div id="bv"></div>`, { cerrable: false, clase: "modal-ancho" }).then(() => resolver());
+    const capa = modal.actual;
+    const pintar = () => {
+      const p = pasos[i], ultimo = i === pasos.length - 1;
+      capa.querySelector("#bv").innerHTML = `
+        <div class="pila" style="gap:16px">
+          <div class="fila-entre">
+            <div class="fila" style="gap:6px" aria-label="Paso ${i + 1} de ${pasos.length}">${pasos.map((_, k) => `<i style="display:block;height:6px;border-radius:3px;width:${k === i ? 22 : 6}px;background:${k <= i ? "var(--cobre)" : "var(--linea)"};transition:width .3s"></i>`).join("")}</div>
+            ${ultimo ? "" : `<button class="btn-texto" id="bv-saltar">Saltar</button>`}
+          </div>
+          ${i === 0 ? `<img src="${LOGO}" alt="Mozzafiato" style="width:150px;align-self:center;margin:4px 0">` : `<div class="medalla medalla-cobre" style="width:64px;height:64px;align-self:center">${icono(p.icono, 30)}</div>`}
+          <h2 class="modal-titulo" style="text-align:center">${p.titulo}</h2>
+          ${p.cuerpo}
+          <div class="fila-botones">
+            ${i > 0 ? `<button class="btn btn-sec" id="bv-atras">${icono("back", 18)}Atrás</button>` : ""}
+            <button class="btn" id="bv-sig">${ultimo ? "¡Empezar!" : "Siguiente"} ${ultimo ? "" : icono("next", 18)}</button>
+          </div>
+        </div>`;
+      capa.querySelector("#bv-sig").onclick = () => { if (ultimo) capa.cerrar(true); else { i++; pintar(); } };
+      capa.querySelector("#bv-atras")?.addEventListener("click", () => { i--; pintar(); });
+      capa.querySelector("#bv-saltar")?.addEventListener("click", () => { i = pasos.length - 1; pintar(); });
+      capa.querySelector(".modal").scrollTop = 0;
+    };
+    pintar();
+  });
 }
 
 // ---------------------------------------------------------------------
