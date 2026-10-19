@@ -129,6 +129,7 @@ function crearNube() {
 
     // ---------- Admin ----------
     adminAvance: () => rpc("academia_admin_avance"),
+    adminPerfiles: () => q(sb.from("academia_perfiles").select("user_id, nombre, usuario, gestor_id, activo").eq("rol", "empleado")),
     otorgarInsignia: (userId, insignia) => rpc("academia_otorgar_insignia", { p_user: userId, p_insignia: insignia }),
     crearEmpleado: (d) => funcion("academia-admin", { accion: "crear_empleado", ...d }),
     importarEmpleados: (lista) => funcion("academia-admin", { accion: "importar_empleados", empleados: lista }),
@@ -136,6 +137,15 @@ function crearNube() {
     actualizarEmpleado: (userId, cambios) => funcion("academia-admin", { accion: "actualizar_empleado", user_id: userId, ...cambios }),
     bunnyColecciones: () => funcion("academia-admin", { accion: "listar_colecciones" }),
     bunnyVideos: (coleccion) => funcion("academia-admin", { accion: "listar_videos", coleccion: coleccion || undefined }),
+    // Lee a los empleados del Gestor de Descansos (misma cuenta de Supabase, solo lectura).
+    async gestorEmpleados() {
+      const { data: s } = await sb.auth.getSession();
+      const owner = s?.session?.user?.id;
+      if (!owner) throw new ErrorAcademia("Tu sesión expiró. Vuelve a entrar.");
+      const filas = await q(sb.from("descansos_kv").select("k, v").eq("owner", owner).like("k", "desc.v1.%employees"));
+      filas.push(...await q(sb.from("descansos_kv").select("k, v").eq("owner", owner).eq("k", "desc.v1.sedes")));
+      return leerGestor(filas);
+    },
     crearColeccion: (nombre) => funcion("academia-admin", { accion: "crear_coleccion", nombre }),
     prepararSubida: (titulo, coleccion, videoId) =>
       funcion("academia-admin", { accion: "preparar_subida", titulo, coleccion, video_id: videoId || undefined }),
@@ -198,6 +208,43 @@ function crearNube() {
       q(sb.from("academia_canjes").update({ estado, resuelto_en: new Date().toISOString() }).eq("id", id).eq("estado", "pendiente")),
     async catalogoInsignias() { return q(sb.from("academia_insignias").select("*").order("orden")); },
   };
+}
+
+// ---------------------------------------------------------------------
+//  Traduce los datos del Gestor de Descansos a una lista de empleados.
+//  Sede "mozza" → desc.v1.employees ; otras sedes → desc.v1.<id>.employees
+// ---------------------------------------------------------------------
+export function leerGestor(filas) {
+  const kv = Object.fromEntries((filas || []).map((f) => [f.k, f.v]));
+  const sedes = Array.isArray(kv["desc.v1.sedes"]) && kv["desc.v1.sedes"].length ? kv["desc.v1.sedes"]
+    : [{ id: "mozza", name: "Mozzafiato" }, { id: "casaregina", name: "Casa Regina" }];
+  const lunes = (() => {
+    const d = new Date(); const dia = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dia);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
+  const activo = (e) => {
+    const st = Array.isArray(e.stints) && e.stints.length ? e.stints : [{ start: e.start || null, end: e.end || null }];
+    return st.some((s) => (!s.start || lunes >= s.start) && (!s.end || lunes < s.end));
+  };
+  const lista = [];
+  for (const s of sedes) {
+    const clave = s.id === "mozza" ? "desc.v1.employees" : `desc.v1.${s.id}.employees`;
+    const emps = Array.isArray(kv[clave]) ? kv[clave] : [];
+    for (const e of emps) {
+      if (!e || !e.name) continue;
+      lista.push({
+        gestor_id: `${s.id}:${e.id}`,
+        nombre: String(e.name).trim(),
+        area: ["piso", "barra", "cocina"].includes(e.area) ? e.area : (s.id === "mozza" ? "piso" : "casa_regina"),
+        turno: e.shift === "AM" || e.shift === "PM" ? e.shift : null,
+        sede: s.name || (s.id === "mozza" ? "Mozzafiato" : s.id),
+        whatsapp: e.wa ? String(e.wa).replace(/\D/g, "") : null,
+        encargado: !!e.mgr,
+        activo: activo(e),
+      });
+    }
+  }
+  return lista;
 }
 
 export const datos = MODO === "nube" ? crearNube() : crearDemo();

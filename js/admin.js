@@ -149,8 +149,9 @@ async function pintarEmpleados(main) {
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-end">
       <h1 class="titulo-pagina" style="font-size:38px">Empleados</h1>
       <div class="fila" style="flex-wrap:wrap">
+        <button class="btn" id="gestor">${icono("refresh", 18)}Importar del Gestor</button>
         <button class="btn btn-sec" id="lote">${icono("users", 18)}Alta en lote</button>
-        <button class="btn" id="nuevo">${icono("plus", 18)}Nuevo empleado</button>
+        <button class="btn btn-sec" id="nuevo">${icono("plus", 18)}Nuevo empleado</button>
       </div>
     </div>
     <section class="panel">
@@ -165,7 +166,7 @@ async function pintarEmpleados(main) {
           <button class="mini-btn" title="Editar" aria-label="Editar ${esc(e.nombre)}" data-editar="${e.user_id}">${icono("edit", 18)}</button>
           <button class="mini-btn" title="${e.activo ? "Desactivar" : "Activar"}" aria-label="${e.activo ? "Desactivar" : "Activar"} ${esc(e.nombre)}" data-activo="${e.user_id}">${icono(e.activo ? "x" : "check", 18)}</button>
         </td></tr>`).join("")}
-      </tbody></table></div>` : `<div class="vacio"><strong>Da de alta a tu equipo</strong>Cada empleado entra con un usuario y un PIN de 6 dígitos.</div>`}
+      </tbody></table></div>` : `<div class="vacio"><strong>Trae a tu equipo del Gestor de Descansos</strong>Toca <b>Importar del Gestor</b>: cada empleado recibe un usuario y un PIN de 6 dígitos, y se lo mandas por WhatsApp.</div>`}
     </section>
     <p class="texto-tenue">Desactivar a alguien le quita el acceso pero conserva su avance, por si regresa.</p>`;
 
@@ -188,10 +189,19 @@ async function pintarEmpleados(main) {
     } catch (e) { aviso(e.message, "error"); }
   };
   main.querySelector("#lote").onclick = () => altaEnLote(equipo);
+  main.querySelector("#gestor").onclick = () => importarDelGestor();
   main.querySelectorAll("[data-pin]").forEach((b) => (b.onclick = async () => {
     const e = porId(b.dataset.pin);
     if (!(await confirmar("¿Generar nuevo PIN?", `${e.nombre} ya no podrá entrar con su PIN anterior.`, "Generar"))) return;
-    try { const r = await datos.cambiarPin(e.user_id); await mostrarAcceso(e.nombre, e.usuario, r.pin); }
+    try {
+      const r = await datos.cambiarPin(e.user_id);
+      let wa = null;
+      try {
+        const perfil = (await datos.adminPerfiles()).find((x) => x.user_id === e.user_id);
+        if (perfil?.gestor_id) wa = (await datos.gestorEmpleados()).find((g) => g.gestor_id === perfil.gestor_id)?.whatsapp || null;
+      } catch (_) { /* sin WhatsApp */ }
+      await mostrarAcceso(e.nombre, e.usuario, r.pin, wa);
+    }
     catch (err) { aviso(err.message, "error"); }
   }));
   main.querySelectorAll("[data-editar]").forEach((b) => (b.onclick = async () => {
@@ -230,7 +240,9 @@ async function copiar(texto) {
   catch { aviso("No se pudo copiar; selecciónalo a mano", "error"); }
 }
 
-function mostrarAcceso(nombre, usuario, pin) {
+const linkWhats = (msg, numero) => `https://wa.me/${numero ? String(numero).replace(/\D/g, "") : ""}?text=${encodeURIComponent(msg)}`;
+
+function mostrarAcceso(nombre, usuario, pin, whatsapp) {
   const msg = mensajeAcceso(nombre, usuario, pin);
   const p = modal(`
     <h2 class="modal-titulo">Acceso de ${esc(nombre)}</h2>
@@ -239,11 +251,100 @@ function mostrarAcceso(nombre, usuario, pin) {
     <p class="texto-tenue" style="margin:0">Guárdalo o envíaselo ahora: por seguridad no se vuelve a mostrar (puedes generar otro cuando quieras).</p>
     <div class="fila-botones">
       <button class="btn btn-sec" id="copiar-msg">${icono("file", 18)}Copiar mensaje</button>
-      <a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">Enviar por WhatsApp</a>
+      <a class="btn" target="_blank" rel="noopener" href="${linkWhats(msg, whatsapp)}">${whatsapp ? "Enviar a su WhatsApp" : "Enviar por WhatsApp"}</a>
     </div>
     <button class="btn btn-sec btn-bloque" data-cerrar>Listo</button>`, { cerrable: false });
   modal.actual.querySelector("#copiar-msg").onclick = () => copiar(msg);
   return p;
+}
+
+// Importa al equipo desde el Gestor de Descansos (solo lectura del Gestor).
+async function importarDelGestor() {
+  const p = modal(`<h2 class="modal-titulo">Importar del Gestor</h2><div id="ig"><div class="cargando" style="min-height:160px"><div class="taza-carga"></div></div></div>`, { clase: "modal-ancho" });
+  const capa = modal.actual;
+  const caja = capa.querySelector("#ig");
+  let gestor, perfiles;
+  try { [gestor, perfiles] = await Promise.all([datos.gestorEmpleados(), datos.adminPerfiles()]); }
+  catch (e) {
+    caja.innerHTML = `<div class="vacio"><strong>No se pudo leer el Gestor</strong>${esc(e.message)}<br>Entra a la Academia con la misma cuenta que usas en el Gestor.</div><button class="btn btn-sec" data-cerrar>Cerrar</button>`;
+    return p;
+  }
+  const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const yaEsta = (g) => perfiles.find((x) => x.gestor_id === g.gestor_id) || perfiles.find((x) => norm(x.nombre) === norm(g.nombre));
+  // Una cuenta por persona: si alguien está en las dos sedes, se toma la primera.
+  const vistos = new Set();
+  const filas = gestor.filter((g) => { const k = norm(g.nombre); if (vistos.has(k)) return false; vistos.add(k); return true; })
+    .map((g) => ({ ...g, existente: yaEsta(g) }));
+  const nuevos = filas.filter((f) => f.activo && !f.existente);
+  const bajas = filas.filter((f) => !f.activo && f.existente?.activo);
+  let verBajas = false;
+
+  const pintar = () => {
+    const visibles = filas.filter((f) => verBajas || f.activo);
+    caja.innerHTML = `
+      <p class="modal-texto">${nuevos.length ? `${nuevos.length} empleado(s) activos del Gestor todavía no tienen cuenta.` : "Todo tu equipo activo ya tiene cuenta en la Academia."}</p>
+      <label class="check"><input type="checkbox" id="ig-bajas" ${verBajas ? "checked" : ""}><span>Mostrar también a los dados de baja</span></label>
+      <div class="tabla-caja" style="max-height:46vh;overflow:auto"><table class="tabla" style="min-width:560px">
+        <thead><tr><th style="width:36px"><input type="checkbox" id="ig-todos" aria-label="Seleccionar todos" checked></th><th>Nombre</th><th>Área</th><th>Sede · turno</th><th>WhatsApp</th></tr></thead>
+        <tbody>${visibles.map((f) => `<tr class="${f.activo ? "" : "inactivo"}">
+          <td>${f.existente ? icono("check", 18, 'style="color:var(--verde)"') : `<input type="checkbox" class="ig-sel" value="${esc(f.gestor_id)}" ${f.activo ? "checked" : ""} aria-label="Importar a ${esc(f.nombre)}">`}</td>
+          <td><b>${esc(f.nombre)}</b>${f.existente ? `<div class="texto-tenue" style="font-size:12px">Ya tiene cuenta: @${esc(f.existente.usuario)}</div>` : ""}${f.activo ? "" : ' <span class="pildora">Baja</span>'}</td>
+          <td>${esc(nombreArea(f.area))}</td><td>${esc(f.sede)}${f.turno ? " · " + esc(f.turno) : ""}</td>
+          <td>${f.whatsapp ? "Sí" : '<span class="texto-tenue">—</span>'}</td></tr>`).join("")}</tbody>
+      </table></div>
+      ${bajas.length ? `<div class="tarjeta pila" style="padding:12px;border:1px solid var(--alerta)">
+        <b style="font-size:14px">${bajas.length} persona(s) están dadas de baja en el Gestor pero siguen activas aquí</b>
+        <span class="texto-tenue">${bajas.map((b) => esc(b.nombre)).join(", ")}</span>
+        <button class="btn btn-sec btn-chico" id="ig-desactivar" style="align-self:flex-start">Quitarles el acceso</button></div>` : ""}
+      <p class="error-form" id="ig-err" hidden></p>
+      <div class="fila-botones"><button class="btn btn-sec" data-cerrar>Cancelar</button><button class="btn" id="ig-ok">Crear cuentas</button></div>`;
+    caja.querySelector("#ig-bajas").onchange = (e) => { verBajas = e.target.checked; pintar(); };
+    caja.querySelector("#ig-todos").onchange = (e) => caja.querySelectorAll(".ig-sel").forEach((c) => (c.checked = e.target.checked));
+    const des = caja.querySelector("#ig-desactivar");
+    if (des) des.onclick = async () => {
+      des.disabled = true; des.textContent = "Quitando acceso…";
+      try { for (const b of bajas) await datos.actualizarEmpleado(b.existente.user_id, { activo: false }); aviso("Acceso retirado", "ok"); capa.cerrar(true); recargar(); }
+      catch (e) { aviso(e.message, "error"); des.disabled = false; }
+    };
+    caja.querySelector("#ig-ok").onclick = async () => {
+      const ids = new Set([...caja.querySelectorAll(".ig-sel:checked")].map((c) => c.value));
+      const elegidos = filas.filter((f) => ids.has(f.gestor_id));
+      const err = caja.querySelector("#ig-err");
+      if (!elegidos.length) { err.textContent = "Selecciona al menos a una persona"; err.hidden = false; return; }
+      const usados = perfiles.map((x) => ({ usuario: x.usuario }));
+      const lista = elegidos.map((f) => {
+        const usuario = sugerirUsuario(f.nombre, f.area, usados); usados.push({ usuario });
+        return { nombre: f.nombre, area: f.area, sede: f.sede, turno: f.turno, gestor_id: f.gestor_id, usuario };
+      });
+      const btn = caja.querySelector("#ig-ok"); btn.disabled = true; btn.textContent = `Creando ${lista.length}…`;
+      try {
+        const r = await datos.importarEmpleados(lista);
+        capa.cerrar(true);
+        const wa = Object.fromEntries(elegidos.map((f) => [f.gestor_id, f.whatsapp]));
+        r.resultados.forEach((x, i) => (x.whatsapp = wa[lista[i]?.gestor_id] || null));
+        await mostrarResultadosLote(r);
+        recargar();
+      } catch (e) { err.textContent = e.message; err.hidden = false; btn.disabled = false; btn.textContent = "Crear cuentas"; }
+    };
+  };
+  pintar();
+  return p;
+}
+
+function mostrarResultadosLote(r) {
+  const ok = r.resultados.filter((x) => x.ok);
+  const todo = ok.map((x) => `${x.nombre}: usuario ${x.usuario} · PIN ${x.pin}`).join("\n");
+  const p2 = modal(`
+    <h2 class="modal-titulo">${r.creados} cuentas creadas</h2>
+    ${r.con_error ? `<p class="error-form">${r.con_error} con error: ${r.resultados.filter((x) => !x.ok).map((x) => esc(`${x.usuario} (${x.error})`)).join(", ")}</p>` : ""}
+    <p class="texto-tenue" style="margin:0">Toca <b>Enviar</b> en cada persona para mandarle su acceso por WhatsApp. Los PIN no se vuelven a mostrar.</p>
+    <div class="tabla-caja" style="max-height:50vh;overflow:auto"><table class="tabla" style="min-width:0"><thead><tr><th>Nombre</th><th>Usuario</th><th>PIN</th><th></th></tr></thead><tbody>
+      ${ok.map((x) => `<tr><td>${esc(x.nombre)}</td><td>@${esc(x.usuario)}</td><td><b style="color:var(--oro);letter-spacing:2px">${esc(x.pin)}</b></td>
+        <td style="text-align:right"><a class="btn btn-chico ${x.whatsapp ? "" : "btn-sec"}" target="_blank" rel="noopener" href="${linkWhats(mensajeAcceso(x.nombre, x.usuario, x.pin), x.whatsapp)}">${x.whatsapp ? "Enviar" : "WhatsApp"}</a></td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="fila-botones"><button class="btn btn-sec" id="copiar-todo">Copiar lista</button><button class="btn" data-cerrar>Listo</button></div>`, { cerrable: false, clase: "modal-ancho" });
+  modal.actual.querySelector("#copiar-todo").onclick = () => copiar(todo);
+  return p2;
 }
 
 async function altaEnLote(equipo) {

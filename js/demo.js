@@ -355,7 +355,7 @@ export function crearDemo() {
       if (!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(usuario)) throw new Error("Usuario inválido (3-30 letras, números, punto o guion)");
       if (db.usuarios.some((u) => u.usuario === usuario)) throw new Error("Ese usuario ya existe");
       const pin = d.pin || String(Math.floor(100000 + Math.random() * 899999));
-      const u = { user_id: uid(), usuario, pin, nombre: d.nombre, area: d.area, sede: d.sede, turno: d.turno, rol: "empleado", activo: true };
+      const u = { user_id: uid(), usuario, pin, nombre: d.nombre, area: d.area, sede: d.sede, turno: d.turno, gestor_id: d.gestor_id || null, rol: "empleado", activo: true };
       db.usuarios.push(u); guardar();
       return { ok: true, usuario, nombre: d.nombre, pin, user_id: u.user_id };
     },
@@ -363,6 +363,10 @@ export function crearDemo() {
       const resultados = [];
       for (const e of lista) { try { resultados.push(await api.crearEmpleado(e)); } catch (err) { resultados.push({ ok: false, usuario: e.usuario, error: err.message }); } }
       return { creados: resultados.filter((r) => r.ok).length, con_error: resultados.filter((r) => !r.ok).length, resultados };
+    },
+    async adminPerfiles() {
+      exigirAdmin();
+      return db.usuarios.filter((u) => u.rol === "empleado").map(({ user_id, nombre, usuario, gestor_id, activo }) => ({ user_id, nombre, usuario, gestor_id, activo }));
     },
     async cambiarPin(userId, pin) {
       await espera(); exigirAdmin();
@@ -385,6 +389,17 @@ export function crearDemo() {
     },
     async bunnyColecciones() { await espera(); return [{ id: "c1", nombre: "Barismo nivel 1 (demo)", videos: 4 }]; },
     async bunnyVideos() { await espera(); return VIDEOS_BUNNY; },
+    async gestorEmpleados() {
+      await espera();
+      const l = [
+        ["mozza:1", "Ana P.", "barra", "AM", "Mozzafiato", "529830000001", true],
+        ["mozza:2", "Yuliana", "piso", "AM", "Mozzafiato", "529830000002", true],
+        ["mozza:3", "Pedro Chan", "cocina", "PM", "Mozzafiato", null, true],
+        ["mozza:4", "Rosa May", "piso", "PM", "Mozzafiato", "529830000004", false],
+        ["casaregina:1", "Lucía Pech", "casa_regina", "AM", "Casa Regina", "529830000005", true],
+      ];
+      return l.map(([gestor_id, nombre, area, turno, sede, whatsapp, activo]) => ({ gestor_id, nombre, area, turno, sede, whatsapp, activo, encargado: false }));
+    },
     async crearColeccion(nombre) { await espera(); return { id: "col-" + uid(), nombre }; },
     async prepararSubida(titulo, coleccion, videoId) {
       await espera(80);
