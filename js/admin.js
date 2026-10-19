@@ -3,6 +3,7 @@
 // =====================================================================
 import { datos, MODO } from "./datos.js";
 import { icono, esc, num, duracion, fechaCorta, hoyISO, haceCuanto, aviso, modal, confirmar, formulario, AREAS, SEDES, nombreArea } from "./ui.js";
+import { subirCursoDesdeCarpeta } from "./subir.js";
 
 const LOGO = "img/logo.png";
 let ctx; // { ir, salir }
@@ -295,8 +296,12 @@ async function pintarCursos(main) {
   main.innerHTML = `
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-end">
       <h1 class="titulo-pagina" style="font-size:38px">Cursos</h1>
-      <button class="btn" id="nuevo">${icono("plus", 18)}Nuevo curso</button>
+      <div class="fila" style="flex-wrap:wrap">
+        <button class="btn btn-sec" id="nuevo">${icono("plus", 18)}Curso vacío</button>
+        <button class="btn" id="carpeta">${icono("video", 18)}Subir curso desde carpeta</button>
+      </div>
     </div>
+    <p class="texto-tenue" style="margin:0">Tip: organiza en tu computadora <b>Curso / Capítulos / videos</b> y súbelo de una vez. Cada subcarpeta se vuelve un capítulo y cada video una lección, en orden por nombre (usa 01, 02, 03…).</p>
     ${cursos.length ? `<div class="rejilla">${cursos.map((c) => `
       <a class="tarjeta-borde pila" href="#/admin/curso/${c.id}" style="gap:8px">
         <div class="fila-entre" style="align-items:flex-start"><b style="font-size:16px">${esc(c.titulo)}</b>
@@ -315,6 +320,20 @@ async function pintarCursos(main) {
     try { const c = await datos.guardarCurso({ ...d, orden: cursos.length + 1 }); ctx.ir(`/admin/curso/${c.id}`); }
     catch (e) { aviso(e.message, "error"); }
   };
+  main.querySelector("#carpeta").onclick = () => subirCursoDesdeCarpeta({ alTerminar: (id) => ctx.ir(`/admin/curso/${id}`) });
+}
+
+// Completa duraciones de lecciones recién subidas cuando Bunny termina de procesarlas.
+async function sincronizarDuraciones(lecciones) {
+  const faltan = lecciones.filter((l) => l.bunny_video_id && !l.duracion_seg);
+  if (!faltan.length) return false;
+  try {
+    const videos = await datos.bunnyVideos();
+    const porId = Object.fromEntries(videos.map((v) => [v.id, v]));
+    const cambios = faltan.filter((l) => porId[l.bunny_video_id]?.duracion_seg > 0);
+    await Promise.all(cambios.map((l) => datos.actualizarLeccion(l.id, { duracion_seg: Math.round(porId[l.bunny_video_id].duracion_seg) })));
+    return cambios.length > 0;
+  } catch (e) { console.warn("No se pudieron leer duraciones", e); return false; }
 }
 
 async function pintarEditorCurso(main, id) {
@@ -329,7 +348,7 @@ async function pintarEditorCurso(main, id) {
   const leccionHTML = (l, lista, i) => `
     <div class="leccion-admin">
       ${icono("video", 18, 'style="color:var(--arena);flex:none"')}
-      <div class="nombre"><b style="font-weight:600">${esc(l.titulo)}</b><small>${l.duracion_seg ? duracion(l.duracion_seg) : "duración al reproducir"}${l.bunny_video_id ? "" : " · sin video"}</small></div>
+      <div class="nombre"><b style="font-weight:600">${esc(l.titulo)}</b><small>${l.duracion_seg ? duracion(l.duracion_seg) : l.bunny_video_id ? "Bunny lo está procesando…" : ""}${l.bunny_video_id ? "" : "sin video"}</small></div>
       <button class="mini-btn" aria-label="Subir" data-mover-l="${l.id}" data-dir="-1" ${i === 0 ? "disabled" : ""}>${icono("up", 18)}</button>
       <button class="mini-btn" aria-label="Bajar" data-mover-l="${l.id}" data-dir="1" ${i === lista.length - 1 ? "disabled" : ""}>${icono("down", 18)}</button>
       <button class="mini-btn" aria-label="Renombrar" data-renombrar-l="${l.id}">${icono("edit", 18)}</button>
@@ -391,6 +410,7 @@ async function pintarEditorCurso(main, id) {
     </div>`;
 
   const conError = async (fn, ok) => { try { await fn(); if (ok) aviso(ok, "ok"); recargar(); } catch (e) { aviso(e.message, "error"); } };
+  sincronizarDuraciones(d.lecciones).then((hubo) => { if (hubo && location.hash.includes(c.id)) recargar(); });
 
   main.querySelector("#editar").onclick = async () => {
     const v = await formulario("Datos del curso", [

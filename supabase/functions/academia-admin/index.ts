@@ -9,6 +9,8 @@
 //    actualizar_empleado → cambia nombre/área/sede/turno o lo activa/desactiva
 //    listar_colecciones  → colecciones (cursos) de tu biblioteca Bunny
 //    listar_videos       → videos de Bunny (opcional: de una colección)
+//    crear_coleccion     → crea (o reutiliza) una colección en Bunny
+//    preparar_subida     → crea un video en Bunny y firma la subida directa
 //
 //  Secretos que necesita (Edge Functions → Secrets):
 //    BUNNY_LIBRARY_ID, BUNNY_API_KEY
@@ -123,15 +125,36 @@ Deno.serve(async (req) => {
     return { ok: true, usuario, nombre, pin, user_id: creado.user.id };
   }
 
-  async function bunny(path: string) {
+  async function bunny(path: string, metodo = "GET", cuerpo?: unknown) {
     const lib = Deno.env.get("BUNNY_LIBRARY_ID");
     const key = Deno.env.get("BUNNY_API_KEY");
     if (!lib || !key) throw new Error("Faltan los secretos BUNNY_LIBRARY_ID / BUNNY_API_KEY");
     const r = await fetch(`https://video.bunnycdn.com/library/${lib}${path}`, {
-      headers: { AccessKey: key, accept: "application/json" },
+      method: metodo,
+      headers: { AccessKey: key, accept: "application/json", "content-type": "application/json" },
+      body: cuerpo ? JSON.stringify(cuerpo) : undefined,
     });
     if (!r.ok) throw new Error(`Bunny respondió ${r.status}`);
     return await r.json();
+  }
+
+  async function sha256Hex(texto: string) {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  // Firma para que el navegador suba el archivo directo a Bunny (TUS),
+  // sin que la API key salga nunca del servidor.
+  async function firmarSubida(videoId: string) {
+    const lib = Deno.env.get("BUNNY_LIBRARY_ID")!;
+    const key = Deno.env.get("BUNNY_API_KEY")!;
+    const expira = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+    return {
+      video_id: videoId,
+      library_id: lib,
+      expira,
+      firma: await sha256Hex(lib + key + expira + videoId),
+    };
   }
 
   // ---------------------------------------------------------------
@@ -205,6 +228,31 @@ Deno.serve(async (req) => {
           listo: v.status === 4, // 4 = procesado y listo para ver
           miniatura: v.thumbnailFileName ?? null,
         })));
+      }
+
+      case "crear_coleccion": {
+        const nombre = String(body.nombre ?? "").trim();
+        if (!nombre) return json({ error: "Falta el nombre" }, 400);
+        // Si ya existe una colección con ese nombre, se reutiliza.
+        const d = await bunny(`/collections?page=1&itemsPerPage=100&search=${encodeURIComponent(nombre)}`);
+        const existe = (d.items ?? []).find((c: any) => c.name === nombre);
+        if (existe) return json({ id: existe.guid, nombre: existe.name });
+        const c = await bunny(`/collections`, "POST", { name: nombre });
+        return json({ id: c.guid, nombre: c.name });
+      }
+
+      case "preparar_subida": {
+        // Crea el video vacío en Bunny (o reutiliza video_id para reintentar) y devuelve la firma.
+        let videoId = body.video_id ? String(body.video_id) : "";
+        if (!videoId) {
+          const titulo = String(body.titulo ?? "").trim() || "Lección";
+          const v = await bunny(`/videos`, "POST", {
+            title: titulo,
+            ...(body.coleccion ? { collectionId: String(body.coleccion) } : {}),
+          });
+          videoId = v.guid;
+        }
+        return json(await firmarSubida(videoId));
       }
 
       default:

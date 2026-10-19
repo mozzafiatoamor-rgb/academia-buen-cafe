@@ -136,6 +136,9 @@ function crearNube() {
     actualizarEmpleado: (userId, cambios) => funcion("academia-admin", { accion: "actualizar_empleado", user_id: userId, ...cambios }),
     bunnyColecciones: () => funcion("academia-admin", { accion: "listar_colecciones" }),
     bunnyVideos: (coleccion) => funcion("academia-admin", { accion: "listar_videos", coleccion: coleccion || undefined }),
+    crearColeccion: (nombre) => funcion("academia-admin", { accion: "crear_coleccion", nombre }),
+    prepararSubida: (titulo, coleccion, videoId) =>
+      funcion("academia-admin", { accion: "preparar_subida", titulo, coleccion, video_id: videoId || undefined }),
 
     async adminCursos() {
       const [cursos, lecciones, asign] = await Promise.all([

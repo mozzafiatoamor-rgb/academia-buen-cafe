@@ -385,6 +385,13 @@ export function crearDemo() {
     },
     async bunnyColecciones() { await espera(); return [{ id: "c1", nombre: "Barismo nivel 1 (demo)", videos: 4 }]; },
     async bunnyVideos() { await espera(); return VIDEOS_BUNNY; },
+    async crearColeccion(nombre) { await espera(); return { id: "col-" + uid(), nombre }; },
+    async prepararSubida(titulo, coleccion, videoId) {
+      await espera(80);
+      const id = videoId || "demo-" + uid();
+      if (!videoId) VIDEOS_BUNNY.push({ id, titulo, duracion_seg: 60 + Math.floor(Math.random() * 300), coleccion, listo: true });
+      return { video_id: id, library_id: "demo", expira: 0, firma: "demo", demo: true };
+    },
     async adminCursos() {
       await espera(); exigirAdmin();
       return db.cursos.map((c) => ({ ...c, lecciones: leccionesDe(c.id).length,
