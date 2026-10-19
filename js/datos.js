@@ -8,6 +8,21 @@ const CFG = window.ACADEMIA_CONFIG;
 const paramModo = new URLSearchParams(location.search).get("modo");
 export const MODO = paramModo === "demo" || !CFG.SUPABASE_URL || !window.supabase ? "demo" : CFG.MODO;
 
+// Identificador de este dispositivo (se guarda en el navegador).
+export function dispositivoId() {
+  try {
+    let id = localStorage.getItem("academia-dispositivo");
+    if (!id) { id = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()); localStorage.setItem("academia-dispositivo", id); }
+    return id;
+  } catch { return "sin-almacenamiento-" + navigator.userAgent.length; }
+}
+export function nombreDispositivo() {
+  const ua = navigator.userAgent;
+  const so = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : "Otro";
+  const nav = /Edg\//.test(ua) ? "Edge" : /CriOS|Chrome\//.test(ua) ? "Chrome" : /FxiOS|Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "Navegador";
+  return `${so} · ${nav}`;
+}
+
 const correoDe = (usuario) => `${String(usuario).trim().toLowerCase()}@${CFG.DOMINIO_USUARIOS}`;
 
 // ---------- Errores legibles ----------
@@ -17,11 +32,17 @@ function traducir(msg = "") {
   if (/banned|User is banned/i.test(m)) return "Tu cuenta está desactivada. Habla con Gustavo.";
   if (/rate limit|too many/i.test(m)) return "Demasiados intentos. Espera unos minutos.";
   if (/Failed to fetch|NetworkError|network/i.test(m)) return "Sin conexión. Revisa tu internet.";
+  if (/SESION_REEMPLAZADA/.test(m)) return "Tu cuenta se abrió en otro dispositivo.";
   if (/JWT|session/i.test(m)) return "Tu sesión expiró. Vuelve a entrar.";
   return m.replace(/^.*?ERROR:\s*/i, "");
 }
 export class ErrorAcademia extends Error {
-  constructor(msg, red = false) { super(traducir(msg)); this.red = red; }
+  constructor(msg, red = false) {
+    super(traducir(msg));
+    this.red = red;
+    if (/SESION_REEMPLAZADA/.test(String(msg))) this.codigo = "SESION_REEMPLAZADA";
+    if (/Could not find the function|PGRST202/i.test(String(msg))) this.codigo = "SIN_FUNCION";
+  }
 }
 const esDeRed = (e) => /Failed to fetch|NetworkError|network|Load failed/i.test(String(e?.message || e));
 
@@ -80,8 +101,23 @@ function crearNube() {
     marcarInsigniasVistas: () => rpc("academia_marcar_insignias_vistas"),
     ranking: (periodo) => rpc("academia_ranking", { p_periodo: periodo }),
     solicitarCanje: (premioId) => rpc("academia_solicitar_canje", { p_premio: premioId }),
-    registrarAvance: (leccionId, segundo, duracion) =>
-      rpc("academia_registrar_avance", { p_leccion: leccionId, p_segundo: Math.floor(segundo), p_duracion: duracion ? Math.round(duracion) : null }),
+    async registrarAvance(leccionId, segundo, duracion) {
+      const args = { p_leccion: leccionId, p_segundo: Math.floor(segundo), p_duracion: duracion ? Math.round(duracion) : null };
+      try { return await rpc("academia_registrar_avance", { ...args, p_dispositivo: dispositivoId() }); }
+      catch (e) { if (e.codigo === "SIN_FUNCION") return rpc("academia_registrar_avance", args); throw e; }
+    },
+    // Una sesión a la vez: marca este dispositivo como el activo y cierra los demás.
+    async activarDispositivo() {
+      try { await rpc("academia_registrar_dispositivo", { p_dispositivo: dispositivoId(), p_nombre: nombreDispositivo() }); }
+      catch (e) { if (e.codigo !== "SIN_FUNCION") throw e; }
+      try { await sb.auth.signOut({ scope: "others" }); } catch (_) { /* no crítico */ }
+    },
+    async verificarDispositivo() {
+      try { return await rpc("academia_verificar_dispositivo", { p_dispositivo: dispositivoId() }); }
+      catch (e) { if (e.codigo === "SIN_FUNCION" || e.red) return true; throw e; }
+    },
+    adminDispositivos: () => rpc("academia_admin_dispositivos"),
+    olvidarDispositivos: (userId) => rpc("academia_admin_olvidar_dispositivos", { p_user: userId }),
     enviarQuiz: (cursoId, respuestas) => rpc("academia_enviar_quiz", { p_curso: cursoId, p_respuestas: respuestas }),
     video: (leccionId) => funcion("academia-video", { leccion_id: leccionId }),
 
@@ -267,7 +303,7 @@ export async function enviarAvance(leccionId, segundo, duracion) {
   try {
     return await datos.registrarAvance(leccionId, segundo, duracion);
   } catch (e) {
-    if (e.red) {
+    if (e.red && !e.codigo) {
       const cola = leerCola().filter((x) => x.l !== leccionId);
       cola.push({ l: leccionId, s: segundo, d: duracion });
       guardarCola(cola);

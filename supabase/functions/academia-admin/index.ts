@@ -184,6 +184,9 @@ Deno.serve(async (req) => {
         if (errPin) return json({ error: errPin }, 400);
         const { error } = await admin.auth.admin.updateUserById(String(body.user_id), { password: pin });
         if (error) return json({ error: error.message }, 400);
+        // Cierra todas sus sesiones abiertas: ningún dispositivo queda como activo.
+        await admin.from("academia_perfiles").update({ dispositivo_activo: `pin-cambiado-${Date.now()}` })
+          .eq("user_id", String(body.user_id)).eq("rol", "empleado");
         return json({ ok: true, pin });
       }
 

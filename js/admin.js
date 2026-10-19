@@ -94,10 +94,13 @@ async function pintarResumen(main) {
         </div>
         <div class="tabla-caja" id="tabla-avance"></div>
       </section>
-      <section class="panel" style="flex:1 1 300px">
-        <h2>Canjes por aprobar</h2>
-        <div id="canjes" class="pila">${listaCanjesHTML(pendientes)}</div>
-      </section>
+      <div class="pila" style="flex:1 1 300px;gap:20px">
+        <section class="panel" id="alertas-cuentas" hidden></section>
+        <section class="panel">
+          <h2>Canjes por aprobar</h2>
+          <div id="canjes" class="pila">${listaCanjesHTML(pendientes)}</div>
+        </section>
+      </div>
     </div>`;
 
   const pintarTabla = () => {
@@ -120,6 +123,47 @@ async function pintarResumen(main) {
     pintarTabla();
   };
   conectarCanjes(main);
+  pintarAlertasCuentas(main.querySelector("#alertas-cuentas"));
+}
+
+// Cuentas que se usaron en más de 2 dispositivos en 30 días.
+async function pintarAlertasCuentas(caja) {
+  let lista;
+  try { lista = await datos.adminDispositivos(); } catch (_) { return; } // SQL de dispositivos aún no instalado
+  const raras = lista.filter((x) => x.en_30_dias > 2);
+  if (!raras.length) return;
+  caja.hidden = false;
+  caja.style.borderColor = "var(--alerta)";
+  caja.innerHTML = `<h2>Cuentas a revisar</h2>
+    <p class="texto-tenue" style="margin:0">Entraron desde más de 2 dispositivos en 30 días. Puede ser un PIN compartido, o que cambiaron de celular o borraron datos del navegador.</p>
+    ${raras.map((x) => `<button class="tarjeta fila-entre" data-disp="${x.user_id}" style="border:0;color:inherit;text-align:left;width:100%;padding:12px">
+      <span><b style="font-size:14px">${esc(x.nombre)}</b><br><small class="texto-tenue">${x.en_30_dias} dispositivos en 30 días</small></span>
+      <span class="pildora pildora-alerta">Revisar</span></button>`).join("")}`;
+  caja.querySelectorAll("[data-disp]").forEach((b) => (b.onclick = () => verDispositivos(lista.find((x) => x.user_id === b.dataset.disp))));
+}
+
+async function verDispositivos(x) {
+  if (!x) return;
+  const fecha = (iso) => new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const r = await modal(`
+    <h2 class="modal-titulo">Dispositivos de ${esc(x.nombre)}</h2>
+    <p class="texto-tenue" style="margin:0">Últimos 60 días. Solo el marcado como <b>activo</b> puede usar la cuenta ahora; los demás se cerraron.</p>
+    <div class="pila" style="gap:8px">${x.dispositivos.length ? x.dispositivos.map((d) => `
+      <div class="tarjeta fila-entre" style="padding:12px">
+        <span><b style="font-size:14px">${esc(d.nombre || "Dispositivo")}</b><br>
+        <small class="texto-tenue">Primera vez ${fecha(d.primer_ingreso)} · última ${fecha(d.ultimo_ingreso)} · ${d.ingresos} ingreso(s)</small></span>
+        ${d.activo ? '<span class="pildora pildora-ok">Activo</span>' : ""}
+      </div>`).join("") : '<p class="texto-tenue">Sin registros.</p>'}</div>
+    <p class="texto-tenue" style="margin:0">Si crees que compartió su PIN, genera uno nuevo: se cierran todas sus sesiones.</p>
+    <div class="fila-botones">
+      <button class="btn btn-sec" data-cerrar="olvidar">Olvidar dispositivos</button>
+      <button class="btn" data-cerrar="pin">${icono("key", 18)}Nuevo PIN</button>
+    </div>
+    <button class="btn btn-sec btn-bloque" data-cerrar>Cerrar</button>`, { clase: "modal-ancho" });
+  try {
+    if (r === "olvidar") { await datos.olvidarDispositivos(x.user_id); aviso("Historial borrado (se conserva el activo)", "ok"); recargar(); }
+    if (r === "pin") { const p = await datos.cambiarPin(x.user_id); await mostrarAcceso(x.nombre, x.usuario, p.pin); recargar(); }
+  } catch (e) { aviso(e.message, "error"); }
 }
 
 function listaCanjesHTML(pendientes) {
@@ -155,12 +199,13 @@ async function pintarEmpleados(main) {
       </div>
     </div>
     <section class="panel">
-      ${equipo.length ? `<div class="tabla-caja"><table class="tabla"><thead><tr><th>Nombre</th><th>Usuario</th><th>Área</th><th>Sede · turno</th><th>Avance</th><th></th></tr></thead><tbody>
+      ${equipo.length ? `<div class="tabla-caja"><table class="tabla"><thead><tr><th>Nombre</th><th>Usuario</th><th>Área</th><th>Sede · turno</th><th>Avance</th><th>Dispositivos</th><th></th></tr></thead><tbody>
       ${equipo.map((e) => `<tr class="${e.activo ? "" : "inactivo"}">
         <td><b>${esc(e.nombre)}</b>${e.activo ? "" : ' <span class="pildora">Inactivo</span>'}</td>
         <td>@${esc(e.usuario)}</td><td>${esc(nombreArea(e.area))}</td>
         <td>${esc(e.sede || "—")}${e.turno ? " · " + esc(e.turno) : ""}</td>
         <td>${pct(e)}% · ${num(e.puntos)} pts</td>
+        <td><button class="btn-texto" data-disp="${e.user_id}" style="min-height:36px;color:var(--arena)">—</button></td>
         <td style="white-space:nowrap;text-align:right">
           <button class="mini-btn" title="Nuevo PIN" aria-label="Nuevo PIN de ${esc(e.nombre)}" data-pin="${e.user_id}">${icono("key", 18)}</button>
           <button class="mini-btn" title="Editar" aria-label="Editar ${esc(e.nombre)}" data-editar="${e.user_id}">${icono("edit", 18)}</button>
@@ -190,6 +235,15 @@ async function pintarEmpleados(main) {
   };
   main.querySelector("#lote").onclick = () => altaEnLote(equipo);
   main.querySelector("#gestor").onclick = () => importarDelGestor();
+  datos.adminDispositivos().then((lista) => {
+    main.querySelectorAll("[data-disp]").forEach((b) => {
+      const x = lista.find((y) => y.user_id === b.dataset.disp);
+      const n = x?.en_30_dias || 0;
+      b.textContent = n ? `${n} ${n === 1 ? "dispositivo" : "dispositivos"}` : "Sin ingresar";
+      if (n > 2) { b.style.color = "var(--alerta-texto)"; b.textContent += " · revisar"; }
+      b.onclick = () => verDispositivos(x);
+    });
+  }).catch(() => main.querySelectorAll("[data-disp]").forEach((b) => (b.textContent = "—")));
   main.querySelectorAll("[data-pin]").forEach((b) => (b.onclick = async () => {
     const e = porId(b.dataset.pin);
     if (!(await confirmar("¿Generar nuevo PIN?", `${e.nombre} ya no podrá entrar con su PIN anterior.`, "Generar"))) return;

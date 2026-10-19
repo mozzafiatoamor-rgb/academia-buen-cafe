@@ -367,6 +367,24 @@ export function crearDemo() {
       for (const e of lista) { try { resultados.push(await api.crearEmpleado(e)); } catch (err) { resultados.push({ ok: false, usuario: e.usuario, error: err.message }); } }
       return { creados: resultados.filter((r) => r.ok).length, con_error: resultados.filter((r) => !r.ok).length, resultados };
     },
+    async activarDispositivo() {
+      const u = exigir(); const id = localStorage.getItem("academia-dispositivo") || "demo";
+      db.dispositivos = db.dispositivos || [];
+      const d = db.dispositivos.find((x) => x.user_id === u.user_id && x.id === id);
+      if (d) { d.ultimo_ingreso = ahora(); d.ingresos++; } else db.dispositivos.push({ user_id: u.user_id, id, nombre: "Este dispositivo", primer_ingreso: ahora(), ultimo_ingreso: ahora(), ingresos: 1 });
+      u.dispositivo_activo = id; guardar();
+    },
+    async verificarDispositivo() { const u = yo(); return !u || u.rol === "admin" || !u.dispositivo_activo || u.dispositivo_activo === (localStorage.getItem("academia-dispositivo") || "demo"); },
+    async adminDispositivos() {
+      exigirAdmin(); const ds = db.dispositivos || [];
+      const extra = { "u-karla": [["k1", "Android · Chrome"], ["k2", "iPhone · Safari"], ["k3", "Windows · Edge"]] };
+      return db.usuarios.filter((u) => u.rol === "empleado").map((u) => {
+        const lista = ds.filter((d) => d.user_id === u.user_id).map((d) => ({ ...d, activo: d.id === u.dispositivo_activo }))
+          .concat((extra[u.user_id] || []).map(([id, nombre], i) => ({ id, nombre, primer_ingreso: ahora(), ultimo_ingreso: ahora(), ingresos: 3 - i, activo: i === 0 })));
+        return { user_id: u.user_id, nombre: u.nombre, usuario: u.usuario, en_30_dias: lista.length, dispositivos: lista };
+      });
+    },
+    async olvidarDispositivos(userId) { exigirAdmin(); db.dispositivos = (db.dispositivos || []).filter((d) => d.user_id !== userId); guardar(); },
     async adminPerfiles() {
       exigirAdmin();
       return db.usuarios.filter((u) => u.rol === "empleado").map(({ user_id, nombre, usuario, gestor_id, activo }) => ({ user_id, nombre, usuario, gestor_id, activo }));

@@ -31,6 +31,7 @@ async function enrutar() {
     estado.catCargadas = true;
   }
   const esAdmin = estado.perfil.rol === "admin";
+  if (!esAdmin && !(await vigilarSesion())) return;
   if (esAdmin && ruta !== "admin") return ir("/admin");
   if (!esAdmin && ruta === "admin") return ir("/inicio");
   window.scrollTo(0, 0);
@@ -193,6 +194,7 @@ function pintarLogin(errorInicial = "") {
       errorEl.textContent = "Entrando…";
       try {
         estado.perfil = await datos.entrar(usuario, pin);
+        await datos.activarDispositivo?.().catch((e) => console.warn("dispositivo", e));
         try { localStorage.setItem("academia-usuario", usuario); } catch (_) { /* nada */ }
         ir("/inicio");
       } catch (err) {
@@ -224,6 +226,34 @@ function pintarLogin(errorInicial = "") {
     if (!recordado) usuarioEl.focus();
   };
   pintar();
+}
+
+// ---------------------------------------------------------------------
+//  Una sesión a la vez: si la cuenta se abrió en otro dispositivo, aquí se cierra.
+// ---------------------------------------------------------------------
+let ultimaVerificacion = 0;
+// Devuelve false (y saca al usuario) si su cuenta se abrió en otro dispositivo.
+async function vigilarSesion(forzar = false) {
+  if (!datos.verificarDispositivo || !estado.perfil || estado.perfil.rol === "admin") return true;
+  if (!forzar && Date.now() - ultimaVerificacion < 30000) return true;
+  ultimaVerificacion = Date.now();
+  let ok = true;
+  try { ok = await datos.verificarDispositivo(); } catch (_) { ok = true; /* sin señal: se revisa luego */ }
+  if (!ok) { await expulsar(); return false; }
+  return true;
+}
+setInterval(() => vigilarSesion(true), 120000);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") vigilarSesion(true); });
+
+export async function expulsar() {
+  if (!estado.perfil) return;
+  if (estado.limpieza) { const l = estado.limpieza; estado.limpieza = null; try { await l(); } catch (_) { /* nada */ } }
+  document.querySelectorAll(".modal-capa").forEach((m) => m.remove());
+  await datos.salir();
+  estado.perfil = null;
+  app.className = "";
+  history.replaceState(null, "", location.pathname + location.search + "#/entrar");
+  pintarLogin("Tu cuenta se abrió en otro dispositivo. Si no fuiste tú, avisa a Gustavo para cambiar tu PIN.");
 }
 
 async function salir() {
@@ -516,40 +546,96 @@ async function pintarLeccion(cursoId, leccionId) {
         await celebrar(r.insignias_nuevas);
         if (r.curso_terminado) aviso("¡Terminaste el curso!", "ok");
       }
-    } catch (e) { console.warn(e); }
+    } catch (e) {
+      console.warn(e);
+      if (e.codigo === "SESION_REEMPLAZADA") { enviando = false; return expulsar(); }
+    }
     finally { enviando = false; }
   };
-  const alOcultar = () => { if (document.visibilityState === "hidden") reportar(true); };
+  let pausarVideo = () => {};
+  const alOcultar = () => { if (document.visibilityState === "hidden") { pausarVideo(); reportar(true); } };
   document.addEventListener("visibilitychange", alOcultar);
 
   if (v.demo) {
     const barra = app.querySelector("#sim-barra"), tiempo = app.querySelector("#sim-tiempo"), play = app.querySelector("#sim-play");
     let timer = null;
     const mover = (s) => { ultimoSeg = Math.min(s, ultimaDur); barra.value = ultimoSeg; tiempo.textContent = `${reloj(ultimoSeg)} / ${reloj(ultimaDur)}`; };
-    play.onclick = () => {
-      if (timer) { clearInterval(timer); timer = null; play.innerHTML = icono("play", 24); reportar(true); return; }
+    const parar = () => { if (timer) { clearInterval(timer); timer = null; play.innerHTML = icono("play", 24); reportar(true); } };
+    const arrancar = () => {
+      if (timer) return;
       play.innerHTML = icono("x", 24);
-      timer = setInterval(() => { mover(ultimoSeg + 5); reportar(); if (ultimoSeg >= ultimaDur) { clearInterval(timer); timer = null; play.innerHTML = icono("play", 24); reportar(true); } }, 500);
+      timer = setInterval(() => { mover(ultimoSeg + 5); vig.avanzar(5); reportar(); if (ultimoSeg >= ultimaDur) parar(); }, 500);
     };
+    const vig = crearVigilante({ pausar: parar, reanudar: arrancar, min: 40, max: 70, activo: !vp });
+    pausarVideo = parar;
+    play.onclick = () => (timer ? parar() : arrancar());
     barra.oninput = () => mover(Number(barra.value));
     barra.onchange = () => reportar(true);
-    estado.limpieza = async () => { clearInterval(timer); document.removeEventListener("visibilitychange", alOcultar); await reportar(true); };
+    estado.limpieza = async () => { clearInterval(timer); vig.detener(); document.removeEventListener("visibilitychange", alOcultar); await reportar(true); };
     return;
   }
 
   // Bunny player.js
   const iframe = app.querySelector("#video");
   let player = null;
+  const vig = crearVigilante({ pausar: () => player?.pause(), reanudar: () => player?.play(), min: 240, max: 420, activo: !vp });
+  pausarVideo = () => player?.pause();
   try {
     player = new window.playerjs.Player(iframe);
     player.on("ready", () => {
       if (v.segundo_inicio > 5) player.setCurrentTime(v.segundo_inicio);
-      player.on("timeupdate", (t) => { ultimoSeg = t.seconds; if (t.duration) ultimaDur = t.duration; reportar(); });
+      let previo = null;
+      player.on("timeupdate", (t) => {
+        if (previo !== null) { const d = t.seconds - previo; if (d > 0 && d < 5) vig.avanzar(d); }
+        previo = t.seconds;
+        ultimoSeg = t.seconds; if (t.duration) ultimaDur = t.duration; reportar();
+      });
       player.on("pause", () => reportar(true));
       player.on("ended", () => { ultimoSeg = ultimaDur; reportar(true); });
     });
   } catch (e) { console.warn("player.js no disponible", e); }
-  estado.limpieza = async () => { document.removeEventListener("visibilitychange", alOcultar); await reportar(true); };
+  estado.limpieza = async () => { vig.detener(); document.removeEventListener("visibilitychange", alOcultar); await reportar(true); };
+}
+
+// "¿Sigues ahí?": cada cierto tiempo de reproducción pausa y pide confirmar.
+function crearVigilante({ pausar, reanudar, min = 240, max = 420, activo = true }) {
+  const siguiente = () => min + Math.random() * (max - min);
+  let acumulado = 0, meta = siguiente(), abierto = false, vivo = true, reloj60 = null;
+  const preguntar = () => {
+    abierto = true;
+    pausar();
+    let quedan = 60;
+    const posicion = ["flex-start", "center", "flex-end"][Math.floor(Math.random() * 3)];
+    modal(`
+      <div class="pila" style="align-items:center;text-align:center">
+        <div class="medalla medalla-cobre" style="width:72px;height:72px">${icono("eye", 34)}</div>
+        <h2 class="modal-titulo">¿Sigues ahí?</h2>
+        <p class="modal-texto" id="sa-texto">Toca el botón para seguir viendo. <span id="sa-seg">60</span> s</p>
+      </div>
+      <div class="fila" style="justify-content:${posicion}"><button class="btn" data-cerrar="si" style="min-width:180px">Sí, continuar</button></div>`, { cerrable: false })
+      .then(() => {
+        clearInterval(reloj60); abierto = false; acumulado = 0; meta = siguiente();
+        if (vivo) reanudar();
+      });
+    reloj60 = setInterval(() => {
+      quedan--;
+      const el = document.getElementById("sa-seg");
+      if (el) el.textContent = Math.max(0, quedan);
+      if (quedan <= 0) {
+        clearInterval(reloj60);
+        const t = document.getElementById("sa-texto");
+        if (t) t.textContent = "El video sigue en pausa. Toca el botón cuando estés listo.";
+      }
+    }, 1000);
+  };
+  return {
+    avanzar(seg) {
+      if (!activo || abierto || !vivo) return;
+      acumulado += seg;
+      if (acumulado >= meta) preguntar();
+    },
+    detener() { vivo = false; clearInterval(reloj60); },
+  };
 }
 
 function estadoLeccionHTML(completado) {
