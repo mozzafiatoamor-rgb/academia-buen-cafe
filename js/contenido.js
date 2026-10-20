@@ -202,10 +202,12 @@ export async function panelMateriales(caja, curso) {
       <div class="leccion-admin">
         ${icono(m.tipo === "link" ? "next" : "file", 18, 'style="color:var(--oro);flex:none"')}
         <div class="nombre"><b style="font-weight:600">${esc(m.titulo)}</b><small>${m.tipo === "link" ? "Link" : (m.tipo || "pdf").toUpperCase()}${m.peso_kb ? " · " + pesoTexto(m.peso_kb) : ""}</small></div>
+        ${m.tipo === "link" ? "" : `<button class="chip ${m.descargable ? "activo" : ""}" data-mdesc="${m.id}" title="Toca para cambiar" style="min-height:32px;font-size:11.5px;white-space:nowrap">${m.descargable ? "Descargable" : "Solo lectura"}</button>`}
         <button class="mini-btn" aria-label="Renombrar" data-medit="${m.id}">${icono("edit", 16)}</button>
         <button class="mini-btn" aria-label="Quitar" data-mdel="${m.id}">${icono("trash", 16)}</button>
       </div>`).join("")
     : `<p class="texto-tenue" style="margin:0">PDFs, recetas, fichas técnicas o imágenes (máx. ${MAX_MB} MB cada uno). También links, por ejemplo a un documento de Drive.</p>`}
+    ${lista.some((m) => m.tipo !== "link") ? `<p class="texto-tenue" style="margin:0;font-size:12px"><b>Solo lectura:</b> se ve dentro de la app con marca de agua del empleado, sin descarga. Toca la etiqueta para permitir la descarga.</p>` : ""}
     <p class="texto-tenue" id="mt-estado" style="margin:0"></p>`;
 
   caja.querySelector("#mt-archivo").onclick = () => {
@@ -235,6 +237,11 @@ export async function panelMateriales(caja, curso) {
     if (!/^https?:\/\//i.test(v.url)) return aviso("El link debe empezar con https://", "error");
     try { await datos.agregarMaterialLink(curso.id, v.titulo, v.url, lista.length + 1); recargar(); } catch (e) { aviso(e.message, "error"); }
   };
+  caja.querySelectorAll("[data-mdesc]").forEach((b) => (b.onclick = async () => {
+    const m = lista.find((x) => x.id === b.dataset.mdesc);
+    try { await datos.actualizarMaterial(m.id, { descargable: !m.descargable }); aviso(!m.descargable ? "Ahora se puede descargar" : "Ahora es solo lectura", "ok"); recargar(); }
+    catch (e) { aviso(/descargable/.test(e.message) ? "Falta correr el SQL 03 en Supabase" : e.message, "error"); }
+  }));
   caja.querySelectorAll("[data-medit]").forEach((b) => (b.onclick = async () => {
     const m = lista.find((x) => x.id === b.dataset.medit);
     const v = await formulario("Renombrar material", [{ nombre: "titulo", etiqueta: "Nombre", valor: m.titulo, requerido: true }]);

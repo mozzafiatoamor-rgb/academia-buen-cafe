@@ -1,9 +1,9 @@
 // Service worker: la app abre al instante y funciona con señal débil.
 // Sube el número de VERSION cada vez que publiques cambios.
-const VERSION = "academia-v1.5.0";
+const VERSION = "academia-v1.5.1";
 const NUCLEO = [
   "./", "index.html", "style.css", "config.js", "manifest.webmanifest",
-  "js/app.js", "js/admin.js", "js/datos.js", "js/demo.js", "js/ui.js", "js/subir.js", "js/contenido.js", "js/certificado.js",
+  "js/app.js", "js/admin.js", "js/datos.js", "js/demo.js", "js/ui.js", "js/subir.js", "js/contenido.js", "js/certificado.js", "js/visor.js",
   "img/logo.png", "img/icon-192.png", "img/icon-512.png",
 ];
 
@@ -33,7 +33,7 @@ self.addEventListener("fetch", (e) => {
     return;
   }
   // Librerías y fuentes (CDN): caché primero.
-  if (/jsdelivr\.net|fonts\.(googleapis|gstatic)\.com/.test(url.hostname)) {
+  if (/jsdelivr\.net|cdnjs\.cloudflare\.com|fonts\.(googleapis|gstatic)\.com/.test(url.hostname)) {
     e.respondWith(caches.match(e.request).then((r) => r || fetch(e.request).then((resp) => {
       const copia = resp.clone(); caches.open(VERSION).then((c) => c.put(e.request, copia)); return resp;
     })));

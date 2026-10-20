@@ -138,9 +138,11 @@ function crearNube() {
       return { curso, modulos, lecciones, materiales, preguntas, progreso, intentos };
     },
 
-    async urlMaterial(m) {
+    async urlMaterial(m, { descargar = false } = {}) {
       if (/^https?:\/\//.test(m.ruta)) return m.ruta;
-      const r = await sb.storage.from("academia-materiales").createSignedUrl(m.ruta, 3600);
+      const nombre = `${String(m.titulo || "material").replace(/[\\/:*?"<>|]+/g, "")}.${m.tipo || "pdf"}`;
+      const r = await sb.storage.from("academia-materiales")
+        .createSignedUrl(m.ruta, descargar ? 600 : 300, descargar ? { download: nombre } : undefined);
       if (r.error) throw new ErrorAcademia(r.error.message);
       return r.data.signedUrl;
     },

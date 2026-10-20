@@ -5,6 +5,7 @@ import { datos, MODO, enviarAvance, vaciarCola, pendientesCola } from "./datos.j
 import { icono, esc, num, duracion, reloj, fechaCorta, hoyISO, haceCuanto, iniciales, saludo, aviso, modal, confirmar, nombreArea, nombreCategoria, fijarCategorias } from "./ui.js";
 import { vistaAdmin } from "./admin.js";
 import { mostrarCertificado, folio } from "./certificado.js";
+import { abrirVisor } from "./visor.js";
 
 const app = document.getElementById("app");
 const LOGO = "img/logo.png";
@@ -524,7 +525,7 @@ async function pintarCurso(id) {
     </header>
 
     ${terminado ? `<div class="tarjeta fila" style="border:1px solid var(--verde)">${icono("trophy", 28)}<div><b>¡Curso completado!</b><div class="texto-tenue">Buen trabajo. Tus puntos ya están en tu cuenta.</div></div></div>` : ""}
-    ${d.curso.certificado && (terminado || vp) ? `<button class="tarjeta-borde fila" id="ver-cert" style="border-color:var(--oro);gap:14px">
+    ${d.curso.certificado && (terminado || vp) ? `<button class="tarjeta-borde fila" id="ver-cert" style="border-color:var(--oro);gap:14px;display:flex;align-items:center">
         <span class="medalla medalla-oro chica" style="flex:none">${icono("medal", 22)}</span>
         <span style="flex:1"><b style="font-size:15px;display:block">${vp ? "Ver ejemplo del certificado" : "Tu certificado está listo"}</b><span class="texto-tenue">Descárgalo o compártelo con tu logo de Mozzafiato.</span></span>
         ${icono("next", 18)}</button>` : ""}
@@ -548,7 +549,7 @@ async function pintarCurso(id) {
       <section class="pila" style="gap:8px">
         <div class="etiqueta">Materiales</div>
         ${d.materiales.map((m) => `<button class="material" data-material="${m.id}">${icono("file", 22, 'style="color:var(--oro)"')}
-          <span style="flex:1"><b style="display:block;font-size:14px">${esc(m.titulo)}</b><small class="texto-tenue">${esc((m.tipo || "pdf").toUpperCase())}${m.peso_kb ? " · " + (m.peso_kb >= 1024 ? (m.peso_kb / 1024).toFixed(1) + " MB" : m.peso_kb + " KB") : ""}</small></span></button>`).join("")}
+          <span style="flex:1"><b style="display:block;font-size:14px">${esc(m.titulo)}</b><small class="texto-tenue">${esc((m.tipo || "pdf").toUpperCase())}${m.tipo !== "link" ? (m.descargable ? " · descargable" : " · solo lectura") : ""}${m.peso_kb ? " · " + (m.peso_kb >= 1024 ? (m.peso_kb / 1024).toFixed(1) + " MB" : m.peso_kb + " KB") : ""}</small></span></button>`).join("")}
       </section>` : ""}
 
     ${d.preguntas.length ? `
@@ -578,10 +579,33 @@ async function pintarCurso(id) {
   app.querySelectorAll(".leccion.bloq").forEach((b) => (b.onclick = () => aviso("Termina la lección anterior para desbloquear esta")));
   app.querySelectorAll("[data-material]").forEach((b) => (b.onclick = async () => {
     const m = d.materiales.find((x) => x.id === b.dataset.material);
-    const ventana = window.open("about:blank", "_blank");
-    try { const url = await datos.urlMaterial(m); if (ventana) ventana.location = url; else location.href = url; }
-    catch (e) { if (ventana) ventana.close(); aviso(e.message, "error"); }
+    const esLink = m.tipo === "link" || /^https?:\/\//.test(m.ruta) && !/supabase\.co|^blob:/.test(m.ruta);
+    if (esLink || m.descargable) {
+      // Links externos y materiales con descarga permitida
+      if (m.descargable && !esLink) {
+        const r = await modal(`<h2 class="modal-titulo" style="font-size:22px">${esc(m.titulo)}</h2>
+          <div class="fila-botones"><button class="btn btn-sec" data-cerrar="ver">${icono("eye", 18)}Ver</button><button class="btn" data-cerrar="bajar">${icono("file", 18)}Descargar</button></div>`);
+        if (!r) return;
+        if (r === "ver") return abrirMaterial(m);
+        try { const url = await datos.urlMaterial(m, { descargar: true }); const a = document.createElement("a"); a.href = url; a.download = ""; document.body.appendChild(a); a.click(); a.remove(); }
+        catch (e) { aviso(e.message, "error"); }
+        return;
+      }
+      const ventana = window.open("about:blank", "_blank");
+      try { const url = await datos.urlMaterial(m); if (ventana) ventana.location = url; else location.href = url; }
+      catch (e) { if (ventana) ventana.close(); aviso(e.message, "error"); }
+      return;
+    }
+    abrirMaterial(m);
   }));
+  async function abrirMaterial(m) {
+    try {
+      const url = await datos.urlMaterial(m);
+      const hoy = new Date().toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+      abrirVisor({ titulo: m.titulo, url, tipo: (m.tipo || "pdf") === "pdf" ? "pdf" : "imagen",
+        marca: `${estado.perfil?.nombre || ""} · @${estado.perfil?.usuario || ""} · ${hoy}` });
+    } catch (e) { aviso(e.message, "error"); }
+  }
 }
 
 // ---------------------------------------------------------------------
