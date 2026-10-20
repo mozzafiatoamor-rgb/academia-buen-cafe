@@ -14,8 +14,8 @@ let ctx; // { ir, salir }
 export async function vistaAdmin(app, partes, contexto) {
   ctx = contexto;
   const [seccion = "", id, pestana] = partes;
-  const menu = [["cursos", "book", "Cursos"], ["empleados", "users", "Empleados"], ["", "chart", "Resumen"], ["premios", "gift", "Premios y canjes"], ["insignias", "medal", "Insignias"], ["configuracion", "ajustes", "Configuración"]];
-  const activa = seccion === "curso" ? "cursos" : seccion;
+  const menu = [["cursos", "book", "Cursos"], ["empleados", "users", "Empleados"], ["resumen", "chart", "Resumen"], ["premios", "gift", "Premios y canjes"], ["insignias", "medal", "Insignias"], ["configuracion", "ajustes", "Configuración"]];
+  const activa = seccion === "curso" || !seccion ? "cursos" : seccion;
   app.className = "";
   app.innerHTML = `
   ${MODO === "demo" ? `<div class="banda-demo">MODO DEMO · datos de ejemplo</div>` : ""}
@@ -27,7 +27,8 @@ export async function vistaAdmin(app, partes, contexto) {
         <div class="etiqueta admin-subtitulo">Panel de administración</div>
         <button class="btn btn-sec btn-chico salir-movil" id="salir-movil">${icono("logout", 16)}Salir</button>
       </div>
-      <nav aria-label="Secciones">${menu.map(([r, ic, t]) => `<a href="#/admin${r ? "/" + r : ""}" class="${activa === r ? "activo" : ""}">${icono(ic, 18)}${t}</a>`).join("")}</nav>
+      <div class="pestanas-envoltura"><nav aria-label="Secciones">${menu.map(([r, ic, t]) => `<a href="#/admin/${r}" class="${activa === r ? "activo" : ""}">${icono(ic, 18)}${t}</a>`).join("")}</nav>
+        <span class="pestanas-mas izq" aria-hidden="true">${icono("back", 16)}</span><span class="pestanas-mas der" aria-hidden="true">${icono("next", 16)}</span></div>
       <div class="admin-pie pila" style="margin-top:auto">
         <button class="btn btn-sec btn-chico" id="salir">${icono("logout", 16)}Cerrar sesión</button>
       </div>
@@ -42,12 +43,12 @@ export async function vistaAdmin(app, partes, contexto) {
   const main = app.querySelector("#admin-main");
   try {
     if (seccion === "empleados") return await pintarEmpleados(main);
-    if (seccion === "cursos") return await pintarCursos(main);
+    if (seccion === "resumen") return await pintarResumen(main);
     if (seccion === "curso") return await pintarEditorCurso(main, id, pestana);
     if (seccion === "premios") return await pintarPremios(main);
     if (seccion === "insignias") return await pintarInsignias(main);
     if (seccion === "configuracion") return await pintarConfiguracion(main, id || "puntos");
-    return await pintarResumen(main);
+    return await pintarCursos(main);
   } catch (e) {
     console.error(e);
     main.innerHTML = `<div class="vacio"><strong>No se pudo cargar</strong>${esc(e.message)}</div><button class="btn" id="re">Reintentar</button>`;
@@ -65,10 +66,20 @@ function fijarMenuMovil(app) {
   observadorMarca = new ResizeObserver(medir);
   observadorMarca.observe(marca);
   medir();
+  // Avisos en los bordes cuando hay pestañas ocultas a la izquierda o derecha
+  const env = nav.parentElement;
+  const revisar = () => {
+    const hay = nav.scrollWidth > nav.clientWidth + 2;
+    env.classList.toggle("mas-izq", hay && nav.scrollLeft > 4);
+    env.classList.toggle("mas-der", hay && nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 4);
+  };
+  nav.addEventListener("scroll", revisar, { passive: true });
+  window.addEventListener("resize", revisar, { passive: true });
   const activo = nav.querySelector("a.activo");
-  if (activo && nav.scrollWidth > nav.clientWidth) {
-    requestAnimationFrame(() => { nav.scrollLeft = Math.max(0, activo.offsetLeft - nav.offsetLeft - (nav.clientWidth - activo.offsetWidth) / 2); });
-  }
+  requestAnimationFrame(() => {
+    if (activo && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, activo.offsetLeft - nav.offsetLeft - (nav.clientWidth - activo.offsetWidth) / 2);
+    revisar();
+  });
 }
 
 const recargar = () => window.dispatchEvent(new HashChangeEvent("hashchange"));
