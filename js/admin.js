@@ -83,7 +83,7 @@ async function pintarResumen(main) {
   const fecha = f0.charAt(0).toUpperCase() + f0.slice(1);
   main.innerHTML = `
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-end">
-      <div><div class="texto-tenue">${esc(fecha)}</div><h1 class="titulo-pagina" style="font-size:38px">Resumen del equipo</h1></div>
+      <div><div class="texto-tenue">${esc(fecha)}</div><h1 class="titulo-pagina">Resumen del equipo</h1></div>
       <div class="fila" style="flex-wrap:wrap">
         <a class="btn btn-sec" href="#/admin/empleados">${icono("plus", 18)}Empleado</a>
         <a class="btn" href="#/admin/cursos">${icono("plus", 18)}Curso</a>
@@ -199,7 +199,7 @@ async function pintarEmpleados(main) {
   const equipo = await datos.adminAvance();
   main.innerHTML = `
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-end">
-      <h1 class="titulo-pagina" style="font-size:38px">Empleados</h1>
+      <h1 class="titulo-pagina">Empleados</h1>
       <div class="fila" style="flex-wrap:wrap">
         <button class="btn" id="gestor">${icono("refresh", 18)}Importar del Gestor</button>
         <button class="btn btn-sec" id="lote">${icono("users", 18)}Alta en lote</button>
@@ -468,7 +468,7 @@ async function pintarCursos(main) {
       </a>`;
   main.innerHTML = `
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-end">
-      <h1 class="titulo-pagina" style="font-size:38px">Cursos</h1>
+      <h1 class="titulo-pagina">Cursos</h1>
       <div class="fila" style="flex-wrap:wrap">
         <button class="btn btn-sec" id="categorias">${icono("book", 18)}Categorías</button>
         <button class="btn btn-sec" id="nuevo">${icono("plus", 18)}Curso vacío</button>
@@ -594,7 +594,7 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-start">
       <div class="pila" style="gap:4px;flex:1 1 320px">
         <span class="etiqueta">${esc(nombreCategoria(c.categoria))} · ${c.publicado ? "Publicado" : "Borrador"}</span>
-        <h1 class="titulo-pagina" style="font-size:38px">${esc(c.titulo)}</h1>
+        <h1 class="titulo-pagina">${esc(c.titulo)}</h1>
         <span class="texto-tenue">${caps.length} capítulos · ${d.lecciones.length} lecciones · ${duracion(durTotal)}${c.quiz_obligatorio ? ` · quiz obligatorio (${c.quiz_minimo}%)` : ""}<span id="valor-curso"></span></span>
       </div>
       <div class="fila" style="flex-wrap:wrap">
@@ -826,7 +826,7 @@ async function pintarPremios(main) {
   const pendientes = canjes.filter((c) => c.estado === "pendiente");
   main.innerHTML = `
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-end">
-      <h1 class="titulo-pagina" style="font-size:38px">Premios y canjes</h1>
+      <h1 class="titulo-pagina">Premios y canjes</h1>
       <button class="btn" id="nuevo">${icono("plus", 18)}Nuevo premio</button>
     </div>
     <div class="fila" style="flex-wrap:wrap;align-items:flex-start;gap:20px">
@@ -876,7 +876,7 @@ async function pintarInsignias(main) {
   const [catalogo, equipo] = await Promise.all([datos.catalogoInsignias(), datos.adminAvance()]);
   main.innerHTML = `
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-end">
-      <h1 class="titulo-pagina" style="font-size:38px">Insignias</h1>
+      <h1 class="titulo-pagina">Insignias</h1>
       <button class="btn" id="otorgar">${icono("crown", 18)}Otorgar reconocimiento</button>
     </div>
     <p class="texto-tenue" style="margin:0">Casi todas se ganan solas al avanzar. Las manuales (como "Empleado del mes") las otorgas tú. Para editarlas o crear nuevas ve a <a href="#/admin/configuracion/insignias">Configuración → Insignias</a>.</p>

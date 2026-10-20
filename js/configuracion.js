@@ -45,7 +45,7 @@ export async function pintarConfiguracion(main, pestana = "puntos") {
   fijarCfgPuntos(cfgFilas);
   main.innerHTML = `
     <div class="pila" style="gap:4px">
-      <h1 class="titulo-pagina" style="font-size:38px">Configuración</h1>
+      <h1 class="titulo-pagina">Configuración</h1>
       <p class="texto-tenue" style="margin:0">Cómo se ganan los puntos, los niveles y las insignias. Los cambios aplican de aquí en adelante; los puntos ya ganados no se tocan.</p>
     </div>
     <div class="pestanas" role="tablist" style="max-width:560px">
