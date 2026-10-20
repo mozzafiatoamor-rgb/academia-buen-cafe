@@ -4,6 +4,7 @@
 //  Empleada demo: usuario "ana.barra", PIN 482913
 //  Admin demo:    correo "admin@demo", clave "demo1234"
 // =====================================================================
+import { fijarCfgPuntos, puntosLeccion, puntosCurso, puntosQuiz, puntosATiempo } from "./puntos.js";
 const LLAVE = "academia-demo-v1";
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
 const ahora = () => new Date().toISOString();
@@ -12,7 +13,7 @@ const hoy = () => new Date().toISOString().slice(0, 10);
 const enDias = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const espera = (ms = 120) => new Promise((r) => setTimeout(r, ms));
 
-const INSIGNIAS = [
+const INSIGNIAS_BASE = [
   ["primer_sorbo", "Primer sorbo", "Terminaste tu primera lección", "progreso", "cup", null, false, 10, { tipo: "lecciones", n: 1 }],
   ["primera_taza", "Primera taza", "Terminaste tu primer curso", "progreso", "cup", null, false, 25, { tipo: "cursos", n: 1 }],
   ["cafetera_llena", "Cafetera llena", "Terminaste 5 cursos", "progreso", "coffee", null, false, 100, { tipo: "cursos", n: 5 }],
@@ -34,7 +35,7 @@ const INSIGNIAS = [
 ].map(([id, nombre, descripcion, categoria, icono, nivel, secreta, puntos, regla], i) =>
   ({ id, nombre, descripcion, categoria, icono, nivel, secreta, puntos, regla, activa: true, orden: i }));
 
-const NIVELES = [
+const NIVELES_BASE = [
   { orden: 1, nombre: "Grano verde", puntos_min: 0 },
   { orden: 2, nombre: "Tueste claro", puntos_min: 300 },
   { orden: 3, nombre: "Tueste medio", puntos_min: 800 },
@@ -117,6 +118,10 @@ export function crearDemo() {
   let db;
   try { db = JSON.parse(localStorage.getItem(LLAVE)) || semilla(); } catch { db = semilla(); }
   const guardar = () => { try { localStorage.setItem(LLAVE, JSON.stringify(db)); } catch { /* sin espacio */ } };
+  if (!db.insignias) db.insignias = JSON.parse(JSON.stringify(INSIGNIAS_BASE));
+  if (!db.niveles) db.niveles = JSON.parse(JSON.stringify(NIVELES_BASE));
+  if (!db.config) db.config = {};
+  fijarCfgPuntos(db.config);
   guardar();
 
   const yo = () => db.usuarios.find((u) => u.user_id === db.sesion);
@@ -155,16 +160,16 @@ export function crearDemo() {
   };
   const cerrarCurso = (u, cursoId) => {
     if (!terminado(u.user_id, cursoId)) return 0;
-    let p = darPuntos(u.user_id, 50, "curso", cursoId);
+    let p = darPuntos(u.user_id, puntosCurso(leccionesDe(cursoId)), "curso", cursoId);
     const lim = limite(u, cursoId);
-    if (lim && hoy() <= lim) p += darPuntos(u.user_id, 20, "a_tiempo", cursoId);
+    if (lim && hoy() <= lim) p += darPuntos(u.user_id, puntosATiempo(leccionesDe(cursoId)), "a_tiempo", cursoId);
     return p;
   };
   const evaluar = (u) => {
     const nuevas = [];
     const comp = db.progreso.filter((p) => p.user_id === u.user_id && p.completado);
     const cursosT = db.cursos.filter((c) => terminado(u.user_id, c.id)).length;
-    for (const ins of INSIGNIAS) {
+    for (const ins of db.insignias) {
       if (ins.regla.tipo === "manual" || db.insignias_usuario.some((x) => x.user_id === u.user_id && x.insignia_id === ins.id)) continue;
       const r = ins.regla, n = r.n || 1;
       const porDia = {}; comp.forEach((p) => { const d = diaLocal(p.completado_en); porDia[d] = (porDia[d] || 0) + 1; });
@@ -215,8 +220,8 @@ export function crearDemo() {
     async resumen() {
       await espera(); const u = exigir();
       const g = ganados(u.user_id);
-      const niv = [...NIVELES].reverse().find((n) => n.puntos_min <= g);
-      const sig = NIVELES.find((n) => n.puntos_min > g);
+      const niv = [...db.niveles].reverse().find((n) => n.puntos_min <= g);
+      const sig = db.niveles.find((n) => n.puntos_min > g);
       const r = racha(u.user_id);
       const mias = db.insignias_usuario.filter((x) => x.user_id === u.user_id);
       return {
@@ -225,8 +230,8 @@ export function crearDemo() {
         nivel: niv.nombre, nivel_orden: niv.orden, nivel_min: niv.puntos_min,
         siguiente_nivel: sig?.nombre || null, siguiente_min: sig?.puntos_min || null,
         racha_actual: r.actual, racha_maxima: r.maxima,
-        insignias: mias.length, insignias_total: INSIGNIAS.length,
-        insignias_sin_ver: mias.filter((x) => !x.vista).map((x) => INSIGNIAS.find((i) => i.id === x.insignia_id)),
+        insignias: mias.length, insignias_total: db.insignias.length,
+        insignias_sin_ver: mias.filter((x) => !x.vista).map((x) => db.insignias.find((i) => i.id === x.insignia_id)),
       };
     },
     async marcarInsigniasVistas() { const u = exigir(); db.insignias_usuario.forEach((x) => { if (x.user_id === u.user_id) x.vista = true; }); guardar(); },
@@ -281,7 +286,7 @@ export function crearDemo() {
       let recien = false, pts = 0, nuevas = [];
       if (!p.completado && l.duracion_seg && p.max_segundo >= l.duracion_seg * 0.9) {
         p.completado = true; p.completado_en = ahora(); recien = true;
-        pts = darPuntos(u.user_id, 10, "leccion", leccionId) + cerrarCurso(u, l.curso_id);
+        pts = darPuntos(u.user_id, puntosLeccion(l.duracion_seg), "leccion", leccionId) + cerrarCurso(u, l.curso_id);
         nuevas = evaluar(u);
       }
       guardar();
@@ -298,7 +303,7 @@ export function crearDemo() {
       const c = db.cursos.find((x) => x.id === cursoId);
       const aprobado = puntaje >= c.quiz_minimo;
       db.intentos.push({ user_id: u.user_id, curso_id: cursoId, puntaje, aprobado, creado_en: ahora() });
-      let pts = puntaje === 100 ? darPuntos(u.user_id, 30, "quiz_perfecto", cursoId) : 0;
+      let pts = puntaje === 100 ? darPuntos(u.user_id, puntosQuiz(qs.length), "quiz_perfecto", cursoId) : 0;
       if (aprobado) pts += cerrarCurso(u, cursoId);
       const nuevas = evaluar(u); guardar();
       return { puntaje, aprobado, minimo: c.quiz_minimo, correctas: bien, total: qs.length, detalle, puntos_ganados: pts,
@@ -306,7 +311,7 @@ export function crearDemo() {
     },
     async insignias() {
       await espera(); const u = exigir();
-      return { catalogo: INSIGNIAS, mias: db.insignias_usuario.filter((x) => x.user_id === u.user_id) };
+      return { catalogo: db.insignias, mias: db.insignias_usuario.filter((x) => x.user_id === u.user_id) };
     },
     async ranking(periodo) {
       await espera(); const u = exigir();
@@ -332,7 +337,24 @@ export function crearDemo() {
       db.canjes.push({ id: uid(), user_id: u.user_id, premio_id: p.id, costo: p.costo, estado: "pendiente", creado_en: ahora() });
       guardar(); return { disponibles: disp - p.costo };
     },
-    async niveles() { return NIVELES; },
+    async niveles() { return [...db.niveles].sort((a, b) => a.orden - b.orden); },
+    async config() { return { ...db.config }; },
+    async guardarConfig(obj) { exigirAdmin(); db.config = { ...db.config, ...obj }; fijarCfgPuntos(db.config); guardar(); },
+    async guardarNiveles(lista) { exigirAdmin(); db.niveles = lista.map((n, i) => ({ orden: i + 1, nombre: n.nombre, puntos_min: Number(n.puntos_min) })); guardar(); },
+    async guardarInsignia(ins) {
+      exigirAdmin();
+      const x = db.insignias.find((i) => i.id === ins.id);
+      if (x) Object.assign(x, ins); else db.insignias.push({ activa: true, secreta: false, nivel: null, orden: 200, ...ins });
+      guardar();
+    },
+    async adminValorCatalogo() {
+      exigirAdmin();
+      return db.cursos.filter((c) => c.publicado).map((c) => ({
+        id: c.id, titulo: c.titulo, lecciones: leccionesDe(c.id).map((l) => ({ duracion_seg: l.duracion_seg })),
+        preguntas: db.preguntas.filter((q) => q.curso_id === c.id).length,
+        conFecha: db.asignaciones.some((a) => a.curso_id === c.id && a.fecha_limite),
+      }));
+    },
     async adminQuiz(cursoId) { exigirAdmin(); return deshacer(db.preguntas.filter((x) => x.curso_id === cursoId).sort((a, b) => a.orden - b.orden)); },
     async guardarPregunta(p) {
       exigirAdmin();
@@ -351,7 +373,7 @@ export function crearDemo() {
     async borrarMaterial(m) { exigirAdmin(); db.materiales = db.materiales.filter((x) => x.id !== m.id); guardar(); },
     async categorias() { return db.categorias || null; },
     async guardarCategorias(lista) { exigirAdmin(); db.categorias = lista; guardar(); },
-    async crearInsignia(ins) { exigirAdmin(); if (!INSIGNIAS.some((i) => i.id === ins.id)) INSIGNIAS.push({ activa: true, secreta: false, nivel: null, ...ins }); },
+    async crearInsignia(ins) { exigirAdmin(); if (!db.insignias.some((i) => i.id === ins.id)) db.insignias.push({ activa: true, secreta: false, nivel: null, ...ins }); },
 
     // ---------- Admin ----------
     async adminAvance() {
@@ -418,7 +440,7 @@ export function crearDemo() {
     },
     async otorgarInsignia(userId, insignia) {
       exigirAdmin();
-      const ins = INSIGNIAS.find((i) => i.id === insignia);
+      const ins = db.insignias.find((i) => i.id === insignia);
       if (!db.insignias_usuario.some((x) => x.user_id === userId && x.insignia_id === insignia)) {
         db.insignias_usuario.push({ user_id: userId, insignia_id: insignia, otorgada_en: ahora(), vista: false });
       }
@@ -503,7 +525,7 @@ export function crearDemo() {
       exigirAdmin(); const c = db.canjes.find((x) => x.id === id);
       if (c && c.estado === "pendiente") { c.estado = estado; c.resuelto_en = ahora(); } guardar();
     },
-    async catalogoInsignias() { return INSIGNIAS; },
+    async catalogoInsignias() { return db.insignias; },
     reiniciarDemo() { db = semilla(); guardar(); },
   };
   return api;

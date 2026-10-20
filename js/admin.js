@@ -5,6 +5,8 @@ import { datos, MODO } from "./datos.js";
 import { icono, esc, num, duracion, fechaCorta, hoyISO, haceCuanto, aviso, modal, confirmar, formulario, AREAS, SEDES, nombreArea, nombreCategoria, opcionesCategoria, categorias, fijarCategorias, slug } from "./ui.js";
 import { subirCursoDesdeCarpeta } from "./subir.js";
 import { panelQuiz, panelMateriales } from "./contenido.js";
+import { pintarConfiguracion } from "./configuracion.js";
+import { valorCurso } from "./puntos.js";
 
 const LOGO = "img/logo.png";
 let ctx; // { ir, salir }
@@ -12,7 +14,7 @@ let ctx; // { ir, salir }
 export async function vistaAdmin(app, partes, contexto) {
   ctx = contexto;
   const [seccion = "", id, pestana] = partes;
-  const menu = [["", "chart", "Resumen"], ["empleados", "users", "Empleados"], ["cursos", "book", "Cursos"], ["premios", "gift", "Premios y canjes"], ["insignias", "medal", "Insignias"]];
+  const menu = [["", "chart", "Resumen"], ["empleados", "users", "Empleados"], ["cursos", "book", "Cursos"], ["premios", "gift", "Premios y canjes"], ["insignias", "medal", "Insignias"], ["configuracion", "ajustes", "Configuración"]];
   const activa = seccion === "curso" ? "cursos" : seccion;
   app.className = "";
   app.innerHTML = `
@@ -41,6 +43,7 @@ export async function vistaAdmin(app, partes, contexto) {
     if (seccion === "curso") return await pintarEditorCurso(main, id, pestana);
     if (seccion === "premios") return await pintarPremios(main);
     if (seccion === "insignias") return await pintarInsignias(main);
+    if (seccion === "configuracion") return await pintarConfiguracion(main, id || "puntos");
     return await pintarResumen(main);
   } catch (e) {
     console.error(e);
@@ -590,7 +593,7 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
       <div class="pila" style="gap:4px;flex:1 1 320px">
         <span class="etiqueta">${esc(nombreCategoria(c.categoria))} · ${c.publicado ? "Publicado" : "Borrador"}</span>
         <h1 class="titulo-pagina" style="font-size:38px">${esc(c.titulo)}</h1>
-        <span class="texto-tenue">${caps.length} capítulos · ${d.lecciones.length} lecciones · ${duracion(durTotal)}${c.quiz_obligatorio ? ` · quiz obligatorio (${c.quiz_minimo}%)` : ""}</span>
+        <span class="texto-tenue">${caps.length} capítulos · ${d.lecciones.length} lecciones · ${duracion(durTotal)}${c.quiz_obligatorio ? ` · quiz obligatorio (${c.quiz_minimo}%)` : ""}<span id="valor-curso"></span></span>
       </div>
       <div class="fila" style="flex-wrap:wrap">
         <a class="btn btn-sec" href="#/admin/ver/curso/${c.id}">${icono("eye", 18)}Ver como empleado</a>
@@ -654,6 +657,9 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
   }));
   Promise.all([datos.adminQuiz(c.id).catch(() => null), datos.adminMateriales(c.id).catch(() => null)]).then(([qz, mt]) => {
     if (qz) main.querySelector('[data-cuenta="quiz"]').textContent = ` · ${qz.length}`;
+    const v = valorCurso({ lecciones: d.lecciones, preguntas: qz ? qz.length : 0, conFecha: d.asignaciones.some((a) => a.fecha_limite) });
+    const el = main.querySelector("#valor-curso");
+    if (el && d.lecciones.length) el.innerHTML = ` · <b style="color:var(--oro)">vale hasta ${num(v.total)} pts</b>`;
     if (mt) main.querySelector('[data-cuenta="materiales"]').textContent = ` · ${mt.length}`;
   });
 
@@ -871,14 +877,14 @@ async function pintarInsignias(main) {
       <h1 class="titulo-pagina" style="font-size:38px">Insignias</h1>
       <button class="btn" id="otorgar">${icono("crown", 18)}Otorgar reconocimiento</button>
     </div>
-    <p class="texto-tenue" style="margin:0">Casi todas se ganan solas al avanzar. "Empleado del mes" la otorgas tú (puedes darla cada mes).</p>
+    <p class="texto-tenue" style="margin:0">Casi todas se ganan solas al avanzar. Las manuales (como "Empleado del mes") las otorgas tú. Para editarlas o crear nuevas ve a <a href="#/admin/configuracion/insignias">Configuración → Insignias</a>.</p>
     <div class="vitrina">${catalogo.map((i) => `
       <div class="vitrina-item"><div class="medalla ${i.nivel === "oro" || i.categoria === "especial" ? "medalla-oro" : i.nivel === "plata" ? "medalla-plata" : i.nivel === "bronce" ? "medalla-bronce" : "medalla-cobre"}">${icono(i.icono, 24)}</div>
         <b>${esc(i.nombre)}</b><small>${esc(i.descripcion)}</small><small style="color:var(--oro)">+${num(i.puntos)} pts${i.secreta ? " · secreta" : ""}</small></div>`).join("")}</div>`;
   main.querySelector("#otorgar").onclick = async () => {
     const v = await formulario("Otorgar reconocimiento", [
       { nombre: "user_id", etiqueta: "Empleado", tipo: "select", opciones: equipo.filter((e) => e.activo).map((e) => [e.user_id, e.nombre]) },
-      { nombre: "insignia", etiqueta: "Insignia", tipo: "select", opciones: catalogo.filter((i) => i.regla?.tipo === "manual").map((i) => [i.id, `${i.nombre} (+${i.puntos} pts)`]) },
+      { nombre: "insignia", etiqueta: "Insignia", tipo: "select", opciones: catalogo.filter((i) => i.regla?.tipo === "manual" && i.activa !== false).map((i) => [i.id, `${i.nombre} (+${i.puntos} pts)`]) },
     ], "Otorgar");
     if (!v?.user_id || !v.insignia) return;
     try { await datos.otorgarInsignia(v.user_id, v.insignia); aviso("Reconocimiento otorgado", "ok"); } catch (e) { aviso(e.message, "error"); }

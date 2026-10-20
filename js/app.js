@@ -6,6 +6,8 @@ import { icono, esc, num, duracion, reloj, fechaCorta, hoyISO, haceCuanto, inici
 import { vistaAdmin } from "./admin.js";
 import { mostrarCertificado, folio } from "./certificado.js";
 import { abrirVisor } from "./visor.js";
+import { confeti, momento, subidaDeNivel, fraseLeccion, hitoCurso, fraseInicio, animarBarras } from "./fiesta.js";
+import { fijarCfgPuntos, valorCurso, puntosLeccion } from "./puntos.js";
 
 const app = document.getElementById("app");
 const LOGO = "img/logo.png";
@@ -30,6 +32,7 @@ async function enrutar() {
 
   if (!estado.catCargadas) {
     try { fijarCategorias(await datos.categorias()); } catch (_) { /* usa las de base */ }
+    try { fijarCfgPuntos(await datos.config()); } catch (_) { /* usa los de base */ }
     estado.catCargadas = true;
   }
   const esAdmin = estado.perfil.rol === "admin";
@@ -115,6 +118,7 @@ function claseMedalla(ins, tengo) {
 // Muestra las insignias recién ganadas, una por una, con animación.
 export async function celebrar(insignias, puntos) {
   for (const ins of insignias || []) {
+    confeti({ cantidad: 110 });
     await modal(`
       <div class="desbloqueo pila" style="align-items:center">
         <div class="etiqueta" style="color:var(--oro)">${ins.secreta ? "Insignia secreta desbloqueada" : "Insignia desbloqueada"}</div>
@@ -127,6 +131,43 @@ export async function celebrar(insignias, puntos) {
   }
   if (insignias?.length) { try { await datos.marcarInsigniasVistas(); } catch (_) { /* luego */ } }
   else if (puntos) aviso(`+${num(puntos)} pts`, "ok");
+}
+
+// Celebra cada avance: lección, hito del curso, curso terminado, insignias, racha y nivel.
+async function celebrarAvance({ puntos, insignias, cursoTerminado, pctAntes, pctDespues, curso, cursoId }) {
+  if (cursoTerminado) {
+    confeti({ cantidad: 240, duracion: 3200 });
+    const r = await modal(`
+      <div class="pila desbloqueo" style="align-items:center;text-align:center;gap:12px">
+        <div class="etiqueta" style="color:var(--oro)">¡Curso completado!</div>
+        <div class="destellos"><div class="medalla medalla-oro">${icono("trophy", 48)}</div></div>
+        <h2 class="modal-titulo">${esc(curso.titulo)}</h2>
+        <p class="modal-texto">Lo terminaste de principio a fin. Eso habla de tu compromiso con el equipo y con cada cliente.</p>
+        ${puntos ? `<b style="color:var(--oro);font-size:18px">+${num(puntos)} pts</b>` : ""}
+        ${curso.certificado ? `<button class="btn btn-bloque" data-cerrar="cert">${icono("medal", 18)}Ver mi certificado</button>` : ""}
+        <button class="btn ${curso.certificado ? "btn-sec" : ""} btn-bloque" data-cerrar>Seguir</button>
+      </div>`, { clase: "desbloqueo" });
+    if (r === "cert") { try { sessionStorage.setItem("academia-abrir-cert", cursoId); } catch (_) { /* nada */ } ir(`/curso/${cursoId}`); }
+  } else {
+    const hito = hitoCurso(pctAntes, pctDespues, curso.titulo);
+    if (hito) { confeti({ cantidad: 90 }); momento({ ...hito, puntos, tono: "oro" }); }
+    else momento({ icono: "check", titulo: "Lección completada", texto: fraseLeccion(), puntos, tono: "verde" });
+  }
+  await celebrar(insignias);
+  await revisarNivelYRacha();
+}
+
+async function revisarNivelYRacha() {
+  const antes = estado.perfil;
+  let nuevo = null;
+  try { nuevo = await datos.resumen(); } catch (_) { return; }
+  if (antes && nuevo.racha_actual >= 2 && nuevo.racha_actual > (antes.racha_actual || 0)) {
+    momento({ icono: "flame", titulo: `¡Racha de ${nuevo.racha_actual} días!`, texto: "Vuelve mañana para mantenerla encendida.", tono: "oro", duracion: 3800 });
+  }
+  if (antes && nuevo.nivel_orden > (antes.nivel_orden || 1)) {
+    await subidaDeNivel(nuevo.nivel, nuevo.siguiente_nivel, (nuevo.siguiente_min || 0) - nuevo.puntos_ganados);
+  }
+  estado.perfil = { ...antes, ...nuevo };
 }
 
 // ---------------------------------------------------------------------
@@ -292,6 +333,7 @@ async function pintarInicio() {
       </div>
       <button class="btn-icono avatar yo" id="perfil" aria-label="Mi perfil" style="width:48px;height:48px">${esc(iniciales(r.nombre))}</button>
     </header>
+    <p class="frase-inicio">${icono("coffee", 16)}<span>${esc(fraseInicio(r, cursos))}</span></p>
 
     <section class="tarjeta pila" style="gap:12px">
       <div class="fila-entre">
@@ -347,6 +389,7 @@ async function pintarInicio() {
 
   app.querySelectorAll("[data-ir]").forEach((b) => (b.onclick = () => ir(b.dataset.ir)));
   app.querySelector("#perfil").onclick = () => abrirPerfil(r);
+  animarBarras(app);
   const filtro = app.querySelector("#filtro-cat");
   if (filtro) filtro.onclick = (e) => {
     const b = e.target.closest("[data-cat]"); if (!b) return;
@@ -510,6 +553,7 @@ async function pintarCurso(id) {
   const mejor = d.intentos.reduce((m, i) => Math.max(m, i.puntaje), 0);
   const terminado = todasListas && (!d.curso.quiz_obligatorio || aprobado);
   const durTotal = orden.reduce((a, l) => a + (l.duracion_seg || 0), 0);
+  const valor = valorCurso({ lecciones: orden, preguntas: d.preguntas.length });
 
   let n = 0;
   sinNav(`${vp ? bandaVista() : ""}
@@ -520,6 +564,7 @@ async function pintarCurso(id) {
       <h1>${esc(d.curso.titulo)}</h1>
       ${d.curso.descripcion ? `<p style="margin:0;color:var(--crema-2)">${esc(d.curso.descripcion)}</p>` : ""}
       <div class="texto-tenue" style="color:var(--crema-2)">${caps.length} ${caps.length === 1 ? "capítulo" : "capítulos"} · ${total} lecciones · ${duracion(durTotal)}</div>
+      ${total ? `<div class="fila" style="gap:8px;flex-wrap:wrap"><span class="pildora pildora-oro">${icono("star", 14)}Vale hasta ${num(valor.total)} pts</span>${valor.bono ? `<span class="texto-tenue" style="color:var(--crema-2);font-size:12px">incluye ${num(valor.bono)} de bono al terminar${valor.quiz ? ` y ${num(valor.quiz)} por quiz perfecto` : ""}</span>` : ""}</div>` : ""}
       <div class="fila"><div class="barra" style="flex:1;background:var(--tarjeta)"><i style="width:${pct}%"></i></div><b style="color:var(--oro)">${pct}%</b></div>
       ${siguiente ? `<button class="btn" data-ir="${B}/leccion/${id}/${siguiente.id}">${icono("play", 18)}${listas ? "Continuar" : "Empezar curso"}</button>` : ""}
     </header>
@@ -539,7 +584,7 @@ async function pintarCurso(id) {
           const hecho = hechas.has(l.id), ahora = siguiente?.id === l.id, bloq = !vp && !hecho && !ahora;
           return `<button class="leccion ${ahora ? "actual" : ""} ${bloq ? "bloq" : ""}" ${bloq ? 'aria-disabled="true"' : `data-ir="${B}/leccion/${id}/${l.id}"`}>
             <span class="leccion-estado ${hecho ? "hecho" : ahora ? "ahora" : "pend"}">${icono(hecho ? "check" : ahora || vp ? "play" : "lock", hecho ? 16 : 14)}</span>
-            <span style="flex:1;min-width:0"><b>${n}. ${esc(l.titulo)}</b><small>${l.duracion_seg ? duracion(l.duracion_seg) : "video"}</small></span>
+            <span style="flex:1;min-width:0"><b>${n}. ${esc(l.titulo)}</b><small>${l.duracion_seg ? duracion(l.duracion_seg) : "video"}${hecho ? "" : ` · +${puntosLeccion(l.duracion_seg)} pts`}</small></span>
           </button>`;
         }).join("")}
       </section>`).join("")}
@@ -574,6 +619,13 @@ async function pintarCurso(id) {
       puntaje: mejor || null,
       codigo: folio(vp ? "ejemplo" : estado.perfil.usuario, d.curso.id),
     });
+  animarBarras(app);
+  try {
+    if (sessionStorage.getItem("academia-abrir-cert") === id) {
+      sessionStorage.removeItem("academia-abrir-cert");
+      setTimeout(() => app.querySelector("#ver-cert")?.click(), 400);
+    }
+  } catch (_) { /* nada */ }
   });
   app.querySelectorAll("[data-ir]").forEach((b) => (b.onclick = () => ir(b.dataset.ir)));
   app.querySelectorAll(".leccion.bloq").forEach((b) => (b.onclick = () => aviso("Termina la lección anterior para desbloquear esta")));
@@ -622,6 +674,7 @@ async function pintarLeccion(cursoId, leccionId) {
   if (!leccion) throw new Error("Lección no encontrada");
   const cap = caps.find((c) => c.lecciones.some((l) => l.id === leccionId));
   const prog = d.progreso.find((p) => p.leccion_id === leccionId);
+  let hechasAlEntrar = d.progreso.filter((p) => p.completado && orden.some((l) => l.id === p.leccion_id)).length;
   let completado = vp || !!prog?.completado;
   const siguiente = orden[idx + 1];
 
@@ -675,9 +728,13 @@ async function pintarLeccion(cursoId, leccionId) {
         if (est) est.innerHTML = estadoLeccionHTML(true);
         const b = document.getElementById("btn-siguiente");
         if (b) b.disabled = false;
-        aviso(`Lección completada · +${num(r.puntos_ganados)} pts`, "ok");
-        await celebrar(r.insignias_nuevas);
-        if (r.curso_terminado) aviso("¡Terminaste el curso!", "ok");
+        const total = orden.length, antes = hechasAlEntrar;
+        hechasAlEntrar++;
+        await celebrarAvance({
+          puntos: r.puntos_ganados, insignias: r.insignias_nuevas, cursoTerminado: r.curso_terminado,
+          pctAntes: (antes / total) * 100, pctDespues: ((antes + 1) / total) * 100,
+          curso: d.curso, cursoId,
+        });
       }
     } catch (e) {
       console.warn(e);
@@ -818,6 +875,7 @@ async function pintarQuiz(cursoId) {
         fs.querySelectorAll("input").forEach((i) => (i.disabled = true));
       });
       btn.remove();
+      if (r.aprobado) confeti({ cantidad: r.puntaje === 100 ? 220 : 140 });
       await modal(`
         <div class="pila" style="align-items:center;text-align:center">
           <div class="medalla ${r.aprobado ? "medalla-oro" : "medalla-bloq"}" style="width:88px;height:88px">${icono(r.aprobado ? "trophy" : "refresh", 40)}</div>
@@ -828,7 +886,9 @@ async function pintarQuiz(cursoId) {
           <button class="btn btn-bloque" data-cerrar>${r.aprobado ? "Ver mi curso" : "Revisar"}</button>
         </div>`);
       await celebrar(r.insignias_nuevas);
+      await revisarNivelYRacha();
       if (r.aprobado) {
+        if (r.curso_terminado && d.curso.certificado) { try { sessionStorage.setItem("academia-abrir-cert", cursoId); } catch (_) { /* nada */ } }
         ir(`/curso/${cursoId}`);
       } else {
         form.insertAdjacentHTML("beforeend", `<p class="texto-tenue">Las respuestas en rojo están mal. Repasa las lecciones y vuelve a intentarlo.</p><button type="button" class="btn btn-bloque" id="otra-vez">Intentar de nuevo</button>`);
@@ -843,7 +903,8 @@ async function pintarQuiz(cursoId) {
 // ---------------------------------------------------------------------
 async function pintarInsignias() {
   cargando();
-  const [{ catalogo, mias }, r, niveles] = await Promise.all([datos.insignias(), datos.resumen(), datos.niveles()]);
+  const [{ catalogo: todas, mias }, r, niveles] = await Promise.all([datos.insignias(), datos.resumen(), datos.niveles()]);
+  const catalogo = todas.filter((i) => i.activa !== false);
   const tengo = new Set(mias.map((m) => m.insignia_id));
   const ordenadas = [...catalogo].sort((a, b) => (tengo.has(b.id) - tengo.has(a.id)) || a.orden - b.orden);
   const avancePct = r.siguiente_min ? Math.round(((r.puntos_ganados - r.nivel_min) / (r.siguiente_min - r.nivel_min)) * 100) : 100;

@@ -164,6 +164,31 @@ function crearNube() {
     },
 
     async niveles() { return q(sb.from("academia_niveles").select("*").order("orden")); },
+    async config() {
+      const filas = await q(sb.from("academia_config").select("clave, valor"));
+      return Object.fromEntries(filas.map((f) => [f.clave, f.valor]));
+    },
+    guardarConfig: (obj) => q(sb.from("academia_config").upsert(Object.entries(obj).map(([clave, valor]) => ({ clave, valor })))),
+    async guardarNiveles(lista) {
+      const filas = lista.map((n, i) => ({ orden: i + 1, nombre: n.nombre, puntos_min: Number(n.puntos_min) }));
+      await q(sb.from("academia_niveles").upsert(filas, { onConflict: "orden" }));
+      await q(sb.from("academia_niveles").delete().gt("orden", filas.length));
+    },
+    guardarInsignia: (ins) => q(sb.from("academia_insignias").upsert(ins, { onConflict: "id" })),
+    async adminValorCatalogo() {
+      const [cursos, lecciones, preguntas, asign] = await Promise.all([
+        q(sb.from("academia_cursos").select("id, titulo").eq("publicado", true)),
+        q(sb.from("academia_lecciones").select("curso_id, duracion_seg")),
+        q(sb.from("academia_quiz_preguntas").select("curso_id")),
+        q(sb.from("academia_asignaciones").select("curso_id, fecha_limite")),
+      ]);
+      return cursos.map((c) => ({
+        id: c.id, titulo: c.titulo,
+        lecciones: lecciones.filter((l) => l.curso_id === c.id),
+        preguntas: preguntas.filter((p) => p.curso_id === c.id).length,
+        conFecha: asign.some((a) => a.curso_id === c.id && a.fecha_limite),
+      }));
+    },
     // ---------- Quiz (admin) ----------
     async adminQuiz(cursoId) {
       const preguntas = await q(sb.from("academia_quiz_preguntas").select("*").eq("curso_id", cursoId).order("orden"));
