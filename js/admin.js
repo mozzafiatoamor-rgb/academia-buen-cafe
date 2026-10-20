@@ -14,7 +14,7 @@ let ctx; // { ir, salir }
 export async function vistaAdmin(app, partes, contexto) {
   ctx = contexto;
   const [seccion = "", id, pestana] = partes;
-  const menu = [["", "chart", "Resumen"], ["empleados", "users", "Empleados"], ["cursos", "book", "Cursos"], ["premios", "gift", "Premios y canjes"], ["insignias", "medal", "Insignias"], ["configuracion", "ajustes", "Configuración"]];
+  const menu = [["cursos", "book", "Cursos"], ["empleados", "users", "Empleados"], ["", "chart", "Resumen"], ["premios", "gift", "Premios y canjes"], ["insignias", "medal", "Insignias"], ["configuracion", "ajustes", "Configuración"]];
   const activa = seccion === "curso" ? "cursos" : seccion;
   app.className = "";
   app.innerHTML = `
@@ -36,6 +36,7 @@ export async function vistaAdmin(app, partes, contexto) {
       <main class="admin-main" id="admin-main"><div class="cargando"><div class="taza-carga"></div></div></main>
     </div>
   </div>`;
+  fijarMenuMovil(app);
   app.querySelector("#salir").onclick = ctx.salir;
   app.querySelector("#salir-movil").onclick = ctx.salir;
   const main = app.querySelector("#admin-main");
@@ -51,6 +52,22 @@ export async function vistaAdmin(app, partes, contexto) {
     console.error(e);
     main.innerHTML = `<div class="vacio"><strong>No se pudo cargar</strong>${esc(e.message)}</div><button class="btn" id="re">Reintentar</button>`;
     main.querySelector("#re").onclick = () => vistaAdmin(app, partes, contexto);
+  }
+}
+
+// En celular: la barra de pestañas se queda pegada arriba al desplazar
+// y la pestaña activa siempre queda a la vista (no regresa al inicio).
+let observadorMarca;
+function fijarMenuMovil(app) {
+  const menuEl = app.querySelector(".admin-menu"), marca = app.querySelector(".admin-marca"), nav = menuEl.querySelector("nav");
+  const medir = () => menuEl.style.setProperty("--alto-marca", `${marca.offsetHeight + 10}px`);
+  observadorMarca?.disconnect();
+  observadorMarca = new ResizeObserver(medir);
+  observadorMarca.observe(marca);
+  medir();
+  const activo = nav.querySelector("a.activo");
+  if (activo && nav.scrollWidth > nav.clientWidth) {
+    requestAnimationFrame(() => { nav.scrollLeft = Math.max(0, activo.offsetLeft - nav.offsetLeft - (nav.clientWidth - activo.offsetWidth) / 2); });
   }
 }
 
