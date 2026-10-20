@@ -786,23 +786,17 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
   }));
   main.querySelectorAll("[data-agregar]").forEach((b) => (b.onclick = () => elegirVideos(c.id, b.dataset.agregar, d.lecciones)));
   main.querySelector("#asignar").onclick = async () => {
-    const v = await formulario("Asignar curso", [
-      { nombre: "area", etiqueta: "Área", tipo: "select", opciones: [["", "Todas las áreas"], ...AREAS], valor: c.categoria && AREAS.some(([a]) => a === c.categoria) && c.categoria !== "general" ? c.categoria : "" },
-      { nombre: "sede", etiqueta: "Sede", tipo: "select", opciones: [["", "Todas las sedes"], ...SEDES] },
-      { nombre: "user_id", etiqueta: "Persona específica (opcional)", tipo: "select", opciones: [["", "—"], ...d.perfiles.map((p) => [p.user_id, p.nombre])] },
-      { nombre: "obligatorio", etiqueta: "Obligatorio", tipo: "check", valor: true },
-      { nombre: "fecha_limite", etiqueta: "Fecha límite (opcional)", tipo: "fecha" },
-    ], "Asignar");
+    const v = await elegirAsignacion(c, d.asignaciones);
     if (!v) return;
-    if (v.fecha_limite && v.fecha_limite < hoyISO()) return aviso("La fecha límite ya pasó", "error");
-    let nueva;
-    try { nueva = await datos.agregarAsignacion({ curso_id: c.id, area: v.user_id ? null : v.area, sede: v.user_id ? null : v.sede, user_id: v.user_id || null, obligatorio: !!v.obligatorio, fecha_limite: v.fecha_limite || null }); }
-    catch (e) { return aviso(e.message, "error"); }
-    aviso("Asignado", "ok");
-    if (c.publicado) {
-      const a = nueva && nueva.curso_id ? nueva : { curso_id: c.id, area: v.user_id ? null : v.area || null, sede: v.user_id ? null : v.sede || null, user_id: v.user_id || null, fecha_limite: v.fecha_limite || null };
-      await avisarCurso(c, d.lecciones, [a], "asignado");
-    }
+    const base = { curso_id: c.id, obligatorio: v.obligatorio, fecha_limite: v.fecha_limite };
+    const filas = v.modo === "personas"
+      ? v.ids.map((uid) => ({ ...base, area: null, sede: null, user_id: uid }))
+      : [{ ...base, area: v.area, sede: v.sede, user_id: null }];
+    const creadas = [];
+    try { for (const f of filas) creadas.push((await datos.agregarAsignacion(f)) || f); }
+    catch (e) { aviso(e.message, "error"); if (!creadas.length) return; }
+    aviso(filas.length > 1 ? `Asignado a ${creadas.length} personas` : "Asignado", "ok");
+    if (c.publicado) await avisarCurso(c, d.lecciones, creadas.map((a, k) => (a && a.curso_id ? a : filas[k])), "asignado");
     recargar();
   };
   main.querySelector("#avisar")?.addEventListener("click", () => avisarCurso(c, d.lecciones, d.asignaciones, "manual"));
@@ -810,6 +804,121 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
     if (!(await confirmar("¿Quitar asignación?", "Esas personas dejarán de ver el curso (su avance se conserva).", "Quitar"))) return;
     conError(() => datos.borrarAsignacion(b.dataset.borrarA));
   }));
+}
+
+// ---------------------------------------------------------------------
+//  ASIGNAR · por área/sede o eligiendo varias personas
+// ---------------------------------------------------------------------
+async function elegirAsignacion(c, asignaciones) {
+  const p = modal(`
+    <h2 class="modal-titulo">Asignar curso</h2>
+    <div class="pestanas" role="tablist" id="modo-asig">
+      <button type="button" class="activo" data-modo="personas">Elegir personas</button>
+      <button type="button" data-modo="grupo">Por área o sede</button>
+    </div>
+    <form class="form" novalidate id="form-asig">
+      <div data-panel-modo="personas" class="pila" style="gap:10px">
+        <div class="cargando" style="min-height:120px"><div class="taza-carga"></div></div>
+      </div>
+      <div data-panel-modo="grupo" class="pila" style="gap:10px" hidden>
+        <label class="campo"><span>Área</span><select name="area"><option value="">Todas las áreas</option>${AREAS.map(([v, t]) => `<option value="${v}" ${c.categoria === v && v !== "general" ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+        <label class="campo"><span>Sede</span><select name="sede"><option value="">Todas las sedes</option>${SEDES.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("")}</select></label>
+        <small class="ayuda">Quien entre después a esa área o sede también lo recibe automáticamente.</small>
+      </div>
+      <label class="check"><input type="checkbox" name="obligatorio" checked><span>Obligatorio</span></label>
+      <label class="campo"><span>Fecha límite (opcional)</span><input type="date" name="fecha_limite"></label>
+      <p class="error-form" hidden></p>
+      <div class="fila-botones">
+        <button type="button" class="btn btn-sec" data-cerrar="">Cancelar</button>
+        <button type="submit" class="btn" id="ok-asig">Asignar</button>
+      </div>
+    </form>`, { clase: "modal-ancho" });
+  const capa = modal.actual, form = capa.querySelector("#form-asig");
+  let modo = "personas", perfiles = [], elegidos = new Set(), filtroArea = "", texto = "";
+  const err = form.querySelector(".error-form");
+  const panelP = form.querySelector('[data-panel-modo="personas"]');
+  const okBtn = form.querySelector("#ok-asig");
+  const yaLoTiene = (pf) => asignaciones.some((a) => coincide(a, pf));
+  const actualizarBoton = () => { okBtn.textContent = modo === "personas" ? (elegidos.size ? `Asignar a ${elegidos.size}` : "Asignar") : "Asignar"; };
+
+  capa.querySelector("#modo-asig").onclick = (e) => {
+    const b = e.target.closest("[data-modo]"); if (!b) return;
+    modo = b.dataset.modo;
+    capa.querySelectorAll("[data-modo]").forEach((x) => x.classList.toggle("activo", x === b));
+    form.querySelectorAll("[data-panel-modo]").forEach((x) => (x.hidden = x.dataset.panelModo !== modo));
+    err.hidden = true; actualizarBoton();
+  };
+
+  const visibles = () => perfiles.filter((pf) => (!filtroArea || pf.area === filtroArea)
+    && (!texto || pf.nombre.toLowerCase().includes(texto) || String(pf.usuario || "").toLowerCase().includes(texto)));
+  const pintarLista = () => {
+    const lista = visibles();
+    const libres = lista.filter((pf) => !yaLoTiene(pf));
+    const todos = libres.length && libres.every((pf) => elegidos.has(pf.user_id));
+    panelP.querySelector("#personas").innerHTML = lista.length ? lista.map((pf) => {
+      const ya = yaLoTiene(pf);
+      return `<label class="persona-check ${ya ? "ya" : ""}">
+        <input type="checkbox" value="${pf.user_id}" ${ya ? "disabled" : elegidos.has(pf.user_id) ? "checked" : ""}>
+        <span class="avatar" style="width:34px;height:34px;font-size:12px;flex:none">${esc(pf.nombre.split(" ").map((x) => x[0]).slice(0, 2).join("").toUpperCase())}</span>
+        <span style="flex:1;min-width:0"><b>${esc(pf.nombre)}</b><small>${esc(nombreArea(pf.area))}${pf.sede ? " · " + esc(pf.sede) : ""}</small></span>
+        ${ya ? `<span class="pildora">Ya lo tiene</span>` : ""}
+      </label>`;
+    }).join("") : `<p class="texto-tenue" style="margin:8px 0">Nadie coincide con la búsqueda.</p>`;
+    const t = panelP.querySelector("#todos");
+    t.textContent = todos ? "Quitar todos" : `Seleccionar ${filtroArea || texto ? "los visibles" : "todos"}`;
+    t.disabled = !libres.length;
+    panelP.querySelector("#cuenta-sel").textContent = elegidos.size ? `${elegidos.size} seleccionada${elegidos.size === 1 ? "" : "s"}` : "Nadie seleccionado";
+    actualizarBoton();
+  };
+
+  try {
+    perfiles = (await datos.adminPerfiles()).filter((pf) => pf.activo !== false).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    const areas = [...new Set(perfiles.map((pf) => pf.area).filter(Boolean))];
+    panelP.innerHTML = `
+      <input class="buscar-persona" type="search" placeholder="Buscar por nombre…" aria-label="Buscar persona" id="buscar-p">
+      ${areas.length > 1 ? `<div class="chips" id="areas-p"><button type="button" class="chip activo" data-a="">Todas</button>${areas.map((a) => `<button type="button" class="chip" data-a="${esc(a)}">${esc(nombreArea(a))}</button>`).join("")}</div>` : ""}
+      <div class="fila-entre"><span class="texto-tenue" style="font-size:12px" id="cuenta-sel"></span><button type="button" class="btn-texto" id="todos"></button></div>
+      <div class="lista-personas" id="personas"></div>`;
+    panelP.querySelector("#buscar-p").oninput = (e) => { texto = e.target.value.trim().toLowerCase(); pintarLista(); };
+    const chips = panelP.querySelector("#areas-p");
+    if (chips) chips.onclick = (e) => {
+      const b = e.target.closest("[data-a]"); if (!b) return;
+      filtroArea = b.dataset.a;
+      chips.querySelectorAll(".chip").forEach((x) => x.classList.toggle("activo", x === b));
+      pintarLista();
+    };
+    panelP.querySelector("#personas").onchange = (e) => {
+      const cb = e.target.closest("input[type=checkbox]"); if (!cb) return;
+      cb.checked ? elegidos.add(cb.value) : elegidos.delete(cb.value);
+      err.hidden = true; pintarLista();
+    };
+    panelP.querySelector("#todos").onclick = () => {
+      const libres = visibles().filter((pf) => !yaLoTiene(pf));
+      const todos = libres.every((pf) => elegidos.has(pf.user_id));
+      libres.forEach((pf) => (todos ? elegidos.delete(pf.user_id) : elegidos.add(pf.user_id)));
+      pintarLista();
+    };
+    pintarLista();
+  } catch (e) {
+    panelP.innerHTML = `<div class="vacio"><strong>No se pudo cargar el equipo</strong>${esc(e.message)}</div>`;
+  }
+
+  let resultado = null;
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fecha = form.elements.fecha_limite.value || null;
+    if (fecha && fecha < hoyISO()) { err.textContent = "La fecha límite ya pasó"; err.hidden = false; return; }
+    const comun = { obligatorio: form.elements.obligatorio.checked, fecha_limite: fecha };
+    if (modo === "personas") {
+      if (!elegidos.size) { err.textContent = "Elige al menos una persona"; err.hidden = false; return; }
+      resultado = { modo, ids: [...elegidos], ...comun };
+    } else {
+      resultado = { modo, area: form.elements.area.value || null, sede: form.elements.sede.value || null, ...comun };
+    }
+    capa.cerrar("ok");
+  });
+  await p;
+  return resultado;
 }
 
 // ---------------------------------------------------------------------
