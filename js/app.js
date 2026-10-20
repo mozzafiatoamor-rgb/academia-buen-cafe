@@ -2,7 +2,7 @@
 //  ACADEMIA DEL BUEN CAFÉ · App del empleado + enrutador
 // =====================================================================
 import { datos, MODO, enviarAvance, vaciarCola, pendientesCola } from "./datos.js";
-import { icono, esc, num, duracion, reloj, fechaCorta, hoyISO, haceCuanto, iniciales, saludo, aviso, modal, confirmar, nombreArea, nombreCategoria, fijarCategorias } from "./ui.js";
+import { icono, esc, num, duracion, reloj, fechaCorta, hoyISO, haceCuanto, iniciales, saludo, aviso, modal, confirmar, marcaTitulo, nombreArea, nombreCategoria, fijarCategorias } from "./ui.js";
 import { vistaAdmin } from "./admin.js";
 import { mostrarCertificado, folio } from "./certificado.js";
 import { abrirVisor } from "./visor.js";
@@ -186,7 +186,7 @@ function pintarLogin(errorInicial = "") {
     <main class="login">
       <img class="login-isotipo" src="${ISOTIPO}" alt="Mozzafiato · El placer del buen café">
       <div class="pila" style="align-items:center;gap:4px">
-        <h1 class="login-titulo">Academia del Buen Café</h1>
+        ${marcaTitulo("grande")}
         <p class="texto-tenue" style="margin:0">${modoAdmin ? "Acceso de administrador" : "Entra con tu usuario y tu PIN"}</p>
       </div>
       ${modoAdmin ? `

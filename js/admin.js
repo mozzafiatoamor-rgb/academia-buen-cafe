@@ -2,7 +2,7 @@
 //  ACADEMIA DEL BUEN CAFÉ · Panel de administración
 // =====================================================================
 import { datos, MODO } from "./datos.js";
-import { icono, esc, num, duracion, fechaCorta, hoyISO, haceCuanto, aviso, modal, confirmar, formulario, AREAS, SEDES, nombreArea, nombreCategoria, opcionesCategoria, categorias, fijarCategorias, slug } from "./ui.js";
+import { icono, esc, num, duracion, fechaCorta, hoyISO, haceCuanto, aviso, modal, confirmar, formulario, marcaTitulo, AREAS, SEDES, nombreArea, nombreCategoria, opcionesCategoria, categorias, fijarCategorias, slug } from "./ui.js";
 import { subirCursoDesdeCarpeta } from "./subir.js";
 import { panelQuiz, panelMateriales } from "./contenido.js";
 import { pintarConfiguracion } from "./configuracion.js";
@@ -21,10 +21,10 @@ export async function vistaAdmin(app, partes, contexto) {
   ${MODO === "demo" ? `<div class="banda-demo">MODO DEMO · datos de ejemplo</div>` : ""}
   <div class="admin">
     <aside class="admin-menu">
-      <div class="pila" style="gap:8px">
-        <img src="${LOGO}" alt="Mozzafiato">
-        <div class="serif" style="font-size:20px;line-height:1.1">Academia del Buen Café</div>
-        <div class="etiqueta">Panel de administración</div>
+      <div class="admin-marca">
+        <img class="admin-iso" src="img/isotipo.webp" alt="Mozzafiato">
+        ${marcaTitulo("chica", "div")}
+        <div class="etiqueta admin-subtitulo">Panel de administración</div>
         <button class="btn btn-sec btn-chico salir-movil" id="salir-movil">${icono("logout", 16)}Salir</button>
       </div>
       <nav aria-label="Secciones">${menu.map(([r, ic, t]) => `<a href="#/admin${r ? "/" + r : ""}" class="${activa === r ? "activo" : ""}">${icono(ic, 18)}${t}</a>`).join("")}</nav>
@@ -33,7 +33,6 @@ export async function vistaAdmin(app, partes, contexto) {
       </div>
     </aside>
     <div class="admin-columna">
-      <div class="marca-sup"><img src="img/isotipo.webp" alt="Mozzafiato" style="height:46px"></div>
       <main class="admin-main" id="admin-main"><div class="cargando"><div class="taza-carga"></div></div></main>
     </div>
   </div>`;

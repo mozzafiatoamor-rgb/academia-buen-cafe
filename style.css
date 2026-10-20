@@ -368,3 +368,29 @@ button.tarjeta-borde:hover, a.tarjeta-borde:hover { border-color: #5A4436; }
 .admin-columna > .admin-main { flex: 1 1 auto; padding-top: 12px; }
 .admin-columna > .marca-sup { padding-top: 20px; }
 @media (prefers-reduced-motion: reduce) { .login-isotipo { animation: none; } }
+
+/* ---------- Tipografía y marca (v1.6.2) ---------- */
+:root { --sans: "Nunito", system-ui, -apple-system, sans-serif; --lato: "Lato", system-ui, sans-serif; }
+body { font-family: var(--sans); }
+
+/* "ACADEMIA" delgada y espaciada + "DEL BUEN CAFÉ" gruesa */
+.marca-titulo { display: flex; flex-direction: column; align-items: center; text-align: center; margin: 0; font-family: var(--lato); text-transform: uppercase; color: var(--crema); line-height: 1; }
+.marca-titulo .mt-ligera { display: flex; align-items: center; gap: .7em; font-weight: 300; letter-spacing: .5em; margin-right: -.5em; color: var(--oro); }
+.marca-titulo .mt-ligera i { display: block; width: 1.8em; height: 1px; background: linear-gradient(90deg, transparent, var(--oro)); }
+.marca-titulo .mt-ligera i:last-child { background: linear-gradient(90deg, var(--oro), transparent); margin-left: -.5em; }
+.marca-titulo .mt-fuerte { font-weight: 900; letter-spacing: .08em; margin-top: .35em;
+  background: linear-gradient(180deg, #FFF3DD 0%, var(--crema) 45%, var(--oro) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.marca-grande .mt-ligera { font-size: 15px; }
+.marca-grande .mt-fuerte { font-size: 30px; }
+.marca-chica .mt-ligera { font-size: 11px; }
+.marca-chica .mt-fuerte { font-size: 19px; }
+@media (min-width: 420px) { .marca-grande .mt-fuerte { font-size: 34px; } }
+
+/* Panel admin: isotipo arriba, centrado */
+.admin-marca { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding-top: 4px; }
+.admin-iso { width: 96px; height: auto; filter: drop-shadow(0 6px 18px rgba(227, 182, 107, .3)); }
+.admin-subtitulo { font-size: 10.5px; color: var(--tenue); }
+@media (max-width: 820px) {
+  .admin-marca { gap: 6px; }
+  .admin-iso { width: 64px; }
+}

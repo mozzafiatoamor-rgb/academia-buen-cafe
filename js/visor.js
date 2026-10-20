@@ -28,7 +28,7 @@ function marcaDeAgua(ctx, ancho, alto, texto) {
   ctx.globalAlpha = 0.13;
   ctx.fillStyle = "#5A3E31";
   const tam = Math.max(14, Math.round(ancho / 34));
-  ctx.font = `600 ${tam}px Manrope, system-ui, sans-serif`;
+  ctx.font = `700 ${tam}px Nunito, system-ui, sans-serif`;
   ctx.translate(ancho / 2, alto / 2);
   ctx.rotate(-Math.PI / 6);
   const paso = tam * 7;

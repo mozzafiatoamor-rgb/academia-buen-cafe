@@ -241,3 +241,11 @@ export function nombreCategoria(id) {
 }
 export const slug = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
   .replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 30) || "categoria";
+
+// Título de marca: "ACADEMIA" delgada y espaciada + "DEL BUEN CAFÉ" gruesa (Lato).
+export function marcaTitulo(tam = "normal", etiqueta = "h1") {
+  return `<${etiqueta} class="marca-titulo marca-${tam}" aria-label="Academia del Buen Café">
+    <span class="mt-ligera" aria-hidden="true"><i></i>Academia<i></i></span>
+    <span class="mt-fuerte" aria-hidden="true">del Buen Café</span>
+  </${etiqueta}>`;
+}

@@ -50,13 +50,13 @@ export async function dibujarCertificado({ nombre, curso, fecha, segundos, punta
   try {
     await Promise.all([
       document.fonts.load('600 96px "Cormorant Garamond"'), document.fonts.load('italic 600 96px "Cormorant Garamond"'),
-      document.fonts.load('500 30px "Manrope"'), document.fonts.load('700 30px "Manrope"'),
+      document.fonts.load('500 30px "Nunito"'), document.fonts.load('700 30px "Nunito"'), document.fonts.load('300 30px "Lato"'), document.fonts.load('900 30px "Lato"'),
     ]);
   } catch (_) { /* usa fuentes del sistema */ }
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const x = c.getContext("2d");
-  const serif = '"Cormorant Garamond", Georgia, serif', sans = '"Manrope", system-ui, sans-serif';
+  const serif = '"Cormorant Garamond", Georgia, serif', sans = '"Nunito", system-ui, sans-serif', lato = '"Lato", system-ui, sans-serif';
 
   // Fondo y marcos
   const g = x.createRadialGradient(W / 2, H / 2, 200, W / 2, H / 2, W * 0.7);
@@ -80,9 +80,16 @@ export async function dibujarCertificado({ nombre, curso, fecha, segundos, punta
     x.fillStyle = C.espresso; x.font = `600 80px ${serif}`; x.fillText("MOZZAFIATO", W / 2, 260);
   }
 
-  x.fillStyle = C.cobre; x.font = `700 26px ${sans}`;
+  // "ACADEMIA" delgada + "DEL BUEN CAFÉ" gruesa (Lato), centradas juntas
+  x.fillStyle = C.cobre;
   if ("letterSpacing" in x) x.letterSpacing = "10px";
-  x.fillText("ACADEMIA DEL BUEN CAFÉ", W / 2, 420);
+  x.font = `300 28px ${lato}`; const a1 = x.measureText("ACADEMIA ").width;
+  x.font = `900 28px ${lato}`; const a2 = x.measureText("DEL BUEN CAFÉ").width;
+  const x0 = W / 2 - (a1 + a2) / 2;
+  x.textAlign = "left";
+  x.font = `300 28px ${lato}`; x.fillText("ACADEMIA ", x0, 420);
+  x.font = `900 28px ${lato}`; x.fillText("DEL BUEN CAFÉ", x0 + a1, 420);
+  x.textAlign = "center";
   if ("letterSpacing" in x) x.letterSpacing = "0px";
 
   x.fillStyle = C.espresso; x.font = `600 104px ${serif}`;
