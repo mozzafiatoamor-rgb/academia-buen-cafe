@@ -440,3 +440,31 @@ body { font-family: var(--sans); }
 @keyframes pestana-der { 0%, 100% { transform: translateX(0); opacity: .55; } 50% { transform: translateX(4px); opacity: 1; } }
 @keyframes pestana-izq { 0%, 100% { transform: translateX(0); opacity: .55; } 50% { transform: translateX(-4px); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .pestanas-mas svg { animation: none !important; } }
+
+/* ---------- Avisos de curso nuevo (v1.7.0) ---------- */
+.lista-aviso { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; margin: 6px -4px 0; padding: 0 4px; }
+.fila-aviso { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--linea-suave); border-radius: 14px; background: var(--tarjeta); transition: border-color .25s, background .25s; }
+.fila-aviso.enviado { border-color: rgba(227, 182, 107, .35); }
+.ok-aviso { color: var(--oro); font-weight: 700; }
+.etiqueta-nuevo {
+  display: inline-block; vertical-align: 2px; margin-right: 8px; padding: 2px 8px; border-radius: 999px;
+  font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: #2B1A14; background: linear-gradient(135deg, #F3D9A4, var(--oro)); box-shadow: 0 0 0 0 rgba(227, 182, 107, .55);
+  animation: brillo-nuevo 2.4s ease-in-out infinite;
+}
+@keyframes brillo-nuevo { 0%, 100% { box-shadow: 0 0 0 0 rgba(227, 182, 107, .45); } 50% { box-shadow: 0 0 0 5px rgba(227, 182, 107, 0); } }
+.anuncio-nuevo { display: flex; flex-direction: column; gap: 12px; }
+.anuncio-icono {
+  width: 76px; height: 76px; margin: 2px auto 0; border-radius: 50%; display: grid; place-items: center;
+  color: #2B1A14; background: radial-gradient(circle at 35% 30%, #F7E2B5, var(--oro) 60%, #B8863E);
+  box-shadow: 0 10px 30px rgba(227, 182, 107, .35); animation: aparecer-icono .6s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+@keyframes aparecer-icono { from { transform: scale(.4) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.anuncio-curso {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; border-radius: 14px; cursor: pointer;
+  border: 1px solid rgba(227, 182, 107, .35); background: var(--tarjeta); color: var(--crema); font: inherit;
+}
+.anuncio-curso b { display: block; font-size: 15px; }
+.anuncio-curso small { color: var(--tenue); font-size: 12px; }
+.anuncio-curso svg { color: var(--oro); flex: none; }
+@media (prefers-reduced-motion: reduce) { .etiqueta-nuevo, .anuncio-icono { animation: none !important; } }

@@ -660,7 +660,9 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
       </section>
 
         <section class="panel" data-panel="asignacion" ${pestana === "asignacion" ? "" : "hidden"}>
-          <div class="fila-entre"><h2>¿Quién lo toma?</h2><button class="btn btn-chico" id="asignar">${icono("plus", 16)}Asignar</button></div>
+          <div class="fila-entre" style="flex-wrap:wrap"><h2>¿Quién lo toma?</h2><div class="fila" style="flex-wrap:wrap">
+            ${c.publicado && d.asignaciones.length ? `<button class="btn btn-sec btn-chico" id="avisar">${icono("bell", 16)}Avisar por WhatsApp</button>` : ""}
+            <button class="btn btn-chico" id="asignar">${icono("plus", 16)}Asignar</button></div></div>
           ${d.asignaciones.length ? d.asignaciones.map((a) => `
             <div class="tarjeta fila-entre" style="padding:12px">
               <div><b style="font-size:14px">${a.user_id ? esc(nombrePerfil(a.user_id)) : a.area ? esc(nombreArea(a.area)) : "Todo el equipo"}${a.sede ? " · " + esc(a.sede) : ""}</b>
@@ -707,7 +709,11 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
   main.querySelector("#publicar").onclick = async () => {
     if (!c.publicado && !d.lecciones.length) return aviso("Agrega al menos un video antes de publicar", "error");
     if (!c.publicado && !d.asignaciones.length && !(await confirmar("Sin asignaciones", "Nadie lo verá hasta que lo asignes. ¿Publicar de todos modos?", "Publicar"))) return;
-    conError(() => datos.guardarCurso({ id: c.id, publicado: !c.publicado }), c.publicado ? "Pasó a borrador" : "Curso publicado");
+    if (c.publicado) return conError(() => datos.guardarCurso({ id: c.id, publicado: false }), "Pasó a borrador");
+    try { await datos.guardarCurso({ id: c.id, publicado: true }); } catch (e) { return aviso(e.message, "error"); }
+    aviso("Curso publicado", "ok");
+    if (d.asignaciones.length) await avisarCurso({ ...c, publicado: true }, d.lecciones, d.asignaciones, "publicado");
+    recargar();
   };
   main.querySelector("#borrar-curso").onclick = async () => {
     if (!(await confirmar("¿Borrar este curso?", "Se borra también el avance de todos en este curso. No se puede deshacer. Los videos en Bunny no se tocan.", "Borrar"))) return;
@@ -789,12 +795,105 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
     ], "Asignar");
     if (!v) return;
     if (v.fecha_limite && v.fecha_limite < hoyISO()) return aviso("La fecha límite ya pasó", "error");
-    conError(() => datos.agregarAsignacion({ curso_id: c.id, area: v.user_id ? null : v.area, sede: v.user_id ? null : v.sede, user_id: v.user_id, obligatorio: !!v.obligatorio, fecha_limite: v.fecha_limite }), "Asignado");
+    let nueva;
+    try { nueva = await datos.agregarAsignacion({ curso_id: c.id, area: v.user_id ? null : v.area, sede: v.user_id ? null : v.sede, user_id: v.user_id || null, obligatorio: !!v.obligatorio, fecha_limite: v.fecha_limite || null }); }
+    catch (e) { return aviso(e.message, "error"); }
+    aviso("Asignado", "ok");
+    if (c.publicado) {
+      const a = nueva && nueva.curso_id ? nueva : { curso_id: c.id, area: v.user_id ? null : v.area || null, sede: v.user_id ? null : v.sede || null, user_id: v.user_id || null, fecha_limite: v.fecha_limite || null };
+      await avisarCurso(c, d.lecciones, [a], "asignado");
+    }
+    recargar();
   };
+  main.querySelector("#avisar")?.addEventListener("click", () => avisarCurso(c, d.lecciones, d.asignaciones, "manual"));
   main.querySelectorAll("[data-borrar-a]").forEach((b) => (b.onclick = async () => {
     if (!(await confirmar("¿Quitar asignación?", "Esas personas dejarán de ver el curso (su avance se conserva).", "Quitar"))) return;
     conError(() => datos.borrarAsignacion(b.dataset.borrarA));
   }));
+}
+
+// ---------------------------------------------------------------------
+//  AVISAR POR WHATSAPP · a quienes tienen asignado un curso publicado
+// ---------------------------------------------------------------------
+const coincide = (a, p) => (!a.area || String(a.area).toLowerCase() === String(p.area || "").toLowerCase())
+  && (!a.sede || String(a.sede).toLowerCase() === String(p.sede || "").toLowerCase())
+  && (!a.user_id || a.user_id === p.user_id);
+const urlApp = () => `${location.origin}${location.pathname}`;
+const llaveAvisados = (cursoId) => `academia-avisados-${cursoId}`;
+function leerAvisados(cursoId) { try { return JSON.parse(localStorage.getItem(llaveAvisados(cursoId)) || "{}"); } catch (_) { return {}; } }
+function marcarAvisado(cursoId, userId) {
+  try { const m = leerAvisados(cursoId); m[userId] = hoyISO(); localStorage.setItem(llaveAvisados(cursoId), JSON.stringify(m)); } catch (_) { /* nada */ }
+}
+function fechaLarga(iso) {
+  return new Date(iso + "T12:00:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+}
+function mensajeCurso(nombre, c, segundos, puntos, fecha) {
+  const primer = String(nombre || "").split(" ")[0];
+  return [
+    `¡Hola ${primer}! ☕`,
+    `Ya tienes un curso nuevo en la *Academia del Buen Café*: *${c.titulo}*${segundos ? ` (${duracion(segundos)})` : ""}.`,
+    puntos ? `Vale hasta ${num(puntos)} puntos para tu nivel y premios. 🏆` : "",
+    fecha ? `Tienes hasta el ${fechaLarga(fecha)} para terminarlo.` : "Avanza a tu ritmo, un video a la vez.",
+    `Entra aquí con tu usuario y PIN: ${urlApp()}`,
+  ].filter(Boolean).join("\n");
+}
+
+async function avisarCurso(c, lecciones, asignaciones, motivo = "manual") {
+  const p = modal(`
+    <div class="fila-entre"><h2 class="modal-titulo">Avisar a tu equipo</h2><button class="btn-icono" data-cerrar aria-label="Cerrar">${icono("x")}</button></div>
+    <div id="avisar-cuerpo"><div class="cargando" style="min-height:140px"><div class="taza-carga"></div></div></div>`, { clase: "modal-ancho" });
+  const capa = modal.actual, cuerpo = capa.querySelector("#avisar-cuerpo");
+  try {
+    const [perfiles, gestor, qz] = await Promise.all([
+      datos.adminPerfiles(),
+      datos.gestorEmpleados().catch(() => []),
+      datos.adminQuiz(c.id).catch(() => null),
+    ]);
+    const wa = Object.fromEntries((gestor || []).filter((g) => g.whatsapp).map((g) => [g.gestor_id, g.whatsapp]));
+    const segundos = lecciones.reduce((a, l) => a + (l.duracion_seg || 0), 0);
+    const gente = perfiles.filter((pf) => pf.activo !== false).map((pf) => {
+      const suyas = asignaciones.filter((a) => coincide(a, pf));
+      if (!suyas.length) return null;
+      const fechas = suyas.map((a) => a.fecha_limite).filter(Boolean).sort();
+      return { ...pf, fecha: fechas[0] || null, whatsapp: wa[pf.gestor_id] || null };
+    }).filter(Boolean).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    const v = valorCurso({ lecciones, preguntas: qz ? qz.length : 0, conFecha: gente.some((g) => g.fecha) });
+    const avisados = leerAvisados(c.id);
+    const intro = motivo === "publicado" ? "¡Listo, ya está publicado! Mándales un mensaje para que lo empiecen."
+      : motivo === "asignado" ? "Estas personas acaban de recibir el curso." : "Quienes tienen asignado este curso:";
+    if (!gente.length) {
+      cuerpo.innerHTML = `<p class="texto-tenue">${intro}</p><div class="vacio"><strong>Nadie coincide todavía</strong>Revisa que los empleados tengan el área y la sede correctas.</div>`;
+      return p;
+    }
+    const general = mensajeCurso("equipo", c, segundos, v.total, gente.every((g) => g.fecha === gente[0].fecha) ? gente[0].fecha : null);
+    cuerpo.innerHTML = `
+      <p class="texto-tenue" style="margin:0 0 4px">${intro} El mensaje ya va escrito con su nombre${v.total ? `, los <b style="color:var(--oro)">${num(v.total)} pts</b>` : ""} y su fecha límite.</p>
+      <div class="lista-aviso">${gente.map((g) => `
+        <div class="fila-aviso ${avisados[g.user_id] ? "enviado" : ""}" data-fila="${g.user_id}">
+          <div class="avatar" style="width:38px;height:38px;font-size:13px;flex:none">${esc(g.nombre.split(" ").map((x) => x[0]).slice(0, 2).join("").toUpperCase())}</div>
+          <div style="flex:1;min-width:0"><b style="font-size:14px">${esc(g.nombre)}</b>
+            <div class="texto-tenue" style="font-size:12px">${g.whatsapp ? "WhatsApp del Gestor" : "Sin número: eliges el chat"}${g.fecha ? " · vence " + fechaCorta(g.fecha) : ""}${avisados[g.user_id] ? ` · <span class="ok-aviso">avisado ${avisados[g.user_id] === hoyISO() ? "hoy" : fechaCorta(avisados[g.user_id])}</span>` : ""}</div></div>
+          <a class="btn btn-chico ${avisados[g.user_id] ? "btn-sec" : ""}" target="_blank" rel="noopener" data-enviar="${g.user_id}"
+             href="${linkWhats(mensajeCurso(g.nombre, c, segundos, v.total, g.fecha), g.whatsapp)}">${avisados[g.user_id] ? "Otra vez" : "Enviar"}</a>
+        </div>`).join("")}</div>
+      <div class="pila" style="gap:8px;margin-top:6px">
+        <a class="btn btn-sec btn-bloque" target="_blank" rel="noopener" href="${linkWhats(general, null)}">${icono("users", 18)}Un solo mensaje para el grupo</a>
+        <button class="btn btn-bloque" data-cerrar>Listo</button>
+      </div>`;
+    cuerpo.querySelectorAll("[data-enviar]").forEach((a) => a.addEventListener("click", () => {
+      const id = a.dataset.enviar;
+      marcarAvisado(c.id, id);
+      const fila = cuerpo.querySelector(`[data-fila="${id}"]`);
+      fila.classList.add("enviado");
+      a.classList.add("btn-sec"); a.textContent = "Otra vez";
+      const info = fila.querySelector(".texto-tenue");
+      if (!info.querySelector(".ok-aviso")) info.insertAdjacentHTML("beforeend", ` · <span class="ok-aviso">avisado hoy</span>`);
+    }));
+  } catch (e) {
+    console.error(e);
+    cuerpo.innerHTML = `<div class="vacio"><strong>No se pudo armar la lista</strong>${esc(e.message)}</div>`;
+  }
+  return p;
 }
 
 // Selector de videos de Bunny

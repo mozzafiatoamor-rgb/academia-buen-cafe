@@ -57,7 +57,7 @@ function semilla() {
   const L = (id, curso, modulo, titulo, dur, orden, video) => ({ id, curso_id: curso, modulo_id: modulo, titulo, duracion_seg: dur, orden, bunny_video_id: video });
   return {
     usuarios: [
-      { user_id: ana, usuario: "ana.barra", pin: "482913", nombre: "Ana P.", area: "barra", sede: "Mozzafiato", turno: "AM", rol: "empleado", activo: true },
+      { user_id: ana, usuario: "ana.barra", pin: "482913", nombre: "Ana P.", area: "barra", sede: "Mozzafiato", turno: "AM", rol: "empleado", activo: true, gestor_id: "mozza:1" },
       { user_id: luis, usuario: "luis.piso", pin: "551820", nombre: "Luis M.", area: "piso", sede: "Mozzafiato", turno: "PM", rol: "empleado", activo: true },
       { user_id: karla, usuario: "karla.barra", pin: "730264", nombre: "Karla C.", area: "barra", sede: "Mozzafiato", turno: "AM", rol: "empleado", activo: true },
       { user_id: admin, usuario: "admin@demo", pin: "demo1234", nombre: "Gustavo", rol: "admin", activo: true },
@@ -425,7 +425,7 @@ export function crearDemo() {
     async olvidarDispositivos(userId) { exigirAdmin(); db.dispositivos = (db.dispositivos || []).filter((d) => d.user_id !== userId); guardar(); },
     async adminPerfiles() {
       exigirAdmin();
-      return db.usuarios.filter((u) => u.rol === "empleado").map(({ user_id, nombre, usuario, gestor_id, activo }) => ({ user_id, nombre, usuario, gestor_id, activo }));
+      return db.usuarios.filter((u) => u.rol === "empleado").map(({ user_id, nombre, usuario, gestor_id, activo, area, sede }) => ({ user_id, nombre, usuario, gestor_id, activo, area, sede }));
     },
     async cambiarPin(userId, pin) {
       await espera(); exigirAdmin();

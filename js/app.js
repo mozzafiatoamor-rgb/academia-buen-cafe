@@ -409,7 +409,38 @@ async function pintarInicio() {
     await mostrarBienvenida(r);
     try { localStorage.setItem(llaveBienvenida, "1"); } catch (_) { /* nada */ }
   }
+  await anunciarNuevos(r, cursos);
   if (r.insignias_sin_ver?.length) celebrar(r.insignias_sin_ver);
+}
+
+// Un curso es "nuevo" mientras no hayas visto ni un segundo de él.
+const esNuevo = (c) => !c.terminado && !c.ultima_actividad && !c.completadas;
+
+// Tarjeta de bienvenida a los cursos recién asignados (una sola vez por curso).
+async function anunciarNuevos(r, cursos) {
+  const llave = `academia-anunciados-${r.usuario}`;
+  let vistos = [];
+  try { vistos = JSON.parse(localStorage.getItem(llave) || "[]"); } catch (_) { /* sin almacenamiento */ }
+  const nuevos = cursos.filter((c) => esNuevo(c) && !vistos.includes(c.id));
+  if (!nuevos.length) return;
+  try { localStorage.setItem(llave, JSON.stringify([...new Set([...vistos, ...nuevos.map((c) => c.id)])].slice(-200))); } catch (_) { /* nada */ }
+  const uno = nuevos.length === 1;
+  confeti({ cantidad: 70, duracion: 2200, origenY: 0.25 });
+  const v = await modal(`
+    <div class="anuncio-nuevo">
+      <div class="anuncio-icono">${icono("sparkles", 34)}</div>
+      <h2 class="modal-titulo" style="text-align:center">${uno ? "¡Tienes un curso nuevo!" : `¡Tienes ${nuevos.length} cursos nuevos!`}</h2>
+      <p class="texto-tenue" style="text-align:center;margin:0">${uno ? "Ya está listo para ti. Cada video que termines suma puntos para tu nivel y tus premios." : "Ya están listos para ti. Cada video que termines suma puntos para tu nivel y tus premios."}</p>
+      <div class="pila" style="gap:8px;margin-top:4px">${nuevos.slice(0, 4).map((c) => `
+        <button class="anuncio-curso" data-cerrar="${c.id}">
+          <div style="flex:1;min-width:0;text-align:left"><b>${esc(c.titulo)}</b>
+            <small>${esc(nombreCategoria(c.categoria))} · ${c.lecciones} lecciones · ${duracion(c.duracion_seg)}${c.fecha_limite ? ` · vence ${fechaCorta(c.fecha_limite)}` : ""}</small></div>
+          ${icono("next", 18)}
+        </button>`).join("")}</div>
+      <button class="btn btn-bloque" data-cerrar="${nuevos[0].id}">${icono("play", 18)}Empezar ${uno ? "ahora" : "el primero"}</button>
+      <button class="btn-texto" data-cerrar style="align-self:center">Lo veo después</button>
+    </div>`);
+  if (v && typeof v === "string") ir(`/curso/${v}`);
 }
 
 function tarjetaCurso(c) {
@@ -421,7 +452,7 @@ function tarjetaCurso(c) {
   return `
   <button class="tarjeta-borde pila" data-ir="/curso/${c.id}" style="gap:10px">
     <div class="fila-entre" style="align-items:flex-start">
-      <div><b style="font-size:15px">${esc(c.titulo)}</b>
+      <div><b style="font-size:15px">${esNuevo(c) ? `<span class="etiqueta-nuevo">Nuevo</span>` : ""}${esc(c.titulo)}</b>
         <div class="texto-tenue" style="font-size:12px">${esc(nombreCategoria(c.categoria))} · ${c.lecciones} lecciones · ${duracion(c.duracion_seg)}${c.obligatorio ? " · obligatorio" : ""}</div></div>
       ${pildora}
     </div>
