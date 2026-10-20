@@ -11,6 +11,8 @@ import { fijarCfgPuntos, valorCurso, puntosLeccion } from "./puntos.js";
 
 const app = document.getElementById("app");
 const LOGO = "img/logo.png";
+const ISOTIPO = "img/isotipo.webp";
+const marcaSup = (tam = 46) => `<div class="marca-sup"><img src="${ISOTIPO}" alt="Mozzafiato" style="height:${tam}px"></div>`;
 export const estado = { perfil: null, limpieza: null };
 
 // ---------------------------------------------------------------------
@@ -87,6 +89,7 @@ function cargando() { app.innerHTML = `<div class="cargando"><div class="taza-ca
 function conNav(html, activa) {
   const item = (ruta, ic, txt) => `<a href="#/${ruta}" class="${activa === ruta ? "activo" : ""}" ${activa === ruta ? 'aria-current="page"' : ""}>${icono(ic)}${txt}</a>`;
   app.className = "con-nav";
+  html = html.replace('<main class="vista">', `<main class="vista">${marcaSup()}`);
   app.innerHTML = `${bandaDemo()}${html}
     <nav class="nav" aria-label="Secciones">
       ${item("inicio", "home", "Inicio")}${item("insignias", "medal", "Insignias")}${item("ranking", "trophy", "Ranking")}${item("premios", "gift", "Premios")}
@@ -181,7 +184,7 @@ function pintarLogin(errorInicial = "") {
   const pintar = () => {
     sinNav(`
     <main class="login">
-      <img class="login-logo" src="${LOGO}" alt="Mozzafiato · El placer del buen café">
+      <img class="login-isotipo" src="${ISOTIPO}" alt="Mozzafiato · El placer del buen café">
       <div class="pila" style="align-items:center;gap:4px">
         <h1 class="login-titulo">Academia del Buen Café</h1>
         <p class="texto-tenue" style="margin:0">${modoAdmin ? "Acceso de administrador" : "Entra con tu usuario y tu PIN"}</p>
@@ -559,7 +562,7 @@ async function pintarCurso(id) {
   sinNav(`${vp ? bandaVista() : ""}
   <main class="vista vista-completa">
     <header class="curso-cabeza">
-      <button class="btn-icono" id="volver" aria-label="Volver">${icono("back")}</button>
+      <div class="fila-iso"><button class="btn-icono" id="volver" aria-label="Volver">${icono("back")}</button><img class="cabeza-iso" src="${ISOTIPO}" alt="Mozzafiato"><span style="width:44px"></span></div>
       <div class="etiqueta" style="color:var(--oro)">${esc(nombreCategoria(d.curso.categoria))}${d.curso.quiz_obligatorio ? " · con quiz" : ""}</div>
       <h1>${esc(d.curso.titulo)}</h1>
       ${d.curso.descripcion ? `<p style="margin:0;color:var(--crema-2)">${esc(d.curso.descripcion)}</p>` : ""}
@@ -843,7 +846,8 @@ async function pintarQuiz(cursoId) {
   const preguntas = d.preguntas;
   sinNav(`
   <main class="vista vista-completa">
-    <div class="fila"><button class="btn-icono" id="volver" aria-label="Volver">${icono("back")}</button><span class="texto-tenue">${esc(d.curso.titulo)}</span></div>
+    <div class="fila-iso"><button class="btn-icono" id="volver" aria-label="Volver">${icono("back")}</button><img class="cabeza-iso" src="${ISOTIPO}" alt="Mozzafiato"><span style="width:44px"></span></div>
+    <span class="texto-tenue">${esc(d.curso.titulo)}</span>
     <h1 class="titulo-pagina">Quiz final</h1>
     <p class="texto-tenue" style="margin:0">${preguntas.length} preguntas · apruebas con ${d.curso.quiz_minimo}%</p>
     <form id="quiz" class="pila" style="gap:22px">

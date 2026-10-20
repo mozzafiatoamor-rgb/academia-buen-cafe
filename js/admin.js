@@ -32,7 +32,10 @@ export async function vistaAdmin(app, partes, contexto) {
         <button class="btn btn-sec btn-chico" id="salir">${icono("logout", 16)}Cerrar sesión</button>
       </div>
     </aside>
-    <main class="admin-main" id="admin-main"><div class="cargando"><div class="taza-carga"></div></div></main>
+    <div class="admin-columna">
+      <div class="marca-sup"><img src="img/isotipo.webp" alt="Mozzafiato" style="height:46px"></div>
+      <main class="admin-main" id="admin-main"><div class="cargando"><div class="taza-carga"></div></div></main>
+    </div>
   </div>`;
   app.querySelector("#salir").onclick = ctx.salir;
   app.querySelector("#salir-movil").onclick = ctx.salir;

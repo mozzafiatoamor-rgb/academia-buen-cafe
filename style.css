@@ -356,3 +356,15 @@ button.tarjeta-borde:hover, a.tarjeta-borde:hover { border-color: #5A4436; }
 @media (prefers-reduced-motion: reduce) {
   .momento, .momento-ic, .momento-pts, .nivel-taza svg, .nivel-taza-llenado, .desbloqueo .medalla, .destellos::before, .destellos::after { animation: none !important; }
 }
+
+/* ---------- Isotipo dorado (v1.6.1) ---------- */
+.marca-sup { display: flex; justify-content: center; padding: 2px 0 0; }
+.marca-sup img { width: auto; filter: drop-shadow(0 4px 14px rgba(227, 182, 107, .22)); }
+.login-isotipo { width: 150px; height: auto; filter: drop-shadow(0 10px 28px rgba(227, 182, 107, .28)); animation: aparecer-suave .8s ease-out both; }
+@keyframes aparecer-suave { from { opacity: 0; transform: translateY(8px) scale(.96); } }
+.fila-iso { display: flex; align-items: center; justify-content: space-between; }
+.cabeza-iso { height: 36px; width: auto; filter: drop-shadow(0 3px 10px rgba(227, 182, 107, .2)); }
+.admin-columna { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; }
+.admin-columna > .admin-main { flex: 1 1 auto; padding-top: 12px; }
+.admin-columna > .marca-sup { padding-top: 20px; }
+@media (prefers-reduced-motion: reduce) { .login-isotipo { animation: none; } }
