@@ -328,3 +328,13 @@ button.tarjeta-borde:hover, a.tarjeta-borde:hover { border-color: #5A4436; }
 .lista-videos input { width: 20px; height: 20px; accent-color: var(--cobre); flex: none; }
 .lista-videos .ya { opacity: .5; }
 .pin-grande { font-size: 40px; font-weight: 700; letter-spacing: 8px; color: var(--oro); text-align: center; font-variant-numeric: tabular-nums; background: var(--tarjeta-2); border-radius: 14px; padding: 12px; }
+
+/* Elementos ocultos (pestañas del editor, etc.) */
+[hidden] { display: none !important; }
+
+/* Botón "Salir" del panel admin en pantallas angostas (arriba a la derecha) */
+.admin-menu .salir-movil { display: none; }
+@media (max-width: 820px) {
+  .admin-menu { position: relative; }
+  .admin-menu .salir-movil { display: inline-flex; position: absolute; top: 14px; right: 16px; }
+}

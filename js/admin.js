@@ -11,7 +11,7 @@ let ctx; // { ir, salir }
 
 export async function vistaAdmin(app, partes, contexto) {
   ctx = contexto;
-  const [seccion = "", id] = partes;
+  const [seccion = "", id, pestana] = partes;
   const menu = [["", "chart", "Resumen"], ["empleados", "users", "Empleados"], ["cursos", "book", "Cursos"], ["premios", "gift", "Premios y canjes"], ["insignias", "medal", "Insignias"]];
   const activa = seccion === "curso" ? "cursos" : seccion;
   app.className = "";
@@ -23,6 +23,7 @@ export async function vistaAdmin(app, partes, contexto) {
         <img src="${LOGO}" alt="Mozzafiato">
         <div class="serif" style="font-size:20px;line-height:1.1">Academia del Buen Café</div>
         <div class="etiqueta">Panel de administración</div>
+        <button class="btn btn-sec btn-chico salir-movil" id="salir-movil">${icono("logout", 16)}Salir</button>
       </div>
       <nav aria-label="Secciones">${menu.map(([r, ic, t]) => `<a href="#/admin${r ? "/" + r : ""}" class="${activa === r ? "activo" : ""}">${icono(ic, 18)}${t}</a>`).join("")}</nav>
       <div class="admin-pie pila" style="margin-top:auto">
@@ -32,11 +33,12 @@ export async function vistaAdmin(app, partes, contexto) {
     <main class="admin-main" id="admin-main"><div class="cargando"><div class="taza-carga"></div></div></main>
   </div>`;
   app.querySelector("#salir").onclick = ctx.salir;
+  app.querySelector("#salir-movil").onclick = ctx.salir;
   const main = app.querySelector("#admin-main");
   try {
     if (seccion === "empleados") return await pintarEmpleados(main);
     if (seccion === "cursos") return await pintarCursos(main);
-    if (seccion === "curso") return await pintarEditorCurso(main, id);
+    if (seccion === "curso") return await pintarEditorCurso(main, id, pestana);
     if (seccion === "premios") return await pintarPremios(main);
     if (seccion === "insignias") return await pintarInsignias(main);
     return await pintarResumen(main);
@@ -563,7 +565,7 @@ async function sincronizarDuraciones(lecciones) {
   } catch (e) { console.warn("No se pudieron leer duraciones", e); return false; }
 }
 
-async function pintarEditorCurso(main, id) {
+async function pintarEditorCurso(main, id, pestana = "lecciones") {
   const d = await datos.adminCurso(id);
   if (!d.curso) throw new Error("Curso no encontrado");
   const c = d.curso;
@@ -598,8 +600,13 @@ async function pintarEditorCurso(main, id) {
     </div>
     ${!c.publicado ? `<div class="tarjeta texto-tenue">En borrador: los empleados todavía no lo ven. Agrega capítulos, videos y asignaciones; luego dale <b>Publicar</b>.</div>` : ""}
 
-    <div class="fila" style="flex-wrap:wrap;align-items:flex-start;gap:20px">
-      <section class="panel" style="flex:2 1 520px">
+    <div class="pestanas" role="tablist" id="pestanas-curso" style="max-width:720px;overflow-x:auto">
+      ${[["lecciones", "Lecciones", d.lecciones.length], ["quiz", "Quiz", null], ["materiales", "Materiales", null], ["asignacion", "Asignación", d.asignaciones.length]]
+        .map(([v, t, n]) => `<button role="tab" data-pestana="${v}" aria-selected="${v === pestana}" class="${v === pestana ? "activo" : ""}" style="flex:1 0 auto;padding:0 12px;white-space:nowrap">${t}<span class="cuenta" data-cuenta="${v}">${n !== null ? ` · ${n}` : ""}</span></button>`).join("")}
+    </div>
+
+    <div>
+      <section class="panel" data-panel="lecciones" ${pestana === "lecciones" ? "" : "hidden"}>
         <div class="fila-entre"><h2>Capítulos y lecciones</h2><button class="btn btn-chico" id="nuevo-cap">${icono("plus", 16)}Capítulo</button></div>
         ${caps.map((cap, ci) => `
           <div class="capitulo-admin">
@@ -619,8 +626,7 @@ async function pintarEditorCurso(main, id) {
         ${!caps.length && !sueltas.length ? `<div class="vacio"><strong>Empieza con un capítulo</strong>Por ejemplo "El grano y el café". Luego eliges sus videos de Bunny.</div>` : ""}
       </section>
 
-      <div class="pila" style="flex:1 1 300px;gap:20px">
-        <section class="panel">
+        <section class="panel" data-panel="asignacion" ${pestana === "asignacion" ? "" : "hidden"}>
           <div class="fila-entre"><h2>¿Quién lo toma?</h2><button class="btn btn-chico" id="asignar">${icono("plus", 16)}Asignar</button></div>
           ${d.asignaciones.length ? d.asignaciones.map((a) => `
             <div class="tarjeta fila-entre" style="padding:12px">
@@ -628,17 +634,28 @@ async function pintarEditorCurso(main, id) {
                 <div class="texto-tenue" style="font-size:12px">${a.obligatorio ? "Obligatorio" : "Opcional"}${a.fecha_limite ? " · vence " + fechaCorta(a.fecha_limite) : ""}</div></div>
               <button class="mini-btn" aria-label="Quitar asignación" data-borrar-a="${a.id}">${icono("trash", 18)}</button>
             </div>`).join("") : `<p class="texto-tenue" style="margin:0">Aún no está asignado a nadie.</p>`}
+          <div style="border-top:1px solid var(--linea);padding-top:14px;margin-top:6px">
+            <button class="btn btn-peligro btn-chico" id="borrar-curso">${icono("trash", 16)}Borrar curso</button>
+          </div>
         </section>
-        <section class="panel" id="panel-quiz"></section>
-        <section class="panel" id="panel-materiales"></section>
-        <button class="btn btn-peligro" id="borrar-curso">${icono("trash", 18)}Borrar curso</button>
-      </div>
+        <section class="panel" id="panel-quiz" data-panel="quiz" ${pestana === "quiz" ? "" : "hidden"}></section>
+        <section class="panel" id="panel-materiales" data-panel="materiales" ${pestana === "materiales" ? "" : "hidden"}></section>
     </div>`;
 
   const conError = async (fn, ok) => { try { await fn(); if (ok) aviso(ok, "ok"); recargar(); } catch (e) { aviso(e.message, "error"); } };
   sincronizarDuraciones(d.lecciones).then((hubo) => { if (hubo && location.hash.includes(c.id)) recargar(); });
   panelQuiz(main.querySelector("#panel-quiz"), c, recargar);
   panelMateriales(main.querySelector("#panel-materiales"), c);
+  main.querySelectorAll("[data-pestana]").forEach((b) => (b.onclick = () => {
+    const v = b.dataset.pestana;
+    main.querySelectorAll("[data-pestana]").forEach((x) => { x.classList.toggle("activo", x === b); x.setAttribute("aria-selected", x === b); });
+    main.querySelectorAll("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== v));
+    history.replaceState(null, "", `${location.pathname}${location.search}#/admin/curso/${c.id}/${v}`);
+  }));
+  Promise.all([datos.adminQuiz(c.id).catch(() => null), datos.adminMateriales(c.id).catch(() => null)]).then(([qz, mt]) => {
+    if (qz) main.querySelector('[data-cuenta="quiz"]').textContent = ` · ${qz.length}`;
+    if (mt) main.querySelector('[data-cuenta="materiales"]').textContent = ` · ${mt.length}`;
+  });
 
   main.querySelector("#editar").onclick = async () => {
     const v = await formulario("Datos del curso", [
