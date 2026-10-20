@@ -394,3 +394,18 @@ body { font-family: var(--sans); }
   .admin-marca { gap: 6px; }
   .admin-iso { width: 64px; }
 }
+
+/* ---------- Marca en la app del empleado y títulos en Nunito (v1.6.3) ---------- */
+.marca-usuario { flex-direction: column; align-items: center; gap: 8px; padding-top: 4px; }
+.marca-usuario img { height: 62px; }
+.saludo h1, .titulo-pagina { font-family: var(--sans); font-weight: 800; letter-spacing: -.01em; }
+.saludo h1 { font-size: 30px; }
+
+/* ---------- Toda la tipografía en Nunito, adiós Cormorant (v1.6.4) ---------- */
+:root { --serif: "Nunito", system-ui, -apple-system, sans-serif; }
+.titulo-pagina, .login-titulo, .saludo h1, .curso-cabeza h1, .modal-titulo { font-weight: 800; letter-spacing: -.01em; }
+.titulo-pagina { font-size: 32px; }
+.login-titulo { font-size: 27px; }
+.curso-cabeza h1 { font-size: 29px; line-height: 1.12; }
+.modal-titulo { font-size: 24px; line-height: 1.15; }
+.serif { font-weight: 600; }

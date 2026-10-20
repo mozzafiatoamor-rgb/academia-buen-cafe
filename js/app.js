@@ -12,7 +12,7 @@ import { fijarCfgPuntos, valorCurso, puntosLeccion } from "./puntos.js";
 const app = document.getElementById("app");
 const LOGO = "img/logo.png";
 const ISOTIPO = "img/isotipo.webp";
-const marcaSup = (tam = 46) => `<div class="marca-sup"><img src="${ISOTIPO}" alt="Mozzafiato" style="height:${tam}px"></div>`;
+const marcaSup = () => `<div class="marca-sup marca-usuario"><img src="${ISOTIPO}" alt="Mozzafiato">${marcaTitulo("chica", "div")}</div>`;
 export const estado = { perfil: null, limpieza: null };
 
 // ---------------------------------------------------------------------

@@ -49,14 +49,14 @@ function partirLineas(x, texto, maxAncho) {
 export async function dibujarCertificado({ nombre, curso, fecha, segundos, puntaje, codigo }) {
   try {
     await Promise.all([
-      document.fonts.load('600 96px "Cormorant Garamond"'), document.fonts.load('italic 600 96px "Cormorant Garamond"'),
+      document.fonts.load('800 96px "Nunito"'), document.fonts.load('600 30px "Nunito"'),
       document.fonts.load('500 30px "Nunito"'), document.fonts.load('700 30px "Nunito"'), document.fonts.load('300 30px "Lato"'), document.fonts.load('900 30px "Lato"'),
     ]);
   } catch (_) { /* usa fuentes del sistema */ }
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const x = c.getContext("2d");
-  const serif = '"Cormorant Garamond", Georgia, serif', sans = '"Nunito", system-ui, sans-serif', lato = '"Lato", system-ui, sans-serif';
+  const serif = '"Nunito", system-ui, sans-serif', sans = '"Nunito", system-ui, sans-serif', lato = '"Lato", system-ui, sans-serif';
 
   // Fondo y marcos
   const g = x.createRadialGradient(W / 2, H / 2, 200, W / 2, H / 2, W * 0.7);
@@ -77,7 +77,7 @@ export async function dibujarCertificado({ nombre, curso, fecha, segundos, punta
     const lw = 460, lh = lw * (logo.height / logo.width);
     x.drawImage(logo, (W - lw) / 2, 120, lw, lh);
   } catch (_) {
-    x.fillStyle = C.espresso; x.font = `600 80px ${serif}`; x.fillText("MOZZAFIATO", W / 2, 260);
+    x.fillStyle = C.espresso; x.font = `800 72px ${serif}`; x.fillText("MOZZAFIATO", W / 2, 260);
   }
 
   // "ACADEMIA" delgada + "DEL BUEN CAFÉ" gruesa (Lato), centradas juntas
@@ -92,14 +92,14 @@ export async function dibujarCertificado({ nombre, curso, fecha, segundos, punta
   x.textAlign = "center";
   if ("letterSpacing" in x) x.letterSpacing = "0px";
 
-  x.fillStyle = C.espresso; x.font = `600 104px ${serif}`;
+  x.fillStyle = C.espresso; x.font = `800 88px ${serif}`;
   x.fillText("Certificado de finalización", W / 2, 540);
 
   x.fillStyle = C.cafe; x.font = `500 32px ${sans}`;
   x.fillText("Se otorga con orgullo a", W / 2, 625);
 
   x.fillStyle = C.espresso;
-  ajustarTexto(x, nombre, 1500, 128, `italic 600 {t}px ${serif}`);
+  ajustarTexto(x, nombre, 1500, 112, `800 {t}px ${serif}`);
   x.fillText(nombre, W / 2, 770);
   x.strokeStyle = C.oro; x.lineWidth = 3;
   x.beginPath(); x.moveTo(W / 2 - 520, 805); x.lineTo(W / 2 + 520, 805); x.stroke();
@@ -107,7 +107,7 @@ export async function dibujarCertificado({ nombre, curso, fecha, segundos, punta
   x.fillStyle = C.cafe; x.font = `500 32px ${sans}`;
   x.fillText("por completar con éxito el curso", W / 2, 875);
 
-  x.fillStyle = C.espresso; x.font = `700 72px ${serif}`;
+  x.fillStyle = C.espresso; x.font = `800 62px ${serif}`;
   const lineas = partirLineas(x, curso, 1500).slice(0, 2);
   lineas.forEach((l, i) => x.fillText(l, W / 2, 965 + i * 78));
   const yDet = 965 + (lineas.length - 1) * 78 + 70;
