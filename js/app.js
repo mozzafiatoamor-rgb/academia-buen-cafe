@@ -4,6 +4,7 @@
 import { datos, MODO, enviarAvance, vaciarCola, pendientesCola } from "./datos.js";
 import { icono, esc, num, duracion, reloj, fechaCorta, hoyISO, haceCuanto, iniciales, saludo, aviso, modal, confirmar, nombreArea, nombreCategoria, fijarCategorias } from "./ui.js";
 import { vistaAdmin } from "./admin.js";
+import { mostrarCertificado, folio } from "./certificado.js";
 
 const app = document.getElementById("app");
 const LOGO = "img/logo.png";
@@ -523,6 +524,10 @@ async function pintarCurso(id) {
     </header>
 
     ${terminado ? `<div class="tarjeta fila" style="border:1px solid var(--verde)">${icono("trophy", 28)}<div><b>¡Curso completado!</b><div class="texto-tenue">Buen trabajo. Tus puntos ya están en tu cuenta.</div></div></div>` : ""}
+    ${d.curso.certificado && (terminado || vp) ? `<button class="tarjeta-borde fila" id="ver-cert" style="border-color:var(--oro);gap:14px">
+        <span class="medalla medalla-oro chica" style="flex:none">${icono("medal", 22)}</span>
+        <span style="flex:1"><b style="font-size:15px;display:block">${vp ? "Ver ejemplo del certificado" : "Tu certificado está listo"}</b><span class="texto-tenue">Descárgalo o compártelo con tu logo de Mozzafiato.</span></span>
+        ${icono("next", 18)}</button>` : ""}
 
     ${caps.map((c, ci) => `
       <section class="pila" style="gap:8px">
@@ -556,6 +561,19 @@ async function pintarCurso(id) {
   </main>`);
 
   app.querySelector("#volver").onclick = () => ir(vp ? `/admin/curso/${id}` : "/inicio");
+  app.querySelector("#ver-cert")?.addEventListener("click", () => {
+    const fechas = [...d.progreso.filter((p) => p.completado && orden.some((l) => l.id === p.leccion_id)).map((p) => p.completado_en),
+      ...d.intentos.filter((t) => t.aprobado).map((t) => t.creado_en)].filter(Boolean).sort();
+    const cuando = fechas.length ? new Date(fechas[fechas.length - 1]) : new Date();
+    mostrarCertificado({
+      nombre: vp ? "Nombre del colaborador" : estado.perfil.nombre,
+      curso: d.curso.titulo,
+      fecha: cuando.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" }),
+      segundos: durTotal,
+      puntaje: mejor || null,
+      codigo: folio(vp ? "ejemplo" : estado.perfil.usuario, d.curso.id),
+    });
+  });
   app.querySelectorAll("[data-ir]").forEach((b) => (b.onclick = () => ir(b.dataset.ir)));
   app.querySelectorAll(".leccion.bloq").forEach((b) => (b.onclick = () => aviso("Termina la lección anterior para desbloquear esta")));
   app.querySelectorAll("[data-material]").forEach((b) => (b.onclick = async () => {

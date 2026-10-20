@@ -4,6 +4,7 @@
 import { datos, MODO } from "./datos.js";
 import { icono, esc, num, duracion, fechaCorta, hoyISO, haceCuanto, aviso, modal, confirmar, formulario, AREAS, SEDES, nombreArea, nombreCategoria, opcionesCategoria, categorias, fijarCategorias, slug } from "./ui.js";
 import { subirCursoDesdeCarpeta } from "./subir.js";
+import { panelQuiz, panelMateriales } from "./contenido.js";
 
 const LOGO = "img/logo.png";
 let ctx; // { ir, salir }
@@ -628,16 +629,16 @@ async function pintarEditorCurso(main, id) {
               <button class="mini-btn" aria-label="Quitar asignación" data-borrar-a="${a.id}">${icono("trash", 18)}</button>
             </div>`).join("") : `<p class="texto-tenue" style="margin:0">Aún no está asignado a nadie.</p>`}
         </section>
-        <section class="panel">
-          <h2>Quiz y materiales</h2>
-          <p class="texto-tenue" style="margin:0">El editor de preguntas, los PDFs y el certificado llegan en la siguiente versión.</p>
-        </section>
+        <section class="panel" id="panel-quiz"></section>
+        <section class="panel" id="panel-materiales"></section>
         <button class="btn btn-peligro" id="borrar-curso">${icono("trash", 18)}Borrar curso</button>
       </div>
     </div>`;
 
   const conError = async (fn, ok) => { try { await fn(); if (ok) aviso(ok, "ok"); recargar(); } catch (e) { aviso(e.message, "error"); } };
   sincronizarDuraciones(d.lecciones).then((hubo) => { if (hubo && location.hash.includes(c.id)) recargar(); });
+  panelQuiz(main.querySelector("#panel-quiz"), c, recargar);
+  panelMateriales(main.querySelector("#panel-materiales"), c);
 
   main.querySelector("#editar").onclick = async () => {
     const v = await formulario("Datos del curso", [

@@ -333,6 +333,22 @@ export function crearDemo() {
       guardar(); return { disponibles: disp - p.costo };
     },
     async niveles() { return NIVELES; },
+    async adminQuiz(cursoId) { exigirAdmin(); return deshacer(db.preguntas.filter((x) => x.curso_id === cursoId).sort((a, b) => a.orden - b.orden)); },
+    async guardarPregunta(p) {
+      exigirAdmin();
+      if (p.id) { const x = db.preguntas.find((y) => y.id === p.id); Object.keys(p).forEach((k) => p[k] !== undefined && (x[k] = p[k])); guardar(); return x; }
+      const n = { correcta: 0, ...p, id: uid() }; db.preguntas.push(n); guardar(); return n;
+    },
+    async borrarPregunta(id) { exigirAdmin(); db.preguntas = db.preguntas.filter((x) => x.id !== id); guardar(); },
+    async adminMateriales(cursoId) { exigirAdmin(); return deshacer(db.materiales.filter((m) => m.curso_id === cursoId).sort((a, b) => (a.orden || 0) - (b.orden || 0))); },
+    async subirMaterial(cursoId, archivo, titulo, orden = 0) {
+      exigirAdmin(); await espera(400);
+      const m = { id: uid(), curso_id: cursoId, titulo, ruta: URL.createObjectURL(archivo), tipo: (archivo.name.split(".").pop() || "pdf").toLowerCase(), peso_kb: Math.round(archivo.size / 1024), orden };
+      db.materiales.push(m); guardar(); return m;
+    },
+    async agregarMaterialLink(cursoId, titulo, url, orden = 0) { exigirAdmin(); const m = { id: uid(), curso_id: cursoId, titulo, ruta: url, tipo: "link", orden }; db.materiales.push(m); guardar(); return m; },
+    async actualizarMaterial(id, cambios) { exigirAdmin(); Object.assign(db.materiales.find((m) => m.id === id), cambios); guardar(); },
+    async borrarMaterial(m) { exigirAdmin(); db.materiales = db.materiales.filter((x) => x.id !== m.id); guardar(); },
     async categorias() { return db.categorias || null; },
     async guardarCategorias(lista) { exigirAdmin(); db.categorias = lista; guardar(); },
     async crearInsignia(ins) { exigirAdmin(); if (!INSIGNIAS.some((i) => i.id === ins.id)) INSIGNIAS.push({ activa: true, secreta: false, nivel: null, ...ins }); },

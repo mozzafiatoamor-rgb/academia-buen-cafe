@@ -162,6 +162,42 @@ function crearNube() {
     },
 
     async niveles() { return q(sb.from("academia_niveles").select("*").order("orden")); },
+    // ---------- Quiz (admin) ----------
+    async adminQuiz(cursoId) {
+      const preguntas = await q(sb.from("academia_quiz_preguntas").select("*").eq("curso_id", cursoId).order("orden"));
+      const ids = preguntas.map((p) => p.id);
+      const claves = ids.length ? await q(sb.from("academia_quiz_claves").select("*").in("pregunta_id", ids)) : [];
+      const c = Object.fromEntries(claves.map((k) => [k.pregunta_id, k.correcta]));
+      return preguntas.map((p) => ({ ...p, correcta: c[p.id] ?? 0 }));
+    },
+    async guardarPregunta({ id, curso_id, pregunta, opciones, orden, correcta }) {
+      const fila = { curso_id, pregunta, opciones, orden };
+      Object.keys(fila).forEach((k) => fila[k] === undefined && delete fila[k]);
+      const p = id ? await q(sb.from("academia_quiz_preguntas").update(fila).eq("id", id).select().single())
+                   : await q(sb.from("academia_quiz_preguntas").insert(fila).select().single());
+      if (correcta !== undefined) await q(sb.from("academia_quiz_claves").upsert({ pregunta_id: p.id, correcta }));
+      return p;
+    },
+    borrarPregunta: (id) => q(sb.from("academia_quiz_preguntas").delete().eq("id", id)),
+
+    // ---------- Materiales (admin) ----------
+    adminMateriales: (cursoId) => q(sb.from("academia_materiales").select("*").eq("curso_id", cursoId).order("orden").order("titulo")),
+    async subirMaterial(cursoId, archivo, titulo, orden = 0) {
+      const ext = (archivo.name.split(".").pop() || "pdf").toLowerCase();
+      const base = archivo.name.replace(/\.[^.]+$/, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "archivo";
+      const ruta = `${cursoId}/${Date.now()}-${base}.${ext}`;
+      const r = await sb.storage.from("academia-materiales").upload(ruta, archivo, { contentType: archivo.type || undefined, upsert: false });
+      if (r.error) throw new ErrorAcademia(r.error.message);
+      return q(sb.from("academia_materiales").insert({ curso_id: cursoId, titulo, ruta, tipo: ext, peso_kb: Math.round(archivo.size / 1024), orden }).select().single());
+    },
+    agregarMaterialLink: (cursoId, titulo, url, orden = 0) =>
+      q(sb.from("academia_materiales").insert({ curso_id: cursoId, titulo, ruta: url, tipo: "link", orden }).select().single()),
+    actualizarMaterial: (id, cambios) => q(sb.from("academia_materiales").update(cambios).eq("id", id)),
+    async borrarMaterial(m) {
+      if (!/^https?:\/\//.test(m.ruta)) await sb.storage.from("academia-materiales").remove([m.ruta]);
+      return q(sb.from("academia_materiales").delete().eq("id", m.id));
+    },
+
     async categorias() {
       const r = await q(sb.from("academia_config").select("valor").eq("clave", "categorias").maybeSingle());
       return Array.isArray(r?.valor) ? r.valor : null;

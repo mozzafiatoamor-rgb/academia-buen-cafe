@@ -14,6 +14,8 @@ import { datos } from "./datos.js";
 import { icono, esc, modal, aviso, opcionesCategoria } from "./ui.js";
 
 const EXT = /\.(mp4|mov|m4v|webm|mkv|avi)$/i;
+const DOC = /\.(pdf|png|jpe?g|webp)$/i;
+const MAX_DOC = 20 * 1024 * 1024;
 const MIME = { mp4: "video/mp4", mov: "video/quicktime", m4v: "video/x-m4v", webm: "video/webm", mkv: "video/x-matroska", avi: "video/x-msvideo" };
 const SIMULTANEOS = 2;
 const natural = (a, b) => a.localeCompare(b, "es", { numeric: true, sensitivity: "base" });
@@ -31,12 +33,13 @@ export function tamano(bytes) {
 
 // Convierte la lista de archivos de la carpeta en curso → capítulos → videos.
 export function analizarCarpeta(archivos) {
-  const videos = [], otros = [];
+  const videos = [], otros = [], docs = [];
   for (const f of archivos) {
     const ruta = f.webkitRelativePath || f.name;
     const partes = ruta.split("/");
     if (partes.some((p) => p.startsWith("."))) continue; // .DS_Store y ocultos
     if (EXT.test(f.name)) videos.push({ file: f, partes, ruta });
+    else if (DOC.test(f.name) && f.size <= MAX_DOC) docs.push({ file: f, ruta });
     else otros.push(ruta);
   }
   if (!videos.length) return null;
@@ -57,6 +60,7 @@ export function analizarCarpeta(archivos) {
     curso: limpiarNombre(nombreCurso),
     capitulos,
     otros: otros.length,
+    docs: docs.sort((a, b) => natural(a.ruta, b.ruta)).map((d) => ({ file: d.file, titulo: limpiarNombre(d.file.name.replace(DOC, "")) || d.file.name, bytes: d.file.size })),
     total: videos.length,
     bytes: videos.reduce((a, v) => a + v.file.size, 0),
   };
@@ -98,7 +102,8 @@ export async function subirCursoDesdeCarpeta({ alTerminar }) {
           </ol>
         </details>`).join("")}
     </div>
-    ${plan.otros ? `<p class="texto-tenue" style="margin:0">${plan.otros} archivo(s) que no son video se omiten (los PDFs se podrán agregar como materiales).</p>` : ""}
+    ${plan.docs.length ? `<p class="texto-tenue" style="margin:0">${icono("file", 14)} ${plan.docs.length} PDF/imagen(es) se agregarán como <b>materiales</b> del curso: ${plan.docs.map((d) => esc(d.titulo)).join(", ")}.</p>` : ""}
+    ${plan.otros ? `<p class="texto-tenue" style="margin:0">${plan.otros} archivo(s) se omiten (no son video, PDF ni imagen, o pesan más de 20 MB).</p>` : ""}
     <p class="texto-tenue" style="margin:0">El curso se crea en <b>borrador</b>: nadie lo ve hasta que lo publiques. Después puedes renombrar y reordenar todo.</p>
     <div class="fila-botones"><button class="btn btn-sec" data-cerrar>Cancelar</button><button class="btn" id="sc-ok">${icono("video", 18)}Crear y subir ${plan.total} videos</button></div>`, { clase: "modal-ancho" });
   const capa = modal.actual;
@@ -168,6 +173,11 @@ async function ejecutarSubida(plan, titulo, categoria, alTerminar) {
       modulos.push(await datos.guardarModulo({ curso_id: curso.id, titulo: plan.capitulos[i].nombre, orden: i + 1 }));
     }
     items.forEach((it) => (it.modulo_id = modulos[it.ci].id));
+    for (let i = 0; i < plan.docs.length; i++) {
+      $("#sp-estado").textContent = `Subiendo materiales (${i + 1} de ${plan.docs.length})…`;
+      try { await datos.subirMaterial(curso.id, plan.docs[i].file, plan.docs[i].titulo, i + 1); }
+      catch (e) { aviso(`${plan.docs[i].titulo}: ${e.message}`, "error"); }
+    }
   } catch (e) {
     activo = false; window.removeEventListener("beforeunload", antesDeSalir); bloqueo?.release?.();
     $("#sp-estado").textContent = "No se pudo preparar el curso";
