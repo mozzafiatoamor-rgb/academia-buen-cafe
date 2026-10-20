@@ -479,3 +479,7 @@ body { font-family: var(--sans); }
 .persona-check small { color: var(--tenue); font-size: 12px; }
 .persona-check:has(input:checked) { border-color: var(--cobre); background: rgba(201, 130, 75, .12); }
 .persona-check.ya { opacity: .55; cursor: default; }
+
+/* ---------- Botón para compartir el link por WhatsApp (v1.7.2) ---------- */
+.btn-whats { background: #25D366; color: #0B2A17; text-decoration: none; }
+.btn-whats:hover { filter: brightness(1.06); }

@@ -229,6 +229,7 @@ async function pintarEmpleados(main) {
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-end">
       <h1 class="titulo-pagina">Empleados</h1>
       <div class="fila" style="flex-wrap:wrap">
+        <a class="btn btn-whats" target="_blank" rel="noopener" href="${linkWhats(mensajeLinkApp(), null)}">${icono("share", 18)}Compartir link de la app</a>
         <button class="btn" id="gestor">${icono("refresh", 18)}Importar del Gestor</button>
         <button class="btn btn-sec" id="lote">${icono("users", 18)}Alta en lote</button>
         <button class="btn btn-sec" id="nuevo">${icono("plus", 18)}Nuevo empleado</button>
@@ -318,6 +319,12 @@ function sugerirUsuario(nombre, area, equipo) {
   let u = `${base}.${(area || "mozza").replace(/_.*/, "")}`, n = 2;
   while (equipo.some((e) => e.usuario === u)) u = `${base}.${area}${n++}`;
   return u;
+}
+
+// Link general de la app para mandar al grupo del equipo (sin usuario ni PIN).
+function mensajeLinkApp() {
+  const link = location.origin + location.pathname;
+  return `¡Hola equipo! ☕\nYa está lista la *Academia del Buen Café* de Mozzafiato: cursos en video para crecer, ganar puntos, insignias y premios. 🏆\n\nEntra aquí: ${link}\n\nTu *usuario y PIN* te los mando por privado (no los compartas con nadie).\n\n📲 Tip: guárdala como app en tu celular.\n• iPhone: ábrela en Safari → botón Compartir → "Agregar a inicio".\n• Android: ábrela en Chrome → menú ⋮ → "Instalar app" o "Agregar a pantalla principal".`;
 }
 
 function mensajeAcceso(nombre, usuario, pin) {
