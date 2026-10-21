@@ -630,6 +630,7 @@ export function crearDemo() {
       await espera(); exigirAdmin();
       return { carpeta, items: (AUDIOS_BUNNY[carpeta] || []).map((x) => ({ ...x, ruta: (carpeta ? carpeta + "/" : "") + x.nombre })) };
     },
+    async diagnosticoAudio() { return { BUNNY_STORAGE_ZONE: "demo", BUNNY_STORAGE_KEY: "ok (demo)", BUNNY_STORAGE_HOST: "storage.bunnycdn.com (por defecto)", BUNNY_AUDIO_HOST: "demo.b-cdn.net", BUNNY_AUDIO_TOKEN_KEY: "ok (demo)" }; },
     async audioRuta(ruta) { await espera(); exigirAdmin(); return { url: audioDemo(durDemo(ruta)) }; },
     async adminPremios() {
       await espera(); exigirAdmin();

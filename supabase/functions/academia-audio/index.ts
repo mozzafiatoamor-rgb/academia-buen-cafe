@@ -26,6 +26,11 @@ const CORS = {
 const VIGENCIA_SEG = 6 * 60 * 60;
 const EXT_AUDIO = /\.(mp3|m4a|m4b|aac|ogg|oga|opus|wav|flac)$/i;
 
+// Lee un secreto sin espacios ni saltos de línea (pasa mucho al copiar y pegar).
+const secreto = (n: string) => (Deno.env.get(n) ?? "").trim();
+// "https://algo.b-cdn.net/" → "algo.b-cdn.net"
+const soloHost = (h: string) => h.trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 }
@@ -57,10 +62,18 @@ async function firmar(host: string, llaveToken: string, ruta: string) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  try { return await atender(req); }
+  catch (e) {
+    console.error(e);
+    return json({ error: `Error en academia-audio: ${e instanceof Error ? e.message : String(e)}` }, 500);
+  }
+});
+
+async function atender(req: Request): Promise<Response> {
   if (req.method !== "POST") return json({ error: "Método no permitido" }, 405);
 
-  const host = Deno.env.get("BUNNY_AUDIO_HOST");
-  const llaveToken = Deno.env.get("BUNNY_AUDIO_TOKEN_KEY");
+  const host = soloHost(secreto("BUNNY_AUDIO_HOST"));
+  const llaveToken = secreto("BUNNY_AUDIO_TOKEN_KEY");
   const auth = req.headers.get("Authorization") ?? "";
   if (!auth) return json({ error: "Sesión no válida" }, 401);
 
@@ -106,15 +119,30 @@ Deno.serve(async (req) => {
     return json(await firmar(host, llaveToken, ruta));
   }
 
-  if (accion === "listar") {
-    const zona = Deno.env.get("BUNNY_STORAGE_ZONE");
-    const clave = Deno.env.get("BUNNY_STORAGE_KEY");
-    const hostSt = Deno.env.get("BUNNY_STORAGE_HOST") || "storage.bunnycdn.com";
-    if (!zona || !clave) return json({ error: "Faltan secretos de Bunny Storage" }, 500);
-    const carpeta = limpiarRuta(String(body.carpeta ?? ""));
-    const r = await fetch(`https://${hostSt}/${encodeURIComponent(zona)}/${carpeta ? carpeta.split("/").map(encodeURIComponent).join("/") + "/" : ""}`, {
-      headers: { AccessKey: clave, Accept: "application/json" },
+  if (accion === "diagnostico") {
+    return json({
+      BUNNY_STORAGE_ZONE: secreto("BUNNY_STORAGE_ZONE") || "(falta)",
+      BUNNY_STORAGE_KEY: secreto("BUNNY_STORAGE_KEY") ? `ok (${secreto("BUNNY_STORAGE_KEY").length} caracteres)` : "(falta)",
+      BUNNY_STORAGE_HOST: soloHost(secreto("BUNNY_STORAGE_HOST")) || "storage.bunnycdn.com (por defecto)",
+      BUNNY_AUDIO_HOST: host || "(falta)",
+      BUNNY_AUDIO_TOKEN_KEY: llaveToken ? `ok (${llaveToken.length} caracteres)` : "(falta)",
     });
+  }
+
+  if (accion === "listar") {
+    const zona = secreto("BUNNY_STORAGE_ZONE");
+    const clave = secreto("BUNNY_STORAGE_KEY");
+    const hostSt = soloHost(secreto("BUNNY_STORAGE_HOST")) || "storage.bunnycdn.com";
+    if (!zona || !clave) return json({ error: "Faltan secretos de Bunny Storage (BUNNY_STORAGE_ZONE o BUNNY_STORAGE_KEY)" }, 500);
+    const carpeta = limpiarRuta(String(body.carpeta ?? ""));
+    let r: Response;
+    try {
+      r = await fetch(`https://${hostSt}/${encodeURIComponent(zona)}/${carpeta ? carpeta.split("/").map(encodeURIComponent).join("/") + "/" : ""}`, {
+        headers: { AccessKey: clave, Accept: "application/json" },
+      });
+    } catch (e) {
+      return json({ error: `No se pudo conectar con ${hostSt}. Revisa BUNNY_STORAGE_HOST (debe ser como ny.storage.bunnycdn.com, sin https://). Detalle: ${e instanceof Error ? e.message : e}` }, 502);
+    }
     if (!r.ok) return json({ error: `Bunny Storage respondió ${r.status}. Revisa el nombre de la zona, la contraseña y la región.` }, 502);
     const lista = (await r.json()) as Array<{ ObjectName: string; IsDirectory: boolean; Length: number; LastChanged: string }>;
     const items = lista
@@ -126,4 +154,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ error: "Acción desconocida" }, 400);
-});
+}

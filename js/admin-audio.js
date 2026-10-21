@@ -113,7 +113,21 @@ async function agregarAudiolibro(libros, ctx) {
       cuerpo.querySelectorAll("[data-carpeta]").forEach((b) => (b.onclick = () => abrir(b.dataset.carpeta)));
       cuerpo.querySelectorAll("[data-archivo]").forEach((b) => (b.onclick = () => { elegido = { ruta: b.dataset.archivo, nombre: b.dataset.nombre }; capa.cerrar("ok"); }));
     } catch (e) {
-      cuerpo.innerHTML = guiaBunny(e.message);
+      cuerpo.innerHTML = `${guiaBunny(e.message)}
+        <button class="btn btn-sec btn-bloque" id="diag">${icono("refresh", 18)}Revisar conexión con Bunny</button>
+        <div id="diag-res"></div>`;
+      cuerpo.querySelector("#diag").onclick = async () => {
+        const caja = cuerpo.querySelector("#diag-res");
+        caja.innerHTML = `<div class="cargando" style="min-height:60px"><div class="taza-carga"></div></div>`;
+        try {
+          const r = await datos.diagnosticoAudio();
+          caja.innerHTML = `<div class="tarjeta pila" style="gap:6px"><b>Así ve la función tus secretos:</b>${Object.entries(r).map(([k, v]) =>
+            `<div class="fila-entre" style="gap:10px;font-size:13px"><code>${esc(k)}</code><span style="color:${/falta/.test(v) ? "var(--alerta-texto)" : "var(--verde-texto)"};text-align:right;word-break:break-all">${esc(v)}</span></div>`).join("")}
+            <small class="ayuda">La función sí responde. Si todo dice "ok", revisa que el Password y la región (hostname) sean los de esta Storage Zone.</small></div>`;
+        } catch (err) {
+          caja.innerHTML = `<p class="error-form">La función no responde: ${esc(err.message)}. Vuelve a desplegar <code>academia-audio</code> con el código nuevo.</p>`;
+        }
+      };
     }
   };
   abrir("");

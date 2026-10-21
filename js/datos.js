@@ -343,6 +343,7 @@ function crearNube() {
     borrarAudioAsignacion: (id) => q(sb.from("academia_audio_asignaciones").delete().eq("id", id)),
     audiosBunny: (carpeta) => funcion("academia-audio", { accion: "listar", carpeta: carpeta || "" }),
     audioRuta: (ruta) => funcion("academia-audio", { accion: "url_ruta", ruta }),
+    diagnosticoAudio: () => funcion("academia-audio", { accion: "diagnostico" }),
 
     async adminPremios() {
       const [premios, canjes, perfiles] = await Promise.all([
