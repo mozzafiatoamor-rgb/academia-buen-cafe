@@ -3,7 +3,7 @@
 // =====================================================================
 import { datos } from "./datos.js";
 import { icono, esc, num, duracion, aviso, formulario, confirmar, categorias, nombreCategoria, slug } from "./ui.js";
-import { CFG_BASE, cfgPuntos, fijarCfgPuntos, valorCurso, puntosLeccion, nivelesSugeridos } from "./puntos.js";
+import { CFG_BASE, cfgPuntos, fijarCfgPuntos, valorCurso, valorAudio, puntosLeccion, nivelesSugeridos } from "./puntos.js";
 
 const ICONOS = [["cup", "Taza"], ["coffee", "Café"], ["flame", "Flama"], ["star", "Estrella"], ["trophy", "Trofeo"], ["medal", "Medalla"],
   ["crown", "Corona"], ["target", "Diana"], ["clock", "Reloj"], ["bolt", "Rayo"], ["heart", "Corazón"], ["chef", "Chef"],
@@ -106,6 +106,13 @@ function seccionPuntos(caja, catalogo, recargar) {
         <div class="fila" style="flex-wrap:wrap;align-items:flex-start;gap:12px">
           ${campo("puntos_leccion", "Por lección")}${campo("puntos_curso", "Por terminar un curso")}${campo("puntos_quiz_perfecto", "Por quiz perfecto")}${campo("puntos_a_tiempo", "Por terminar a tiempo")}
         </div>`}
+      <div class="etiqueta">Audiolibros</div>
+      <div class="fila" style="flex-wrap:wrap;align-items:flex-start;gap:12px">
+        ${campo("audio_puntos_por_minuto", "Puntos por minuto escuchado")}${campo("audio_tramo_min", "Se pagan cada (minutos)")}
+      </div>
+      <div class="fila" style="flex-wrap:wrap;align-items:flex-start;gap:12px">
+        ${campo("audio_bono_pct", "Bono al terminar (% de lo escuchado)", "", "%")}${campo("audio_bono_min", "Bono mínimo")}${campo("audio_bono_max", "Bono máximo")}
+      </div>
       <div class="tarjeta pila" id="vista-previa" style="gap:8px"></div>
       <p class="error-form" id="pt-err" hidden></p>
       <div class="fila-botones" style="justify-content:flex-start">
@@ -120,10 +127,12 @@ function seccionPuntos(caja, catalogo, recargar) {
   };
   const vista = () => {
     const ej = [3, 6, 15, 30].map((m) => `${m} min → <b style="color:var(--oro)">${puntosLeccion(m * 60, c)}</b>`).join(" · ");
+    const ejA = [1, 3, 6].map((h) => `${h} h → <b style="color:var(--oro)">${num(valorAudio(h * 3600, false, c).total)}</b>`).join(" · ");
     const filas = catalogo.map((k) => ({ ...k, v: valorCurso(k, c), dur: k.lecciones.reduce((a, l) => a + (l.duracion_seg || 0), 0) })).sort((a, b) => b.v.total - a.v.total);
     caja.querySelector("#vista-previa").innerHTML = `
       <b style="font-size:14px">Así quedaría</b>
       ${Number(c.puntos_por_duracion) === 1 ? `<span class="texto-tenue" style="font-size:13px">Lección de ${ej}</span>` : ""}
+      <span class="texto-tenue" style="font-size:13px">Audiolibro de ${ejA}</span>
       ${filas.length ? `<div class="tabla-caja"><table class="tabla" style="min-width:420px;font-size:13px"><thead><tr><th>Curso publicado</th><th>Duración</th><th>Vale hasta</th></tr></thead><tbody>
         ${filas.map((f) => `<tr><td>${esc(f.titulo)}</td><td>${duracion(f.dur)}</td><td><b style="color:var(--oro)">${num(f.v.total)} pts</b></td></tr>`).join("")}
       </tbody></table></div>` : `<span class="texto-tenue" style="font-size:13px">Cuando publiques cursos, aquí verás cuánto vale cada uno.</span>`}`;
@@ -132,7 +141,9 @@ function seccionPuntos(caja, catalogo, recargar) {
     const err = caja.querySelector("#pt-err");
     const mal = (c.puntos_leccion_min > c.puntos_leccion_max && "El mínimo por lección no puede ser mayor que el máximo")
       || (c.bono_curso_min > c.bono_curso_max && "El mínimo del bono no puede ser mayor que el máximo")
-      || (c.puntos_quiz_min > c.puntos_quiz_max && "El mínimo del quiz no puede ser mayor que el máximo");
+      || (c.puntos_quiz_min > c.puntos_quiz_max && "El mínimo del quiz no puede ser mayor que el máximo")
+      || (c.audio_bono_min > c.audio_bono_max && "El bono mínimo del audiolibro no puede ser mayor que el máximo")
+      || (Number(c.audio_tramo_min) < 1 && "Los puntos del audio se pagan cada 1 minuto como mínimo");
     if (mal) { err.textContent = mal; err.hidden = false; return; }
     const obj = {};
     for (const k of Object.keys(CFG_BASE)) obj[k] = Math.max(0, Math.round(Number(c[k]) || 0));

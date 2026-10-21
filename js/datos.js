@@ -121,6 +121,23 @@ function crearNube() {
     enviarQuiz: (cursoId, respuestas) => rpc("academia_enviar_quiz", { p_curso: cursoId, p_respuestas: respuestas }),
     video: (leccionId) => funcion("academia-video", { leccion_id: leccionId }),
 
+    // ---------- Audiolibros y catálogo ----------
+    async misAudiolibros() {
+      try { return await rpc("academia_mis_audiolibros"); }
+      catch (e) { if (e.codigo === "SIN_FUNCION") return []; throw e; }
+    },
+    async catalogoCursos() {
+      try { return await rpc("academia_catalogo_cursos"); }
+      catch (e) { if (e.codigo === "SIN_FUNCION") return null; throw e; }
+    },
+    audio: (libroId) => funcion("academia-audio", { accion: "url", audiolibro_id: libroId }),
+    registrarAudio: (libroId, segundo, duracion) => rpc("academia_registrar_audio", {
+      p_libro: libroId, p_segundo: Math.floor(segundo), p_duracion: duracion ? Math.round(duracion) : null, p_dispositivo: dispositivoId(),
+    }),
+    marcadores: (libroId) => q(sb.from("academia_audio_marcadores").select("*").eq("audiolibro_id", libroId).order("segundo")),
+    agregarMarcador: (libroId, segundo, nota) => q(sb.from("academia_audio_marcadores").insert({ audiolibro_id: libroId, segundo: Math.floor(segundo), nota: nota || null }).select().single()),
+    borrarMarcador: (id) => q(sb.from("academia_audio_marcadores").delete().eq("id", id)),
+
     async curso(id) {
       const [curso, modulos, lecciones, materiales, preguntas] = await Promise.all([
         q(sb.from("academia_cursos").select("*").eq("id", id).maybeSingle()),
@@ -294,6 +311,38 @@ function crearNube() {
     borrarLeccion: (id) => q(sb.from("academia_lecciones").delete().eq("id", id)),
     agregarAsignacion: (a) => q(sb.from("academia_asignaciones").insert(a).select().single()),
     borrarAsignacion: (id) => q(sb.from("academia_asignaciones").delete().eq("id", id)),
+
+    // ---------- Audiolibros (admin) ----------
+    async adminAudiolibros() {
+      try {
+        const [libros, asign] = await Promise.all([
+          q(sb.from("academia_audiolibros").select("*").order("orden").order("creado_en")),
+          q(sb.from("academia_audio_asignaciones").select("audiolibro_id")),
+        ]);
+        return libros.map((b) => ({ ...b, asignaciones: asign.filter((a) => a.audiolibro_id === b.id).length }));
+      } catch (e) {
+        if (/academia_audiolibros|relation|does not exist|PGRST205/i.test(e.message)) { const err = new ErrorAcademia("Falta correr el paso 5 de SQL (audiolibros) en Supabase"); err.codigo = "SIN_TABLA"; throw err; }
+        throw e;
+      }
+    },
+    async adminAudiolibro(id) {
+      const [libro, asignaciones, perfiles] = await Promise.all([
+        q(sb.from("academia_audiolibros").select("*").eq("id", id).maybeSingle()),
+        q(sb.from("academia_audio_asignaciones").select("*").eq("audiolibro_id", id)),
+        q(sb.from("academia_perfiles").select("user_id, nombre, usuario").eq("rol", "empleado").order("nombre")),
+      ]);
+      return { libro, asignaciones, perfiles };
+    },
+    async guardarAudiolibro(b) {
+      const { id, ...resto } = b;
+      if (id) return q(sb.from("academia_audiolibros").update(resto).eq("id", id).select().single());
+      return q(sb.from("academia_audiolibros").insert(resto).select().single());
+    },
+    borrarAudiolibro: (id) => q(sb.from("academia_audiolibros").delete().eq("id", id)),
+    agregarAudioAsignacion: (a) => q(sb.from("academia_audio_asignaciones").insert(a).select().single()),
+    borrarAudioAsignacion: (id) => q(sb.from("academia_audio_asignaciones").delete().eq("id", id)),
+    audiosBunny: (carpeta) => funcion("academia-audio", { accion: "listar", carpeta: carpeta || "" }),
+    audioRuta: (ruta) => funcion("academia-audio", { accion: "url_ruta", ruta }),
 
     async adminPremios() {
       const [premios, canjes, perfiles] = await Promise.all([

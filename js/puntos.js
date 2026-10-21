@@ -15,6 +15,12 @@ export const CFG_BASE = {
   puntos_quiz_max: 60,
   bono_a_tiempo_pct: 15,
   bono_a_tiempo_min: 10,
+  // Audiolibros
+  audio_puntos_por_minuto: 1,
+  audio_tramo_min: 10,
+  audio_bono_pct: 30,
+  audio_bono_min: 20,
+  audio_bono_max: 300,
   // Modo fijo
   puntos_leccion: 10,
   puntos_curso: 50,
@@ -65,4 +71,14 @@ export function nivelesSugeridos(totalCatalogo, nombres) {
   const pct = [0, 0.08, 0.25, 0.5, 0.85];
   const redondear = (v) => Math.max(50, Math.round(v / 50) * 50);
   return nombres.map((nombre, i) => ({ orden: i + 1, nombre, puntos_min: i === 0 ? 0 : redondear(totalCatalogo * pct[Math.min(i, pct.length - 1)]) }));
+}
+
+
+// Audiolibros: puntos por minuto escuchado (se pagan por tramos) + bono al terminar.
+export function valorAudio(duracionSeg, conFecha = false, c = cfgActual) {
+  const min = Math.max(0, Number(duracionSeg) || 0) / 60;
+  const porMinuto = Math.round(min * c.audio_puntos_por_minuto);
+  const bono = entre(Math.round(min * c.audio_puntos_por_minuto * c.audio_bono_pct / 100), c.audio_bono_min, c.audio_bono_max);
+  const aTiempo = conFecha ? Math.max(Math.round(bono * c.bono_a_tiempo_pct / 100), c.bono_a_tiempo_min) : 0;
+  return { porMinuto, bono, aTiempo, total: porMinuto + bono + aTiempo };
 }

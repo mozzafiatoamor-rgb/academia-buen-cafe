@@ -13,6 +13,30 @@ const hoy = () => new Date().toISOString().slice(0, 10);
 const enDias = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const espera = (ms = 120) => new Promise((r) => setTimeout(r, ms));
 
+// Audio de prueba generado en el navegador (acordes suaves), para el modo demo.
+const audiosDemo = {};
+function audioDemo(seg = 180) {
+  if (audiosDemo[seg]) return audiosDemo[seg];
+  const hz = 8000, n = seg * hz, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+  const txt = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  txt(0, "RIFF"); v.setUint32(4, 36 + n, true); txt(8, "WAVE"); txt(12, "fmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, hz, true);
+  v.setUint32(28, hz, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); txt(36, "data"); v.setUint32(40, n, true);
+  const acordes = [[262, 330, 392], [220, 262, 330], [175, 220, 262], [196, 247, 294]];
+  for (let i = 0; i < n; i++) {
+    const t = i / hz, ac = acordes[Math.floor(t / 4) % 4], env = Math.min(1, (t % 4) * 2) * Math.max(0, 1 - (t % 4) / 4.2);
+    const x = ac.reduce((a, f) => a + Math.sin(2 * Math.PI * f * t), 0) / 3;
+    v.setUint8(44 + i, 128 + Math.round(x * env * 38));
+  }
+  return (audiosDemo[seg] = URL.createObjectURL(new Blob([buf], { type: "audio/wav" })));
+}
+const AUDIOS_BUNNY = {
+  "": [{ nombre: "liderazgo", carpeta: true }, { nombre: "servicio", carpeta: true }],
+  liderazgo: [{ nombre: "lider-de-turno.m4b", carpeta: false, bytes: 48e6 }, { nombre: "conversaciones-dificiles.mp3", carpeta: false, bytes: 31e6 }],
+  servicio: [{ nombre: "el-arte-de-servir.m4b", carpeta: false, bytes: 52e6 }],
+};
+const durDemo = (ruta) => { const n = String(ruta).split("/").pop(); return /lider/.test(n) ? 240 : /conversa/.test(n) ? 150 : 180; };
+
 const INSIGNIAS_BASE = [
   ["primer_sorbo", "Primer sorbo", "Terminaste tu primera lección", "progreso", "cup", null, false, 10, { tipo: "lecciones", n: 1 }],
   ["primera_taza", "Primera taza", "Terminaste tu primer curso", "progreso", "cup", null, false, 25, { tipo: "cursos", n: 1 }],
@@ -121,6 +145,18 @@ export function crearDemo() {
   if (!db.insignias) db.insignias = JSON.parse(JSON.stringify(INSIGNIAS_BASE));
   if (!db.niveles) db.niveles = JSON.parse(JSON.stringify(NIVELES_BASE));
   if (!db.config) db.config = {};
+  if (!db.audiolibros) {
+    db.audiolibros = [
+      { id: "a-servir", titulo: "El arte de servir", autor: "Equipo Mozzafiato", descripcion: "Cómo convertir cada mesa en una experiencia que la gente recuerda.", categoria: "piso",
+        portada_url: null, archivo: "servicio/el-arte-de-servir.m4b", duracion_seg: 180, publicado: true, orden: 1,
+        capitulos: [{ t: 0, titulo: "Introducción" }, { t: 60, titulo: "La primera impresión" }, { t: 120, titulo: "Cerrar con broche de oro" }] },
+      { id: "a-lider", titulo: "Líder de turno", autor: "Equipo Mozzafiato", descripcion: "Organizar, motivar y resolver en plena hora pico.", categoria: "liderazgo",
+        portada_url: null, archivo: "liderazgo/lider-de-turno.m4b", duracion_seg: 240, publicado: true, orden: 2, capitulos: [] },
+    ];
+    db.audio_asignaciones = [{ id: "aa-1", audiolibro_id: "a-servir", area: null, sede: null, user_id: null, obligatorio: false, fecha_limite: null }];
+    db.audio_progreso = [];
+    db.audio_marcadores = [];
+  }
   fijarCfgPuntos(db.config);
   guardar();
 
@@ -293,6 +329,60 @@ export function crearDemo() {
       return { completado: p.completado, recien_completado: recien, max_segundo: p.max_segundo, puntos_ganados: pts,
                insignias_nuevas: nuevas, curso_terminado: recien ? terminado(u.user_id, l.curso_id) : null };
     },
+    // ---------- Audiolibros y catálogo ----------
+    async misAudiolibros() {
+      await espera(); const u = exigir();
+      const asig = (b) => db.audio_asignaciones.filter((a) => a.audiolibro_id === b.id
+        && (!a.area || a.area === u.area) && (!a.sede || a.sede === u.sede) && (!a.user_id || a.user_id === u.user_id));
+      return db.audiolibros.filter((b) => b.publicado).map((b) => {
+        const as = asig(b), pr = db.audio_progreso.find((p) => p.user_id === u.user_id && p.audiolibro_id === b.id);
+        const min = (b.duracion_seg || 0) / 60;
+        return { ...deshacer(b), archivo: undefined, asignado: as.length > 0, obligatorio: as.some((a) => a.obligatorio),
+          fecha_limite: as.map((a) => a.fecha_limite).filter(Boolean).sort()[0] || null,
+          segundo_actual: pr?.segundo_actual || 0, max_segundo: pr?.max_segundo || 0, completado: !!pr?.completado,
+          ultima_actividad: pr?.actualizado || null, valor: Math.round(min) + Math.min(300, Math.max(20, Math.round(min * 0.3))) };
+      }).sort((a, b) => Number(b.asignado) - Number(a.asignado) || (a.fecha_limite || "9999").localeCompare(b.fecha_limite || "9999") || a.orden - b.orden);
+    },
+    async catalogoCursos() {
+      await espera(); const u = exigir();
+      return db.cursos.filter((c) => c.publicado).map((c) => ({ id: c.id, titulo: c.titulo, descripcion: c.descripcion, categoria: c.categoria,
+        lecciones: leccionesDe(c.id).length, duracion_seg: leccionesDe(c.id).reduce((a, l) => a + (l.duracion_seg || 0), 0),
+        asignado: asignado(u, c.id), terminado: terminado(u.user_id, c.id) }));
+    },
+    async audio(libroId) {
+      await espera(); const u = exigir();
+      const b = db.audiolibros.find((x) => x.id === libroId);
+      const ok = b && (esAdmin() || (b.publicado && db.audio_asignaciones.some((a) => a.audiolibro_id === b.id
+        && (!a.area || a.area === u.area) && (!a.sede || a.sede === u.sede) && (!a.user_id || a.user_id === u.user_id))));
+      if (!ok) throw new Error("Este audiolibro no está asignado a ti");
+      return { url: audioDemo(b.duracion_seg || durDemo(b.archivo)), titulo: b.titulo, duracion_seg: b.duracion_seg };
+    },
+    async registrarAudio(libroId, segundo, duracion) {
+      const u = exigir();
+      const b = db.audiolibros.find((x) => x.id === libroId);
+      if (!b) throw new Error("Audiolibro no disponible");
+      if (!b.duracion_seg && duracion) b.duracion_seg = Math.round(duracion);
+      let p = db.audio_progreso.find((x) => x.user_id === u.user_id && x.audiolibro_id === libroId);
+      if (!p) { p = { user_id: u.user_id, audiolibro_id: libroId, segundo_actual: 0, max_segundo: 0, completado: false, completado_en: null, actualizado: ahora() }; db.audio_progreso.push(p); }
+      const antes = p.max_segundo, tramo = 60; // en demo, un tramo por minuto para probar rápido
+      p.segundo_actual = Math.floor(segundo); p.max_segundo = Math.max(p.max_segundo, Math.floor(segundo)); p.actualizado = ahora();
+      let pts = 0, recien = false;
+      for (let n = Math.floor(antes / tramo) + 1; n <= Math.floor(p.max_segundo / tramo); n++) pts += darPuntos(u.user_id, 1, "audio", `${libroId}:${n}`);
+      if (!p.completado && b.duracion_seg && p.max_segundo >= b.duracion_seg * 0.9) {
+        p.completado = true; p.completado_en = ahora(); recien = true;
+        pts += darPuntos(u.user_id, Math.min(300, Math.max(20, Math.round(b.duracion_seg / 60 * 0.3))), "audiolibro", libroId);
+      }
+      const nuevas = pts ? evaluar(u) : [];
+      guardar();
+      return { max_segundo: p.max_segundo, completado: p.completado, recien_completado: recien, puntos_ganados: pts, insignias_nuevas: nuevas };
+    },
+    async marcadores(libroId) { const u = exigir(); return deshacer(db.audio_marcadores.filter((m) => m.user_id === u.user_id && m.audiolibro_id === libroId).sort((a, b) => a.segundo - b.segundo)); },
+    async agregarMarcador(libroId, segundo, nota) {
+      const u = exigir(); const m = { id: uid(), user_id: u.user_id, audiolibro_id: libroId, segundo: Math.floor(segundo), nota: nota || null, creado_en: ahora() };
+      db.audio_marcadores.push(m); guardar(); return deshacer(m);
+    },
+    async borrarMarcador(id) { const u = exigir(); db.audio_marcadores = db.audio_marcadores.filter((m) => !(m.id === id && m.user_id === u.user_id)); guardar(); },
+
     async enviarQuiz(cursoId, respuestas) {
       await espera(300); const u = exigir();
       if (leccionesDe(cursoId).some((l) => !prog(u.user_id, l.id)?.completado)) throw new Error("Termina todas las lecciones antes del quiz");
@@ -511,6 +601,36 @@ export function crearDemo() {
     async borrarLeccion(id) { exigirAdmin(); db.lecciones = db.lecciones.filter((l) => l.id !== id); db.progreso = db.progreso.filter((p) => p.leccion_id !== id); guardar(); },
     async agregarAsignacion(a) { exigirAdmin(); const n = { ...a, id: uid() }; db.asignaciones.push(n); guardar(); return n; },
     async borrarAsignacion(id) { exigirAdmin(); db.asignaciones = db.asignaciones.filter((a) => a.id !== id); guardar(); },
+
+    // ---------- Audiolibros (admin) ----------
+    async adminAudiolibros() {
+      await espera(); exigirAdmin();
+      return deshacer(db.audiolibros.map((b) => ({ ...b, asignaciones: db.audio_asignaciones.filter((a) => a.audiolibro_id === b.id).length })));
+    },
+    async adminAudiolibro(id) {
+      await espera(); exigirAdmin();
+      return deshacer({ libro: db.audiolibros.find((b) => b.id === id), asignaciones: db.audio_asignaciones.filter((a) => a.audiolibro_id === id),
+        perfiles: db.usuarios.filter((u) => u.rol === "empleado").map(({ user_id, nombre, usuario }) => ({ user_id, nombre, usuario })) });
+    },
+    async guardarAudiolibro(b) {
+      exigirAdmin();
+      if (b.id) { const x = db.audiolibros.find((y) => y.id === b.id); Object.assign(x, b); guardar(); return deshacer(x); }
+      const n = { capitulos: [], publicado: false, orden: db.audiolibros.length + 1, categoria: "general", ...b, id: uid() };
+      db.audiolibros.push(n); guardar(); return deshacer(n);
+    },
+    async borrarAudiolibro(id) {
+      exigirAdmin();
+      db.audiolibros = db.audiolibros.filter((b) => b.id !== id);
+      db.audio_asignaciones = db.audio_asignaciones.filter((a) => a.audiolibro_id !== id);
+      db.audio_progreso = db.audio_progreso.filter((p) => p.audiolibro_id !== id); guardar();
+    },
+    async agregarAudioAsignacion(a) { exigirAdmin(); const n = { ...a, id: uid() }; db.audio_asignaciones.push(n); guardar(); return n; },
+    async borrarAudioAsignacion(id) { exigirAdmin(); db.audio_asignaciones = db.audio_asignaciones.filter((a) => a.id !== id); guardar(); },
+    async audiosBunny(carpeta = "") {
+      await espera(); exigirAdmin();
+      return { carpeta, items: (AUDIOS_BUNNY[carpeta] || []).map((x) => ({ ...x, ruta: (carpeta ? carpeta + "/" : "") + x.nombre })) };
+    },
+    async audioRuta(ruta) { await espera(); exigirAdmin(); return { url: audioDemo(durDemo(ruta)) }; },
     async adminPremios() {
       await espera(); exigirAdmin();
       return { premios: [...db.premios].sort((a, b) => a.costo - b.costo),

@@ -6,7 +6,8 @@ import { icono, esc, num, duracion, fechaCorta, hoyISO, haceCuanto, aviso, modal
 import { subirCursoDesdeCarpeta } from "./subir.js";
 import { panelQuiz, panelMateriales } from "./contenido.js";
 import { pintarConfiguracion } from "./configuracion.js";
-import { valorCurso } from "./puntos.js";
+import { valorCurso, valorAudio } from "./puntos.js";
+import { pintarAudiolibrosAdmin, pintarEditorAudio } from "./admin-audio.js";
 
 const LOGO = "img/logo.png";
 let ctx; // { ir, salir }
@@ -14,8 +15,8 @@ let ctx; // { ir, salir }
 export async function vistaAdmin(app, partes, contexto) {
   ctx = contexto;
   const [seccion = "", id, pestana] = partes;
-  const menu = [["cursos", "book", "Cursos"], ["empleados", "users", "Empleados"], ["resumen", "chart", "Resumen"], ["premios", "gift", "Premios y canjes"], ["insignias", "medal", "Insignias"], ["configuracion", "ajustes", "Configuración"]];
-  const activa = seccion === "curso" || !seccion ? "cursos" : seccion;
+  const menu = [["cursos", "book", "Cursos"], ["audiolibros", "audifonos", "Audiolibros"], ["empleados", "users", "Empleados"], ["resumen", "chart", "Resumen"], ["premios", "gift", "Premios y canjes"], ["insignias", "medal", "Insignias"], ["configuracion", "ajustes", "Configuración"]];
+  const activa = seccion === "curso" || !seccion ? "cursos" : seccion === "audio" ? "audiolibros" : seccion;
   app.className = "";
   app.innerHTML = `
   ${MODO === "demo" ? `<div class="banda-demo">MODO DEMO · datos de ejemplo</div>` : ""}
@@ -44,6 +45,8 @@ export async function vistaAdmin(app, partes, contexto) {
   try {
     if (seccion === "empleados") return await pintarEmpleados(main);
     if (seccion === "resumen") return await pintarResumen(main);
+    if (seccion === "audiolibros") return await pintarAudiolibrosAdmin(main, ctx);
+    if (seccion === "audio") return await pintarEditorAudio(main, id, pestana, ctx);
     if (seccion === "curso") return await pintarEditorCurso(main, id, pestana);
     if (seccion === "premios") return await pintarPremios(main);
     if (seccion === "insignias") return await pintarInsignias(main);
@@ -82,7 +85,7 @@ function fijarMenuMovil(app) {
   });
 }
 
-const recargar = () => window.dispatchEvent(new HashChangeEvent("hashchange"));
+export const recargar = () => window.dispatchEvent(new HashChangeEvent("hashchange"));
 const pct = (e) => (e.lecciones_asignadas ? Math.round((e.lecciones_completadas / e.lecciones_asignadas) * 100) : 0);
 
 function estadoEmpleado(e) {
@@ -816,9 +819,9 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
 // ---------------------------------------------------------------------
 //  ASIGNAR · por área/sede o eligiendo varias personas
 // ---------------------------------------------------------------------
-async function elegirAsignacion(c, asignaciones) {
+export async function elegirAsignacion(c, asignaciones, titulo = "Asignar curso") {
   const p = modal(`
-    <h2 class="modal-titulo">Asignar curso</h2>
+    <h2 class="modal-titulo">${esc(titulo)}</h2>
     <div class="pestanas" role="tablist" id="modo-asig">
       <button type="button" class="activo" data-modo="personas">Elegir personas</button>
       <button type="button" data-modo="grupo">Por área o sede</button>
@@ -943,18 +946,19 @@ function marcarAvisado(cursoId, userId) {
 function fechaLarga(iso) {
   return new Date(iso + "T12:00:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
 }
-function mensajeCurso(nombre, c, segundos, puntos, fecha) {
+function mensajeCurso(nombre, c, segundos, puntos, fecha, tipo = "curso") {
   const primer = String(nombre || "").split(" ")[0];
+  const audio = tipo === "audio";
   return [
     `¡Hola ${primer}! ☕`,
-    `Ya tienes un curso nuevo en la *Academia del Buen Café*: *${c.titulo}*${segundos ? ` (${duracion(segundos)})` : ""}.`,
-    puntos ? `Vale hasta ${num(puntos)} puntos para tu nivel y premios. 🏆` : "",
-    fecha ? `Tienes hasta el ${fechaLarga(fecha)} para terminarlo.` : "Avanza a tu ritmo, un video a la vez.",
+    `Ya tienes ${audio ? "un audiolibro nuevo 🎧" : "un curso nuevo"} en la *Academia del Buen Café*: *${c.titulo}*${c.autor && audio ? ` de ${c.autor}` : ""}${segundos ? ` (${duracion(segundos)})` : ""}.`,
+    puntos ? `Vale hasta ${num(puntos)} puntos para tu nivel y premios${audio ? ": ganas por cada minuto que escuches" : ""}. 🏆` : "",
+    fecha ? `Tienes hasta el ${fechaLarga(fecha)} para ${audio ? "escucharlo completo" : "terminarlo"}.` : audio ? "Escúchalo a tu ritmo, hasta con la pantalla apagada." : "Avanza a tu ritmo, un video a la vez.",
     `Entra aquí con tu usuario y PIN: ${urlApp()}`,
   ].filter(Boolean).join("\n");
 }
 
-async function avisarCurso(c, lecciones, asignaciones, motivo = "manual") {
+export async function avisarCurso(c, lecciones, asignaciones, motivo = "manual", tipo = "curso") {
   const p = modal(`
     <div class="fila-entre"><h2 class="modal-titulo">Avisar a tu equipo</h2><button class="btn-icono" data-cerrar aria-label="Cerrar">${icono("x")}</button></div>
     <div id="avisar-cuerpo"><div class="cargando" style="min-height:140px"><div class="taza-carga"></div></div></div>`, { clase: "modal-ancho" });
@@ -963,25 +967,26 @@ async function avisarCurso(c, lecciones, asignaciones, motivo = "manual") {
     const [perfiles, gestor, qz] = await Promise.all([
       datos.adminPerfiles(),
       datos.gestorEmpleados().catch(() => []),
-      datos.adminQuiz(c.id).catch(() => null),
+      tipo === "audio" ? Promise.resolve(null) : datos.adminQuiz(c.id).catch(() => null),
     ]);
     const wa = Object.fromEntries((gestor || []).filter((g) => g.whatsapp).map((g) => [g.gestor_id, g.whatsapp]));
-    const segundos = lecciones.reduce((a, l) => a + (l.duracion_seg || 0), 0);
+    const segundos = tipo === "audio" ? c.duracion_seg || 0 : lecciones.reduce((a, l) => a + (l.duracion_seg || 0), 0);
     const gente = perfiles.filter((pf) => pf.activo !== false).map((pf) => {
       const suyas = asignaciones.filter((a) => coincide(a, pf));
       if (!suyas.length) return null;
       const fechas = suyas.map((a) => a.fecha_limite).filter(Boolean).sort();
       return { ...pf, fecha: fechas[0] || null, whatsapp: wa[pf.gestor_id] || null };
     }).filter(Boolean).sort((a, b) => a.nombre.localeCompare(b.nombre));
-    const v = valorCurso({ lecciones, preguntas: qz ? qz.length : 0, conFecha: gente.some((g) => g.fecha) });
+    const v = tipo === "audio" ? valorAudio(segundos, gente.some((g) => g.fecha)) : valorCurso({ lecciones, preguntas: qz ? qz.length : 0, conFecha: gente.some((g) => g.fecha) });
+    const que = tipo === "audio" ? "audiolibro" : "curso";
     const avisados = leerAvisados(c.id);
     const intro = motivo === "publicado" ? "¡Listo, ya está publicado! Mándales un mensaje para que lo empiecen."
-      : motivo === "asignado" ? "Estas personas acaban de recibir el curso." : "Quienes tienen asignado este curso:";
+      : motivo === "asignado" ? `Estas personas acaban de recibir el ${que}.` : `Quienes tienen asignado este ${que}:`;
     if (!gente.length) {
       cuerpo.innerHTML = `<p class="texto-tenue">${intro}</p><div class="vacio"><strong>Nadie coincide todavía</strong>Revisa que los empleados tengan el área y la sede correctas.</div>`;
       return p;
     }
-    const general = mensajeCurso("equipo", c, segundos, v.total, gente.every((g) => g.fecha === gente[0].fecha) ? gente[0].fecha : null);
+    const general = mensajeCurso("equipo", c, segundos, v.total, gente.every((g) => g.fecha === gente[0].fecha) ? gente[0].fecha : null, tipo);
     cuerpo.innerHTML = `
       <p class="texto-tenue" style="margin:0 0 4px">${intro} El mensaje ya va escrito con su nombre${v.total ? `, los <b style="color:var(--oro)">${num(v.total)} pts</b>` : ""} y su fecha límite.</p>
       <div class="lista-aviso">${gente.map((g) => `
@@ -990,7 +995,7 @@ async function avisarCurso(c, lecciones, asignaciones, motivo = "manual") {
           <div style="flex:1;min-width:0"><b style="font-size:14px">${esc(g.nombre)}</b>
             <div class="texto-tenue" style="font-size:12px">${g.whatsapp ? "WhatsApp del Gestor" : "Sin número: eliges el chat"}${g.fecha ? " · vence " + fechaCorta(g.fecha) : ""}${avisados[g.user_id] ? ` · <span class="ok-aviso">avisado ${avisados[g.user_id] === hoyISO() ? "hoy" : fechaCorta(avisados[g.user_id])}</span>` : ""}</div></div>
           <a class="btn btn-chico ${avisados[g.user_id] ? "btn-sec" : ""}" target="_blank" rel="noopener" data-enviar="${g.user_id}"
-             href="${linkWhats(mensajeCurso(g.nombre, c, segundos, v.total, g.fecha), g.whatsapp)}">${avisados[g.user_id] ? "Otra vez" : "Enviar"}</a>
+             href="${linkWhats(mensajeCurso(g.nombre, c, segundos, v.total, g.fecha, tipo), g.whatsapp)}">${avisados[g.user_id] ? "Otra vez" : "Enviar"}</a>
         </div>`).join("")}</div>
       <div class="pila" style="gap:8px;margin-top:6px">
         <a class="btn btn-sec btn-bloque" target="_blank" rel="noopener" href="${linkWhats(general, null)}">${icono("users", 18)}Un solo mensaje para el grupo</a>

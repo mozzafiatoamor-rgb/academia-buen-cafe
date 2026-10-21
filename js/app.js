@@ -8,6 +8,7 @@ import { mostrarCertificado, folio } from "./certificado.js";
 import { abrirVisor } from "./visor.js";
 import { confeti, momento, subidaDeNivel, fraseLeccion, hitoCurso, fraseInicio, animarBarras } from "./fiesta.js";
 import { fijarCfgPuntos, valorCurso, puntosLeccion } from "./puntos.js";
+import { pintarAudiolibro, pintarBiblioteca, tarjetaAudio, esNuevoAudio } from "./audio.js";
 
 const app = document.getElementById("app");
 const LOGO = "img/logo.png";
@@ -47,6 +48,7 @@ async function enrutar() {
   try {
     if (estado.preview) {
       if (b === "leccion") return await pintarLeccion(partes[3], partes[4]);
+      if (b === "audio") return await pintarAudiolibro(ctxAudio(), partes[3]);
       return await pintarCurso(partes[3]);
     }
     switch (ruta) {
@@ -54,6 +56,8 @@ async function enrutar() {
       case "curso": return await pintarCurso(a);
       case "leccion": return await pintarLeccion(a, b);
       case "quiz": return await pintarQuiz(a);
+      case "audio": return await pintarAudiolibro(ctxAudio(), a);
+      case "biblioteca": return await pintarBiblioteca(ctxAudio());
       case "insignias": return await pintarInsignias();
       case "ranking": return await pintarRanking();
       case "premios": return await pintarPremios();
@@ -92,10 +96,12 @@ function conNav(html, activa) {
   html = html.replace('<main class="vista">', `<main class="vista">${marcaSup()}`);
   app.innerHTML = `${bandaDemo()}${html}
     <nav class="nav" aria-label="Secciones">
-      ${item("inicio", "home", "Inicio")}${item("insignias", "medal", "Insignias")}${item("ranking", "trophy", "Ranking")}${item("premios", "gift", "Premios")}
+      ${item("inicio", "home", "Inicio")}${item("biblioteca", "biblioteca", "Biblioteca")}${item("insignias", "medal", "Insignias")}${item("ranking", "trophy", "Ranking")}${item("premios", "gift", "Premios")}
     </nav>`;
 }
 function sinNav(html) { app.className = ""; app.innerHTML = bandaDemo() + html; }
+// Lo que necesita el módulo de audiolibros de esta pantalla principal.
+const ctxAudio = () => ({ app, estado, conNav, sinNav, ir, cargando, expulsar, celebrar, revisarNivelYRacha, base });
 const base = () => (estado.preview ? "/admin/ver" : "");
 const bandaVista = () => `<div class="banda-demo">VISTA PREVIA COMO EMPLEADO · tu avance no se guarda</div>`;
 const bandaDemo = () => (MODO === "demo" ? `<div class="banda-demo">MODO DEMO · datos de ejemplo</div>` : "");
@@ -316,7 +322,8 @@ async function salir() {
 async function pintarInicio() {
   cargando();
   vaciarCola().catch(() => {});
-  const [r, cursos] = await Promise.all([datos.resumen(), datos.misCursos()]);
+  const [r, cursos, audiosTodos] = await Promise.all([datos.resumen(), datos.misCursos(), datos.misAudiolibros().catch(() => [])]);
+  const audios = audiosTodos.filter((x) => x.asignado);
   estado.perfil = r;
   const avancePct = r.siguiente_min ? Math.round(((r.puntos_ganados - r.nivel_min) / (r.siguiente_min - r.nivel_min)) * 100) : 100;
   const enCurso = cursos.filter((c) => !c.terminado && c.continuar)
@@ -379,6 +386,12 @@ async function pintarInicio() {
       <div class="pila" id="lista-cursos">${cursos.length ? cursos.map(tarjetaCurso).join("") : `<div class="vacio"><strong>Aún no tienes cursos</strong>Cuando Gustavo te asigne uno, aparecerá aquí.</div>`}</div>
     </section>
 
+    ${audios.length ? `
+    <section class="pila">
+      <div class="fila-entre"><div class="etiqueta">Tus audiolibros</div><a class="btn-texto" href="#/biblioteca" style="display:inline-flex;align-items:center">Biblioteca</a></div>
+      <div class="pila" id="lista-audios">${audios.map((x) => tarjetaAudio(x, `/audio/${x.id}`)).join("")}</div>
+    </section>` : ""}
+
     <section class="pila">
       <div class="fila-entre">
         <div class="etiqueta">Insignias recientes</div>
@@ -409,7 +422,7 @@ async function pintarInicio() {
     await mostrarBienvenida(r);
     try { localStorage.setItem(llaveBienvenida, "1"); } catch (_) { /* nada */ }
   }
-  await anunciarNuevos(r, cursos);
+  await anunciarNuevos(r, cursos, audios);
   if (r.insignias_sin_ver?.length) celebrar(r.insignias_sin_ver);
 }
 
@@ -417,30 +430,34 @@ async function pintarInicio() {
 const esNuevo = (c) => !c.terminado && !c.ultima_actividad && !c.completadas;
 
 // Tarjeta de bienvenida a los cursos recién asignados (una sola vez por curso).
-async function anunciarNuevos(r, cursos) {
+async function anunciarNuevos(r, cursosVideo, audios = []) {
   const llave = `academia-anunciados-${r.usuario}`;
   let vistos = [];
   try { vistos = JSON.parse(localStorage.getItem(llave) || "[]"); } catch (_) { /* sin almacenamiento */ }
-  const nuevos = cursos.filter((c) => esNuevo(c) && !vistos.includes(c.id));
+  const cursos = [
+    ...cursosVideo.filter(esNuevo).map((c) => ({ ...c, _llave: c.id, _ruta: `/curso/${c.id}`, _meta: `${esc(nombreCategoria(c.categoria))} · ${c.lecciones} lecciones · ${duracion(c.duracion_seg)}` })),
+    ...audios.filter(esNuevoAudio).map((b) => ({ ...b, _llave: "a:" + b.id, _ruta: `/audio/${b.id}`, _meta: `Audiolibro${b.autor ? " · " + esc(b.autor) : ""}${b.duracion_seg ? " · " + duracion(b.duracion_seg) : ""}` })),
+  ];
+  const nuevos = cursos.filter((c) => !vistos.includes(c._llave));
   if (!nuevos.length) return;
-  try { localStorage.setItem(llave, JSON.stringify([...new Set([...vistos, ...nuevos.map((c) => c.id)])].slice(-200))); } catch (_) { /* nada */ }
+  try { localStorage.setItem(llave, JSON.stringify([...new Set([...vistos, ...nuevos.map((c) => c._llave)])].slice(-200))); } catch (_) { /* nada */ }
   const uno = nuevos.length === 1;
   confeti({ cantidad: 70, duracion: 2200, origenY: 0.25 });
   const v = await modal(`
     <div class="anuncio-nuevo">
       <div class="anuncio-icono">${icono("sparkles", 34)}</div>
-      <h2 class="modal-titulo" style="text-align:center">${uno ? "¡Tienes un curso nuevo!" : `¡Tienes ${nuevos.length} cursos nuevos!`}</h2>
-      <p class="texto-tenue" style="text-align:center;margin:0">${uno ? "Ya está listo para ti. Cada video que termines suma puntos para tu nivel y tus premios." : "Ya están listos para ti. Cada video que termines suma puntos para tu nivel y tus premios."}</p>
+      <h2 class="modal-titulo" style="text-align:center">${uno ? (nuevos[0]._ruta.startsWith("/audio") ? "¡Tienes un audiolibro nuevo!" : "¡Tienes un curso nuevo!") : `¡Tienes ${nuevos.length} títulos nuevos!`}</h2>
+      <p class="texto-tenue" style="text-align:center;margin:0">${uno ? "Ya está listo para ti." : "Ya están listos para ti."} Cada video o minuto que escuches suma puntos para tu nivel y tus premios.</p>
       <div class="pila" style="gap:8px;margin-top:4px">${nuevos.slice(0, 4).map((c) => `
-        <button class="anuncio-curso" data-cerrar="${c.id}">
+        <button class="anuncio-curso" data-cerrar="${c._ruta}">
           <div style="flex:1;min-width:0;text-align:left"><b>${esc(c.titulo)}</b>
-            <small>${esc(nombreCategoria(c.categoria))} · ${c.lecciones} lecciones · ${duracion(c.duracion_seg)}${c.fecha_limite ? ` · vence ${fechaCorta(c.fecha_limite)}` : ""}</small></div>
+            <small>${c._meta}${c.fecha_limite ? ` · vence ${fechaCorta(c.fecha_limite)}` : ""}</small></div>
           ${icono("next", 18)}
         </button>`).join("")}</div>
-      <button class="btn btn-bloque" data-cerrar="${nuevos[0].id}">${icono("play", 18)}Empezar ${uno ? "ahora" : "el primero"}</button>
+      <button class="btn btn-bloque" data-cerrar="${nuevos[0]._ruta}">${icono("play", 18)}Empezar ${uno ? "ahora" : "el primero"}</button>
       <button class="btn-texto" data-cerrar style="align-self:center">Lo veo después</button>
     </div>`);
-  if (v && typeof v === "string") ir(`/curso/${v}`);
+  if (v && typeof v === "string") ir(v);
 }
 
 function tarjetaCurso(c) {
