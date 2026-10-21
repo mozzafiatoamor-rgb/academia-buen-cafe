@@ -223,7 +223,8 @@ async function atender(req: Request): Promise<Response> {
     const sinFirma = await estadoUrl(`https://${host}${rutaCodificada(ruta)}`);
     const r = await probarFirmas(host, llaveToken, ruta);
     if (r.tipo) tipoElegido = r.tipo;
-    return json({ ruta, storage: enStorage, cdn_sin_firma: sinFirma, firmas: r.detalle, funciona: r.tipo });
+    const huella = (k: string) => (k.length > 10 ? `${k.slice(0, 4)}…${k.slice(-4)}` : "(muy corta)") + ` · ${k.length} caracteres`;
+    return json({ ruta, host, llave: huella(llaveToken), storage: enStorage, cdn_sin_firma: sinFirma, firmas: r.detalle, funciona: r.tipo });
   }
 
   if (accion === "diagnostico") {

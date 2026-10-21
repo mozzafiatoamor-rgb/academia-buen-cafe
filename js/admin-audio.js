@@ -513,6 +513,7 @@ export async function pintarEditorAudio(main, id, pestana = "capitulos", ctx) {
         ${linea("El archivo está en tu Storage Zone", ok(r.storage), ok(r.storage) ? "Sí" : `No (${r.storage})`)}
         ${linea("La Pull Zone protege el archivo (sin firma no abre)", !ok(r.cdn_sin_firma), ok(r.cdn_sin_firma) ? "No: activa Token Authentication" : `Sí (${r.cdn_sin_firma})`)}
         ${linea("Link firmado funciona", !!r.funciona, r.funciona ? `Sí (${r.funciona})` : `No ${esc(JSON.stringify(r.firmas))}`)}
+        ${r.llave ? `<div class="texto-tenue" style="font-size:12px;border-top:1px solid var(--linea);padding-top:8px">Pull Zone: <b>${esc(r.host)}</b><br>Clave que usa la función: <b>${esc(r.llave)}</b><br>Compárala con la "Url Token Authentication Key" de esa Pull Zone en Bunny (primeros y últimos 4 caracteres).</div>` : ""}
       </div>
       <p class="texto-tenue" style="margin:0;font-size:13px">${r.funciona ? "¡Todo bien! Ya se puede escuchar." : !ok(r.storage) ? "El archivo no está donde la app lo busca. Revisa que se haya subido completo." : Object.values(r.firmas).every((x) => x === 404) ? "La Pull Zone no encuentra el archivo: revisa que su origen sea tu Storage Zone de audio." : "Bunny rechaza la firma: copia otra vez la Url Token Authentication Key de la Pull Zone de audio en BUNNY_AUDIO_TOKEN_KEY."}</p>`;
     } catch (e) { caja.innerHTML = `<p class="error-form">${esc(e.message)}</p>`; }
