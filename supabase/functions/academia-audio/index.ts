@@ -8,6 +8,8 @@
 //    { accion: "url", audiolibro_id }  → link firmado para escuchar
 //    { accion: "url_ruta", ruta }      → (admin) link firmado de un archivo
 //    { accion: "listar", carpeta }     → (admin) archivos de audio en Storage
+//    { accion: "credencial_subida" }   → (admin) datos para subir directo desde su navegador
+//    POST ?accion=subir&ruta=…  (cuerpo = archivo) → (admin) sube pasando por aquí (respaldo)
 //
 //  Secretos que necesita (Edge Functions → Secrets):
 //    BUNNY_STORAGE_ZONE      nombre de la Storage Zone (ej. academia-audio)
@@ -87,9 +89,10 @@ async function atender(req: Request): Promise<Response> {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  const consulta = new URL(req.url).searchParams;
   let body: Record<string, unknown> = {};
-  try { body = await req.json(); } catch { /* vacío */ }
-  const accion = String(body.accion ?? "url");
+  if (consulta.get("accion") !== "subir") { try { body = await req.json(); } catch { /* vacío */ } }
+  const accion = String(consulta.get("accion") ?? body.accion ?? "url");
 
   const esAdmin = async () => {
     const { data, error } = await sb.rpc("academia_es_admin");
@@ -127,6 +130,29 @@ async function atender(req: Request): Promise<Response> {
       BUNNY_AUDIO_HOST: host || "(falta)",
       BUNNY_AUDIO_TOKEN_KEY: llaveToken ? `ok (${llaveToken.length} caracteres)` : "(falta)",
     });
+  }
+
+  const zonaSt = secreto("BUNNY_STORAGE_ZONE");
+  const claveSt = secreto("BUNNY_STORAGE_KEY");
+  const hostStorage = soloHost(secreto("BUNNY_STORAGE_HOST")) || "storage.bunnycdn.com";
+
+  // Solo el navegador del admin recibe estos datos (nunca los empleados).
+  if (accion === "credencial_subida") {
+    if (!zonaSt || !claveSt) return json({ error: "Faltan secretos de Bunny Storage" }, 500);
+    return json({ host: hostStorage, zona: zonaSt, clave: claveSt });
+  }
+
+  // Respaldo: el archivo pasa por aquí (para archivos medianos si la subida directa falla).
+  if (accion === "subir") {
+    if (!zonaSt || !claveSt) return json({ error: "Faltan secretos de Bunny Storage" }, 500);
+    const ruta = limpiarRuta(consulta.get("ruta") ?? "");
+    if (!ruta || !EXT_AUDIO.test(ruta)) return json({ error: "Ruta de audio inválida" }, 400);
+    const datosArchivo = await req.arrayBuffer();
+    const r = await fetch(`https://${hostStorage}/${encodeURIComponent(zonaSt)}${rutaCodificada(ruta)}`, {
+      method: "PUT", headers: { AccessKey: claveSt, "Content-Type": "application/octet-stream" }, body: datosArchivo,
+    });
+    if (!r.ok) return json({ error: `Bunny Storage respondió ${r.status} al subir` }, 502);
+    return json({ ok: true, ruta });
   }
 
   if (accion === "listar") {

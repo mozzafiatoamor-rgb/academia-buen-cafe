@@ -631,6 +631,15 @@ export function crearDemo() {
       return { carpeta, items: (AUDIOS_BUNNY[carpeta] || []).map((x) => ({ ...x, ruta: (carpeta ? carpeta + "/" : "") + x.nombre })) };
     },
     async diagnosticoAudio() { return { BUNNY_STORAGE_ZONE: "demo", BUNNY_STORAGE_KEY: "ok (demo)", BUNNY_STORAGE_HOST: "storage.bunnycdn.com (por defecto)", BUNNY_AUDIO_HOST: "demo.b-cdn.net", BUNNY_AUDIO_TOKEN_KEY: "ok (demo)" }; },
+    async subirAudio(archivo, ruta, alProgreso = () => {}) {
+      exigirAdmin();
+      const total = archivo.size || 1;
+      for (let i = 1; i <= 10; i++) { await espera(120); alProgreso((total * i) / 10, total); }
+      const partes = ruta.split("/"), nombre = partes.pop(), carpeta = partes.join("/");
+      (AUDIOS_BUNNY[carpeta] ||= []).push({ nombre, carpeta: false, bytes: archivo.size });
+      if (carpeta && !AUDIOS_BUNNY[""].some((x) => x.nombre === carpeta)) AUDIOS_BUNNY[""].push({ nombre: carpeta, carpeta: true });
+      return { ruta };
+    },
     async audioRuta(ruta) { await espera(); exigirAdmin(); return { url: audioDemo(durDemo(ruta)) }; },
     async adminPremios() {
       await espera(); exigirAdmin();

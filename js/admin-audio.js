@@ -3,7 +3,7 @@
 //  asignación y avisos por WhatsApp.
 // =====================================================================
 import { datos } from "./datos.js";
-import { icono, esc, num, duracion, reloj, fechaCorta, aviso, modal, confirmar, formulario, nombreArea, nombreCategoria, opcionesCategoria, categorias } from "./ui.js";
+import { icono, esc, num, duracion, reloj, fechaCorta, aviso, modal, confirmar, formulario, nombreArea, nombreCategoria, opcionesCategoria, categorias, slug } from "./ui.js";
 import { valorAudio } from "./puntos.js";
 import { recargar, elegirAsignacion, avisarCurso } from "./admin.js";
 import { portadaHTML } from "./audio.js";
@@ -56,11 +56,12 @@ export async function pintarAudiolibrosAdmin(main, ctx) {
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-end">
       <h1 class="titulo-pagina">Audiolibros</h1>
       <div class="fila" style="flex-wrap:wrap">
-        <button class="btn btn-sec" id="guia">${icono("q", 18)}Cómo subirlos</button>
-        <button class="btn" id="agregar">${icono("plus", 18)}Agregar audiolibro</button>
+        <button class="btn btn-sec" id="guia">${icono("q", 18)}Ayuda</button>
+        <button class="btn btn-sec" id="agregar">${icono("plus", 18)}Elegir de Bunny</button>
+        <button class="btn" id="subir">${icono("audifonos", 18)}Subir desde mi compu o cel</button>
       </div>
     </div>
-    <p class="texto-tenue" style="margin:0">Sube el MP3 o M4B a Bunny Storage y luego agrégalo aquí. Se asignan igual que los cursos y dan puntos por cada minuto escuchado.</p>
+    <p class="texto-tenue" style="margin:0">Elige uno o varios MP3/M4B (o una carpeta completa) y se suben solos a Bunny. Cada archivo se vuelve un audiolibro en borrador. Se asignan igual que los cursos y dan puntos por cada minuto escuchado.</p>
     ${grupos.length ? grupos.map((g) => `
       <div class="fila-entre"><h2>${esc(g.nombre)}</h2><span class="texto-tenue" style="font-size:12px">${g.items.length} audiolibro(s)</span></div>
       <div class="rejilla">${g.items.map((b) => `
@@ -73,6 +74,140 @@ export async function pintarAudiolibrosAdmin(main, ctx) {
     : `<div class="vacio"><strong>Aún no hay audiolibros</strong>Dale <b>Agregar audiolibro</b> y elige el archivo que subiste a Bunny.</div>`}`;
   main.querySelector("#guia").onclick = () => modal(`${guiaBunny()}<button class="btn btn-bloque" data-cerrar>Entendido</button>`, { clase: "modal-ancho" });
   main.querySelector("#agregar").onclick = () => agregarAudiolibro(libros, ctx);
+  main.querySelector("#subir").onclick = () => subirAudiolibros(libros);
+}
+
+// ---------------------------------------------------------------------
+//  SUBIR DESDE LA COMPU O EL CEL (uno o varios archivos, o una carpeta)
+// ---------------------------------------------------------------------
+const EXT_AUDIO = /\.(mp3|m4a|m4b|aac|ogg|oga|opus|wav|flac)$/i;
+const tamano = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : b >= 1e6 ? Math.round(b / 1e6) + " MB" : Math.max(1, Math.round(b / 1e3)) + " KB");
+const nombreArchivo = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "audiolibro";
+const movil = /iPhone|iPad|Android/i.test(navigator.userAgent);
+
+async function subirAudiolibros(libros) {
+  let lista = [];
+  const p = modal(`
+    <div class="fila-entre"><h2 class="modal-titulo">Subir audiolibros</h2><button class="btn-icono" data-cerrar aria-label="Cerrar">${icono("x")}</button></div>
+    <p class="texto-tenue" style="margin:0">Cada archivo de audio se convierte en un audiolibro (en borrador). Si un libro está en un solo MP3 o M4B, perfecto.</p>
+    <div class="fila" style="flex-wrap:wrap">
+      <label class="btn">${icono("audifonos", 18)}Elegir archivos<input type="file" id="sa-archivos" multiple accept="audio/*,.mp3,.m4a,.m4b,.aac,.ogg,.opus,.wav,.flac" hidden></label>
+      ${movil ? "" : `<label class="btn btn-sec">${icono("book", 18)}Elegir carpeta<input type="file" id="sa-carpeta" webkitdirectory multiple hidden></label>`}
+    </div>
+    <form class="form" id="sa-form" novalidate hidden>
+      <div class="fila" style="flex-wrap:wrap;gap:12px;align-items:flex-start">
+        <label class="campo" style="flex:1 1 180px"><span>Categoría</span><select name="categoria">${opcionesCategoria().map(([v, t]) => `<option value="${esc(v)}" ${v === "general" ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+        <label class="campo" style="flex:1 1 180px"><span>Autor (opcional, para todos)</span><input name="autor" placeholder="Ej. John C. Maxwell"></label>
+      </div>
+      <span class="etiqueta">Títulos (puedes corregirlos)</span>
+      <div class="lista-personas" id="sa-lista" style="max-height:40vh"></div>
+      <p class="error-form" hidden></p>
+      <div class="fila-botones">
+        <button type="button" class="btn btn-sec" data-cerrar="">Cancelar</button>
+        <button type="submit" class="btn" id="sa-ok">Subir</button>
+      </div>
+    </form>`, { clase: "modal-ancho" });
+  const capa = modal.actual, form = capa.querySelector("#sa-form");
+  const pintar = () => {
+    form.hidden = !lista.length;
+    capa.querySelector("#sa-lista").innerHTML = lista.map((x, i) => `
+      <div class="fila-subida">
+        ${icono("audifonos", 18)}
+        <span style="flex:1;min-width:0"><input class="buscar-persona" data-titulo="${i}" value="${esc(x.titulo)}" aria-label="Título">
+          <small>${esc(x.file.name)} · ${tamano(x.file.size)}</small></span>
+        <button type="button" class="mini-btn" aria-label="Quitar" data-quitar="${i}">${icono("x", 16)}</button>
+      </div>`).join("");
+    capa.querySelector("#sa-ok").textContent = `Subir ${lista.length} audiolibro${lista.length === 1 ? "" : "s"}`;
+    capa.querySelectorAll("[data-titulo]").forEach((inp) => (inp.oninput = () => { lista[Number(inp.dataset.titulo)].titulo = inp.value; }));
+    capa.querySelectorAll("[data-quitar]").forEach((b) => (b.onclick = () => { lista.splice(Number(b.dataset.quitar), 1); pintar(); }));
+  };
+  const agregarArchivos = (files) => {
+    const nuevos = [...files].filter((f) => EXT_AUDIO.test(f.name) && !(f.webkitRelativePath || f.name).split("/").some((q) => q.startsWith(".")))
+      .sort((a, b) => (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name, "es", { numeric: true }));
+    if (!nuevos.length) return aviso("No encontré archivos de audio (MP3, M4A, M4B…)", "error");
+    const ya = new Set(lista.map((x) => x.file.name + x.file.size));
+    lista.push(...nuevos.filter((f) => !ya.has(f.name + f.size)).map((f) => ({ file: f, titulo: tituloDeArchivo(f.name) })));
+    pintar();
+  };
+  capa.querySelector("#sa-archivos").onchange = (e) => { agregarArchivos(e.target.files); e.target.value = ""; };
+  capa.querySelector("#sa-carpeta")?.addEventListener("change", (e) => { agregarArchivos(e.target.files); e.target.value = ""; });
+  let pedido = null;
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const err = form.querySelector(".error-form");
+    if (lista.some((x) => !x.titulo.trim())) { err.textContent = "Todos necesitan título"; err.hidden = false; return; }
+    pedido = { categoria: form.elements.categoria.value || "general", autor: form.elements.autor.value.trim() || null };
+    capa.cerrar("ok");
+  };
+  await p;
+  if (!pedido || !lista.length) return;
+  await ejecutarSubidaAudio(lista, pedido, libros);
+  recargar();
+}
+
+async function ejecutarSubidaAudio(lista, { categoria, autor }, libros) {
+  const usadas = new Set(libros.map((b) => b.archivo));
+  const items = lista.map((x, i) => {
+    const ext = (x.file.name.match(EXT_AUDIO) || [".mp3"])[0].toLowerCase();
+    let base = `${slug(categoria).replace(/_/g, "-")}/${nombreArchivo(x.titulo)}`, ruta = base + ext, n = 2;
+    while (usadas.has(ruta)) ruta = `${base}-${n++}${ext}`;
+    usadas.add(ruta);
+    return { ...x, i, ruta, estado: "espera", subidos: 0 };
+  });
+  const total = items.reduce((a, x) => a + x.file.size, 0);
+  modal(`
+    <h2 class="modal-titulo">Subiendo audiolibros</h2>
+    <p class="texto-tenue" style="margin:0">No cierres esta pantalla ni dejes que el equipo se duerma hasta que termine.</p>
+    <div class="pila" style="gap:6px">
+      <div class="fila-entre"><b id="su-estado">Preparando…</b><b id="su-pct" style="color:var(--oro)">0%</b></div>
+      <div class="barra"><i id="su-barra" style="width:0%"></i></div>
+      <span class="texto-tenue" id="su-bytes">0 de ${tamano(total)}</span>
+    </div>
+    <div class="lista-personas" style="max-height:40vh">${items.map((x) => `
+      <div class="fila" id="su-${x.i}" style="padding:8px 10px;border-radius:10px;background:var(--tarjeta-2);gap:10px">
+        <span class="su-ic" style="flex:none;color:var(--arena)">${icono("clock", 16)}</span>
+        <span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.titulo)}</span>
+        <span class="su-pct texto-tenue" style="font-size:12px;min-width:48px;text-align:right">—</span></div>`).join("")}</div>
+    <div class="fila-botones" id="su-botones"></div>`, { cerrable: false, clase: "modal-ancho" });
+  const capa = modal.actual, $ = (q) => capa.querySelector(q);
+  let activo = true, bloqueo = null;
+  const antesDeSalir = (e) => { if (activo) { e.preventDefault(); e.returnValue = ""; } };
+  window.addEventListener("beforeunload", antesDeSalir);
+  try { bloqueo = await navigator.wakeLock?.request("screen"); } catch (_) { /* no soportado */ }
+  const fila = (x) => {
+    const el = capa.querySelector(`#su-${x.i}`); if (!el) return;
+    const [ic, color] = { espera: ["clock", "var(--arena)"], subiendo: ["audifonos", "var(--oro)"], listo: ["check", "var(--verde)"], error: ["x", "var(--alerta-texto)"] }[x.estado];
+    el.querySelector(".su-ic").innerHTML = icono(ic, 16); el.querySelector(".su-ic").style.color = color;
+    el.querySelector(".su-pct").textContent = x.estado === "listo" ? "Listo" : x.estado === "error" ? "Error" : x.estado === "subiendo" ? Math.floor((x.subidos / (x.file.size || 1)) * 100) + "%" : "—";
+  };
+  const totalUI = () => {
+    const sub = items.reduce((a, x) => a + (x.estado === "listo" ? x.file.size : x.subidos), 0);
+    const pct = Math.min(100, Math.floor((sub / (total || 1)) * 100));
+    $("#su-barra").style.width = pct + "%"; $("#su-pct").textContent = pct + "%";
+    $("#su-bytes").textContent = `${tamano(sub)} de ${tamano(total)}`;
+  };
+  let ok = 0;
+  const errores = [];
+  for (const x of items) {
+    x.estado = "subiendo"; fila(x);
+    $("#su-estado").textContent = `Subiendo ${x.i + 1} de ${items.length}…`;
+    try {
+      const dur = await medirDuracion(URL.createObjectURL(x.file));
+      await datos.subirAudio(x.file, x.ruta, (cargado) => { x.subidos = cargado; fila(x); totalUI(); });
+      await datos.guardarAudiolibro({ titulo: x.titulo.trim(), autor, categoria, descripcion: null, portada_url: null, archivo: x.ruta, duracion_seg: dur, capitulos: [], publicado: false });
+      x.estado = "listo"; ok++;
+    } catch (e) {
+      console.error(e); x.estado = "error"; errores.push(`${x.titulo}: ${e.message}`);
+    }
+    fila(x); totalUI();
+  }
+  activo = false; window.removeEventListener("beforeunload", antesDeSalir); bloqueo?.release?.();
+  $("#su-estado").textContent = errores.length ? `Listo: ${ok} de ${items.length}` : "¡Todos subidos!";
+  $("#su-botones").innerHTML = `${errores.length ? `<p class="error-form" style="margin:0;flex:1 1 100%">${errores.map(esc).join("<br>")}</p>` : ""}
+    <button class="btn btn-bloque" data-cerrar>Ver audiolibros</button>`;
+  if (!errores.length) aviso(`${ok} audiolibro${ok === 1 ? "" : "s"} en borrador. Ahora asígnalos y publícalos.`, "ok");
+  await new Promise((r) => capa.querySelector("[data-cerrar]").addEventListener("click", r, { once: true }));
+  capa.cerrar?.(true);
 }
 
 // Medir la duración real del archivo (lee solo el inicio del archivo).

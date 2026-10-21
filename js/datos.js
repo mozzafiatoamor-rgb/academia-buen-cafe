@@ -344,6 +344,30 @@ function crearNube() {
     audiosBunny: (carpeta) => funcion("academia-audio", { accion: "listar", carpeta: carpeta || "" }),
     audioRuta: (ruta) => funcion("academia-audio", { accion: "url_ruta", ruta }),
     diagnosticoAudio: () => funcion("academia-audio", { accion: "diagnostico" }),
+    // Sube un archivo de audio a Bunny Storage desde el navegador del admin.
+    // 1º directo a Bunny (rápido, cualquier tamaño); si el navegador lo bloquea, pasa por la función.
+    async subirAudio(archivo, ruta, alProgreso = () => {}) {
+      const cred = this._credAudio || (this._credAudio = await funcion("academia-audio", { accion: "credencial_subida" }));
+      const codificada = ruta.split("/").map(encodeURIComponent).join("/");
+      const enviar = (url, cabeceras, metodo) => new Promise((ok, falla) => {
+        const x = new XMLHttpRequest();
+        x.open(metodo, url);
+        Object.entries(cabeceras).forEach(([k, v]) => x.setRequestHeader(k, v));
+        x.upload.onprogress = (e) => { if (e.lengthComputable) alProgreso(e.loaded, e.total); };
+        x.onload = () => (x.status >= 200 && x.status < 300 ? ok(x.status) : falla(Object.assign(new Error(`Bunny respondió ${x.status}${x.status === 401 ? " (revisa BUNNY_STORAGE_KEY)" : ""}`), { estado: x.status })));
+        x.onerror = () => falla(Object.assign(new Error("Sin conexión con Bunny"), { estado: 0 }));
+        x.send(archivo);
+      });
+      if (!this._audioPorFuncion) {
+        try { await enviar(`https://${cred.host}/${encodeURIComponent(cred.zona)}/${codificada}`, { AccessKey: cred.clave, "Content-Type": "application/octet-stream" }, "PUT"); return { ruta }; }
+        catch (e) { if (e.estado !== 0 || !navigator.onLine) throw e; this._audioPorFuncion = true; }
+      }
+      if (archivo.size > 140 * 1048576) throw new ErrorAcademia("Este archivo es muy grande para subirlo por la app con tu conexión actual. Súbelo desde el panel de Bunny (Storage → File Manager) y luego usa \"Elegir de Bunny\".");
+      const { data } = await sb.auth.getSession();
+      await enviar(`${CFG.SUPABASE_URL}/functions/v1/academia-audio?accion=subir&ruta=${encodeURIComponent(ruta)}`,
+        { Authorization: `Bearer ${data?.session?.access_token || ""}`, apikey: CFG.SUPABASE_KEY, "Content-Type": "application/octet-stream" }, "POST");
+      return { ruta };
+    },
 
     async adminPremios() {
       const [premios, canjes, perfiles] = await Promise.all([
