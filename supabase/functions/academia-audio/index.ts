@@ -53,13 +53,93 @@ function limpiarRuta(r: string): string {
 const rutaCodificada = (r: string) => "/" + limpiarRuta(r).split("/").map(encodeURIComponent).join("/");
 
 // Token avanzado de Bunny CDN: "HS256-" + Base64URL(HMAC-SHA256(llave, ruta + expira))
-async function firmar(host: string, llaveToken: string, ruta: string) {
+// Bunny acepta varias formas de firmar el link; probamos cuál acepta tu Pull Zone
+// y la recordamos. Se puede fijar con el secreto BUNNY_AUDIO_TOKEN_TIPO (hs256 | sha256 | md5).
+type Tipo = "hs256" | "sha256" | "md5";
+const TIPOS: Tipo[] = ["sha256", "hs256", "md5"];
+let tipoElegido: Tipo | null = null;
+const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+async function firmarCon(tipo: Tipo, host: string, llaveToken: string, ruta: string) {
   const path = rutaCodificada(ruta);
   const expira = Math.floor(Date.now() / 1000) + VIGENCIA_SEG;
-  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(llaveToken), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const firma = new Uint8Array(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(path + expira)));
-  const b64 = btoa(String.fromCharCode(...firma)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  return { url: `https://${host}${path}?token=HS256-${b64}&expires=${expira}`, expira };
+  const enc = new TextEncoder();
+  let token = "";
+  if (tipo === "hs256") {
+    const k = await crypto.subtle.importKey("raw", enc.encode(llaveToken), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    token = "HS256-" + b64url(new Uint8Array(await crypto.subtle.sign("HMAC", k, enc.encode(path + expira))));
+  } else if (tipo === "sha256") {
+    token = b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(llaveToken + path + expira))));
+  } else {
+    token = b64url(md5(enc.encode(llaveToken + path + expira)));
+  }
+  return { url: `https://${host}${path}?token=${token}&expires=${expira}`, expira };
+}
+
+// MD5 (para la firma "básica" de Bunny; WebCrypto no lo trae).
+function md5(datos: Uint8Array): Uint8Array {
+  const K = new Uint32Array(64), S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+  for (let i = 0; i < 64; i++) K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) >>> 0;
+  const largo = datos.length, n = (((largo + 8) >>> 6) + 1) * 64, m = new Uint8Array(n);
+  m.set(datos); m[largo] = 0x80;
+  const v = new DataView(m.buffer);
+  v.setUint32(n - 8, (largo * 8) >>> 0, true); v.setUint32(n - 4, Math.floor(largo / 0x20000000), true);
+  let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+  for (let off = 0; off < n; off += 64) {
+    let A = a0, B = b0, C = c0, D = d0;
+    for (let i = 0; i < 64; i++) {
+      let F: number, g: number;
+      if (i < 16) { F = (B & C) | (~B & D); g = i; }
+      else if (i < 32) { F = (D & B) | (~D & C); g = (5 * i + 1) % 16; }
+      else if (i < 48) { F = B ^ C ^ D; g = (3 * i + 5) % 16; }
+      else { F = C ^ (B | ~D); g = (7 * i) % 16; }
+      F = (F + A + K[i] + v.getUint32(off + g * 4, true)) >>> 0;
+      A = D; D = C; C = B;
+      const r = S[(i >> 4) * 4 + (i % 4)];
+      B = (B + ((F << r) | (F >>> (32 - r)))) >>> 0;
+    }
+    a0 = (a0 + A) >>> 0; b0 = (b0 + B) >>> 0; c0 = (c0 + C) >>> 0; d0 = (d0 + D) >>> 0;
+  }
+  const out = new Uint8Array(16), o = new DataView(out.buffer);
+  [a0, b0, c0, d0].forEach((x, i) => o.setUint32(i * 4, x, true));
+  return out;
+}
+
+async function estadoUrl(url: string): Promise<number> {
+  try {
+    const r = await fetch(url, { headers: { Range: "bytes=0-1" } });
+    try { await r.body?.cancel(); } catch (_) { /* nada */ }
+    return r.status;
+  } catch (_) { return 0; }
+}
+
+// Prueba las formas de firma con un archivo real. Devuelve la que funciona y el detalle.
+async function probarFirmas(host: string, llaveToken: string, ruta: string) {
+  const detalle: Record<string, number> = {};
+  for (const t of TIPOS) {
+    const st = await estadoUrl((await firmarCon(t, host, llaveToken, ruta)).url);
+    detalle[t] = st;
+    if (st === 200 || st === 206) return { tipo: t, detalle };
+  }
+  return { tipo: null as Tipo | null, detalle };
+}
+
+async function firmar(host: string, llaveToken: string, ruta: string) {
+  const fijo = secreto("BUNNY_AUDIO_TOKEN_TIPO").toLowerCase() as Tipo;
+  if (TIPOS.includes(fijo)) return firmarCon(fijo, host, llaveToken, ruta);
+  if (!tipoElegido) {
+    const r = await probarFirmas(host, llaveToken, ruta);
+    if (!r.tipo) {
+      const st = Object.values(r.detalle);
+      const motivo = st.every((x) => x === 404) ? "el archivo no está en la Pull Zone (revisa que la Pull Zone apunte a tu Storage Zone)"
+        : st.every((x) => x === 403 || x === 401) ? "Bunny rechazó la firma (revisa BUNNY_AUDIO_TOKEN_KEY: debe ser la de la Pull Zone de audio)"
+        : st.every((x) => x === 0) ? `no se pudo conectar con ${host} (revisa BUNNY_AUDIO_HOST)`
+        : `Bunny respondió ${JSON.stringify(r.detalle)}`;
+      throw new Error(`No se pudo preparar el audio: ${motivo}.`);
+    }
+    tipoElegido = r.tipo;
+  }
+  return firmarCon(tipoElegido, host, llaveToken, ruta);
 }
 
 Deno.serve(async (req) => {
@@ -128,6 +208,22 @@ async function atender(req: Request): Promise<Response> {
     const ruta = limpiarRuta(String(body.ruta ?? ""));
     if (!ruta) return json({ error: "Ruta vacía" }, 400);
     return json(await firmar(host, llaveToken, ruta));
+  }
+
+  // Prueba completa de un archivo: ¿existe en Storage? ¿qué firma acepta la Pull Zone?
+  if (accion === "probar") {
+    if (!host || !llaveToken) return json({ error: "Faltan BUNNY_AUDIO_HOST o BUNNY_AUDIO_TOKEN_KEY" }, 500);
+    const ruta = limpiarRuta(String(body.ruta ?? ""));
+    if (!ruta) return json({ error: "Ruta vacía" }, 400);
+    let enStorage = 0;
+    const z = secreto("BUNNY_STORAGE_ZONE"), c = secreto("BUNNY_STORAGE_KEY"), hs = soloHost(secreto("BUNNY_STORAGE_HOST")) || "storage.bunnycdn.com";
+    if (z && c) {
+      try { const r = await fetch(`https://${hs}/${encodeURIComponent(z)}${rutaCodificada(ruta)}`, { headers: { AccessKey: c, Range: "bytes=0-1" } }); enStorage = r.status; try { await r.body?.cancel(); } catch (_) { /* nada */ } } catch (_) { enStorage = 0; }
+    }
+    const sinFirma = await estadoUrl(`https://${host}${rutaCodificada(ruta)}`);
+    const r = await probarFirmas(host, llaveToken, ruta);
+    if (r.tipo) tipoElegido = r.tipo;
+    return json({ ruta, storage: enStorage, cdn_sin_firma: sinFirma, firmas: r.detalle, funciona: r.tipo });
   }
 
   if (accion === "diagnostico") {

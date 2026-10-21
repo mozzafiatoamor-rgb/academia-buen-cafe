@@ -344,6 +344,7 @@ function crearNube() {
     audiosBunny: (carpeta) => funcion("academia-audio", { accion: "listar", carpeta: carpeta || "" }),
     audioRuta: (ruta) => funcion("academia-audio", { accion: "url_ruta", ruta }),
     diagnosticoAudio: () => funcion("academia-audio", { accion: "diagnostico" }),
+    probarAudio: (ruta) => funcion("academia-audio", { accion: "probar", ruta }),
     // Sube un archivo de audio a Bunny Storage desde el navegador del admin.
     // 1º directo a Bunny (rápido, cualquier tamaño); si el navegador lo bloquea, pasa por la función.
     async subirAudio(archivo, ruta, alProgreso = () => {}) {

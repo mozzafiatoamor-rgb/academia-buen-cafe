@@ -398,6 +398,7 @@ export async function pintarEditorAudio(main, id, pestana = "capitulos", ctx) {
     </div>
     <div class="fila" style="flex-wrap:wrap">
       <a class="btn btn-sec" href="#/admin/ver/audio/${b.id}">${icono("eye", 18)}Ver como empleado</a>
+      <button class="btn btn-sec" id="probar">${icono("refresh", 18)}Probar reproducción</button>
       <button class="btn btn-sec" id="editar">${icono("edit", 18)}Datos</button>
       <button class="btn ${b.publicado ? "btn-sec" : ""}" id="publicar">${b.publicado ? "Pasar a borrador" : "Publicar"}</button>
     </div>
@@ -500,6 +501,23 @@ export async function pintarEditorAudio(main, id, pestana = "capitulos", ctx) {
     guardarCaps(caps.filter((_, k) => k !== Number(x.dataset.borrarC)));
   }));
 
+  main.querySelector("#probar").onclick = async () => {
+    const p = modal(`<h2 class="modal-titulo">Probar reproducción</h2><div id="pr-res"><div class="cargando" style="min-height:120px"><div class="taza-carga"></div></div></div>
+      <button class="btn btn-bloque" data-cerrar>Cerrar</button>`, { clase: "modal-ancho" });
+    const caja = modal.actual.querySelector("#pr-res");
+    try {
+      const r = await datos.probarAudio(b.archivo);
+      const ok = (st) => st === 200 || st === 206;
+      const linea = (txt, bien, det) => `<div class="fila-entre" style="gap:10px;font-size:14px"><span>${txt}</span><b style="color:${bien ? "var(--verde-texto)" : "var(--alerta-texto)"}">${det}</b></div>`;
+      caja.innerHTML = `<div class="tarjeta pila" style="gap:8px">
+        ${linea("El archivo está en tu Storage Zone", ok(r.storage), ok(r.storage) ? "Sí" : `No (${r.storage})`)}
+        ${linea("La Pull Zone protege el archivo (sin firma no abre)", !ok(r.cdn_sin_firma), ok(r.cdn_sin_firma) ? "No: activa Token Authentication" : `Sí (${r.cdn_sin_firma})`)}
+        ${linea("Link firmado funciona", !!r.funciona, r.funciona ? `Sí (${r.funciona})` : `No ${esc(JSON.stringify(r.firmas))}`)}
+      </div>
+      <p class="texto-tenue" style="margin:0;font-size:13px">${r.funciona ? "¡Todo bien! Ya se puede escuchar." : !ok(r.storage) ? "El archivo no está donde la app lo busca. Revisa que se haya subido completo." : Object.values(r.firmas).every((x) => x === 404) ? "La Pull Zone no encuentra el archivo: revisa que su origen sea tu Storage Zone de audio." : "Bunny rechaza la firma: copia otra vez la Url Token Authentication Key de la Pull Zone de audio en BUNNY_AUDIO_TOKEN_KEY."}</p>`;
+    } catch (e) { caja.innerHTML = `<p class="error-form">${esc(e.message)}</p>`; }
+    await p;
+  };
   main.querySelector("#editar").onclick = async () => {
     const r = await formulario("Datos del audiolibro", [
       { nombre: "titulo", etiqueta: "Título", valor: b.titulo, requerido: true },
