@@ -355,7 +355,8 @@ export function crearDemo() {
       const ok = b && (esAdmin() || (b.publicado && db.audio_asignaciones.some((a) => a.audiolibro_id === b.id
         && (!a.area || a.area === u.area) && (!a.sede || a.sede === u.sede) && (!a.user_id || a.user_id === u.user_id))));
       if (!ok) throw new Error("Este audiolibro no está asignado a ti");
-      return { url: audioDemo(b.duracion_seg || durDemo(b.archivo)), titulo: b.titulo, duracion_seg: b.duracion_seg };
+      const pistas = (b.archivos || []).length > 1 ? b.archivos.map((a) => ({ url: audioDemo(Math.max(2, Math.round(a.dur || 60))), dur: a.dur || 60, titulo: a.titulo })) : [];
+      return { url: pistas[0]?.url || audioDemo(b.duracion_seg || durDemo(b.archivo)), pistas, titulo: b.titulo, duracion_seg: b.duracion_seg };
     },
     async registrarAudio(libroId, segundo, duracion) {
       const u = exigir();

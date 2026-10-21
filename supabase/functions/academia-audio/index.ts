@@ -106,10 +106,18 @@ async function atender(req: Request): Promise<Response> {
     const { data: puede, error } = await sb.rpc("academia_puede_oir", { p_libro: id });
     if (error) return json({ error: "Sesión no válida" }, 401);
     if (!puede) return json({ error: "Este audiolibro no está asignado a ti" }, 403);
-    const { data: libro } = await servicio.from("academia_audiolibros").select("archivo, titulo, duracion_seg").eq("id", id).maybeSingle();
+    let { data: libro, error: errLibro } = await servicio.from("academia_audiolibros").select("archivo, archivos, titulo, duracion_seg").eq("id", id).maybeSingle();
+    if (errLibro) ({ data: libro } = await servicio.from("academia_audiolibros").select("archivo, titulo, duracion_seg").eq("id", id).maybeSingle()); // sin paso 6
     if (!libro?.archivo) return json({ error: "Audiolibro no disponible" }, 404);
     const f = await firmar(host, llaveToken, libro.archivo);
-    return json({ ...f, titulo: libro.titulo, duracion_seg: libro.duracion_seg });
+    // Libro en varios archivos (uno por capítulo): un link firmado por archivo.
+    const lista = Array.isArray(libro.archivos) ? libro.archivos : [];
+    const pistas = [];
+    for (const a of lista) {
+      if (!a?.ruta) continue;
+      pistas.push({ url: (await firmar(host, llaveToken, String(a.ruta))).url, dur: Number(a.dur) || 0, titulo: a.titulo ?? null });
+    }
+    return json({ ...f, pistas, titulo: libro.titulo, duracion_seg: libro.duracion_seg });
   }
 
   // Lo de abajo es solo para el admin.

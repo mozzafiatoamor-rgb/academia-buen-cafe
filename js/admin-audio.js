@@ -85,21 +85,47 @@ const tamano = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : b >= 1e6 ? Math
 const nombreArchivo = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "audiolibro";
 const movil = /iPhone|iPad|Android/i.test(navigator.userAgent);
 
+const natural = (a, b) => a.localeCompare(b, "es", { numeric: true, sensitivity: "base" });
+const rutaDe = (f) => f.webkitRelativePath || f.name;
+
+// Arma los libros según cómo eligió los archivos:
+//  "uno"   → todo es un solo audiolibro (cada archivo = un capítulo)
+//  "cada"  → cada archivo suelto es un audiolibro
+//  "carpetas" → cada subcarpeta es un audiolibro; sus archivos (aunque estén en sub-subcarpetas) son capítulos
+function armarLibros(files, modo, nombreRaiz) {
+  const fs = [...files].sort((a, b) => natural(rutaDe(a), rutaDe(b)));
+  const cap = (f) => ({ file: f, titulo: tituloDeArchivo(f.name) });
+  if (modo === "uno") return fs.length ? [{ titulo: tituloDeArchivo(nombreRaiz || fs[0].name), archivos: fs.map(cap) }] : [];
+  if (modo === "cada") return fs.map((f) => ({ titulo: tituloDeArchivo(f.name), archivos: [cap(f)] }));
+  const grupos = new Map();
+  for (const f of fs) {
+    const partes = rutaDe(f).split("/");
+    const clave = partes.length >= 3 ? partes[1] : "\u0000" + f.name; // suelto en la raíz = libro propio
+    if (!grupos.has(clave)) grupos.set(clave, { titulo: tituloDeArchivo(partes.length >= 3 ? partes[1] : f.name), archivos: [] });
+    grupos.get(clave).archivos.push(cap(f));
+  }
+  return [...grupos.values()];
+}
+
 async function subirAudiolibros(libros) {
-  let lista = [];
+  let archivos = [], porCarpeta = false, raiz = "", modo = "cada";
   const p = modal(`
     <div class="fila-entre"><h2 class="modal-titulo">Subir audiolibros</h2><button class="btn-icono" data-cerrar aria-label="Cerrar">${icono("x")}</button></div>
-    <p class="texto-tenue" style="margin:0">Cada archivo de audio se convierte en un audiolibro (en borrador). Si un libro está en un solo MP3 o M4B, perfecto.</p>
+    <p class="texto-tenue" style="margin:0">Puedes elegir uno o varios archivos${movil ? "" : ", o una carpeta completa (por ejemplo <b>Mi libro/</b> con un MP3 por capítulo, o <b>Audiolibros/</b> con una subcarpeta por libro)"}.</p>
     <div class="fila" style="flex-wrap:wrap">
       <label class="btn">${icono("audifonos", 18)}Elegir archivos<input type="file" id="sa-archivos" multiple accept="audio/*,.mp3,.m4a,.m4b,.aac,.ogg,.opus,.wav,.flac" hidden></label>
       ${movil ? "" : `<label class="btn btn-sec">${icono("book", 18)}Elegir carpeta<input type="file" id="sa-carpeta" webkitdirectory multiple hidden></label>`}
     </div>
     <form class="form" id="sa-form" novalidate hidden>
+      <div class="pila" style="gap:6px" id="sa-modo-caja">
+        <span class="etiqueta" id="sa-modo-titulo"></span>
+        <div class="chips" id="sa-modo"></div>
+      </div>
       <div class="fila" style="flex-wrap:wrap;gap:12px;align-items:flex-start">
         <label class="campo" style="flex:1 1 180px"><span>Categoría</span><select name="categoria">${opcionesCategoria().map(([v, t]) => `<option value="${esc(v)}" ${v === "general" ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
         <label class="campo" style="flex:1 1 180px"><span>Autor (opcional, para todos)</span><input name="autor" placeholder="Ej. John C. Maxwell"></label>
       </div>
-      <span class="etiqueta">Títulos (puedes corregirlos)</span>
+      <span class="etiqueta" id="sa-cuantos"></span>
       <div class="lista-personas" id="sa-lista" style="max-height:40vh"></div>
       <p class="error-form" hidden></p>
       <div class="fila-botones">
@@ -108,53 +134,81 @@ async function subirAudiolibros(libros) {
       </div>
     </form>`, { clase: "modal-ancho" });
   const capa = modal.actual, form = capa.querySelector("#sa-form");
+  let librosArmados = [];
+  const opcionesModo = () => porCarpeta
+    ? [["carpetas", `Cada subcarpeta es un libro`], ["uno", `"${raiz}" es un solo libro`], ["cada", "Cada archivo es un libro"]]
+    : [["cada", "Cada archivo es un libro"], ["uno", "Son capítulos de un mismo libro"]];
   const pintar = () => {
-    form.hidden = !lista.length;
-    capa.querySelector("#sa-lista").innerHTML = lista.map((x, i) => `
-      <div class="fila-subida">
+    form.hidden = !archivos.length;
+    if (!archivos.length) return;
+    const hayModo = archivos.length > 1;
+    capa.querySelector("#sa-modo-caja").hidden = !hayModo;
+    capa.querySelector("#sa-modo-titulo").textContent = porCarpeta ? `¿Cómo está organizada la carpeta "${raiz}"?` : "¿Qué son estos archivos?";
+    capa.querySelector("#sa-modo").innerHTML = opcionesModo().map(([v, t]) => `<button type="button" class="chip ${modo === v ? "activo" : ""}" data-modo="${v}">${esc(t)}</button>`).join("");
+    librosArmados = armarLibros(archivos, hayModo ? modo : "cada", raiz);
+    const n = librosArmados.length;
+    capa.querySelector("#sa-cuantos").textContent = `${n} audiolibro${n === 1 ? "" : "s"} · puedes corregir los títulos`;
+    capa.querySelector("#sa-lista").innerHTML = librosArmados.map((l, i) => {
+      const bytes = l.archivos.reduce((a, x) => a + x.file.size, 0);
+      const caps = l.archivos.length > 1 ? `${l.archivos.length} capítulos: ${l.archivos.slice(0, 3).map((x) => esc(x.titulo)).join(", ")}${l.archivos.length > 3 ? `… y ${l.archivos.length - 3} más` : ""}` : esc(l.archivos[0].file.name);
+      return `<div class="fila-subida">
         ${icono("audifonos", 18)}
-        <span style="flex:1;min-width:0"><input class="buscar-persona" data-titulo="${i}" value="${esc(x.titulo)}" aria-label="Título">
-          <small>${esc(x.file.name)} · ${tamano(x.file.size)}</small></span>
+        <span style="flex:1;min-width:0"><input class="buscar-persona" data-titulo="${i}" value="${esc(l.titulo)}" aria-label="Título">
+          <small>${caps} · ${tamano(bytes)}</small></span>
         <button type="button" class="mini-btn" aria-label="Quitar" data-quitar="${i}">${icono("x", 16)}</button>
-      </div>`).join("");
-    capa.querySelector("#sa-ok").textContent = `Subir ${lista.length} audiolibro${lista.length === 1 ? "" : "s"}`;
-    capa.querySelectorAll("[data-titulo]").forEach((inp) => (inp.oninput = () => { lista[Number(inp.dataset.titulo)].titulo = inp.value; }));
-    capa.querySelectorAll("[data-quitar]").forEach((b) => (b.onclick = () => { lista.splice(Number(b.dataset.quitar), 1); pintar(); }));
+      </div>`;
+    }).join("");
+    capa.querySelector("#sa-ok").textContent = `Subir ${n} audiolibro${n === 1 ? "" : "s"}`;
+    capa.querySelectorAll("[data-titulo]").forEach((inp) => (inp.oninput = () => { librosArmados[Number(inp.dataset.titulo)].titulo = inp.value; }));
+    capa.querySelectorAll("[data-quitar]").forEach((b) => (b.onclick = () => {
+      const quitar = new Set(librosArmados[Number(b.dataset.quitar)].archivos.map((x) => x.file));
+      archivos = archivos.filter((f) => !quitar.has(f));
+      pintar();
+    }));
   };
-  const agregarArchivos = (files) => {
-    const nuevos = [...files].filter((f) => EXT_AUDIO.test(f.name) && !(f.webkitRelativePath || f.name).split("/").some((q) => q.startsWith(".")))
-      .sort((a, b) => (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name, "es", { numeric: true }));
-    if (!nuevos.length) return aviso("No encontré archivos de audio (MP3, M4A, M4B…)", "error");
-    const ya = new Set(lista.map((x) => x.file.name + x.file.size));
-    lista.push(...nuevos.filter((f) => !ya.has(f.name + f.size)).map((f) => ({ file: f, titulo: tituloDeArchivo(f.name) })));
+  capa.querySelector("#sa-modo").onclick = (e) => { const b = e.target.closest("[data-modo]"); if (!b) return; modo = b.dataset.modo; pintar(); };
+  const elegir = (files, esCarpeta) => {
+    const audios = [...files].filter((f) => EXT_AUDIO.test(f.name) && !rutaDe(f).split("/").some((q) => q.startsWith(".")));
+    if (!audios.length) return aviso("No encontré archivos de audio (MP3, M4A, M4B…)", "error");
+    archivos = audios; porCarpeta = esCarpeta;
+    raiz = esCarpeta ? rutaDe(audios[0]).split("/")[0] : "";
+    const haySub = esCarpeta && audios.some((f) => rutaDe(f).split("/").length >= 3);
+    modo = esCarpeta ? (haySub ? "carpetas" : "uno") : "cada";
     pintar();
   };
-  capa.querySelector("#sa-archivos").onchange = (e) => { agregarArchivos(e.target.files); e.target.value = ""; };
-  capa.querySelector("#sa-carpeta")?.addEventListener("change", (e) => { agregarArchivos(e.target.files); e.target.value = ""; });
+  capa.querySelector("#sa-archivos").onchange = (e) => { elegir(e.target.files, false); e.target.value = ""; };
+  capa.querySelector("#sa-carpeta")?.addEventListener("change", (e) => { elegir(e.target.files, true); e.target.value = ""; });
   let pedido = null;
   form.onsubmit = (e) => {
     e.preventDefault();
     const err = form.querySelector(".error-form");
-    if (lista.some((x) => !x.titulo.trim())) { err.textContent = "Todos necesitan título"; err.hidden = false; return; }
+    if (librosArmados.some((l) => !l.titulo.trim())) { err.textContent = "Todos necesitan título"; err.hidden = false; return; }
     pedido = { categoria: form.elements.categoria.value || "general", autor: form.elements.autor.value.trim() || null };
     capa.cerrar("ok");
   };
   await p;
-  if (!pedido || !lista.length) return;
-  await ejecutarSubidaAudio(lista, pedido, libros);
+  if (!pedido || !librosArmados.length) return;
+  await ejecutarSubidaAudio(librosArmados, pedido, libros);
   recargar();
 }
 
 async function ejecutarSubidaAudio(lista, { categoria, autor }, libros) {
   const usadas = new Set(libros.map((b) => b.archivo));
-  const items = lista.map((x, i) => {
-    const ext = (x.file.name.match(EXT_AUDIO) || [".mp3"])[0].toLowerCase();
-    let base = `${slug(categoria).replace(/_/g, "-")}/${nombreArchivo(x.titulo)}`, ruta = base + ext, n = 2;
-    while (usadas.has(ruta)) ruta = `${base}-${n++}${ext}`;
-    usadas.add(ruta);
-    return { ...x, i, ruta, estado: "espera", subidos: 0 };
+  const carpetaCat = slug(categoria).replace(/_/g, "-");
+  const items = lista.map((l, i) => {
+    const varios = l.archivos.length > 1;
+    let base = `${carpetaCat}/${nombreArchivo(l.titulo)}`, n = 2;
+    const libre = (b) => (varios ? ![...usadas].some((u) => u.startsWith(b + "/")) : !usadas.has(b + ((l.archivos[0].file.name.match(EXT_AUDIO) || [".mp3"])[0].toLowerCase())));
+    while (!libre(base)) base = `${carpetaCat}/${nombreArchivo(l.titulo)}-${n++}`;
+    const archivosX = l.archivos.map((x, k) => {
+      const ext = (x.file.name.match(EXT_AUDIO) || [".mp3"])[0].toLowerCase();
+      const ruta = varios ? `${base}/${String(k + 1).padStart(2, "0")}-${nombreArchivo(x.titulo)}${ext}` : base + ext;
+      usadas.add(ruta);
+      return { ...x, ruta, subidos: 0 };
+    });
+    return { ...l, i, archivos: archivosX, bytes: archivosX.reduce((a, x) => a + x.file.size, 0), estado: "espera" };
   });
-  const total = items.reduce((a, x) => a + x.file.size, 0);
+  const total = items.reduce((a, x) => a + x.bytes, 0);
   modal(`
     <h2 class="modal-titulo">Subiendo audiolibros</h2>
     <p class="texto-tenue" style="margin:0">No cierres esta pantalla ni dejes que el equipo se duerma hasta que termine.</p>
@@ -166,7 +220,7 @@ async function ejecutarSubidaAudio(lista, { categoria, autor }, libros) {
     <div class="lista-personas" style="max-height:40vh">${items.map((x) => `
       <div class="fila" id="su-${x.i}" style="padding:8px 10px;border-radius:10px;background:var(--tarjeta-2);gap:10px">
         <span class="su-ic" style="flex:none;color:var(--arena)">${icono("clock", 16)}</span>
-        <span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.titulo)}</span>
+        <span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.titulo)}${x.archivos.length > 1 ? ` <span class="texto-tenue">· ${x.archivos.length} capítulos</span>` : ""}</span>
         <span class="su-pct texto-tenue" style="font-size:12px;min-width:48px;text-align:right">—</span></div>`).join("")}</div>
     <div class="fila-botones" id="su-botones"></div>`, { cerrable: false, clase: "modal-ancho" });
   const capa = modal.actual, $ = (q) => capa.querySelector(q);
@@ -174,14 +228,15 @@ async function ejecutarSubidaAudio(lista, { categoria, autor }, libros) {
   const antesDeSalir = (e) => { if (activo) { e.preventDefault(); e.returnValue = ""; } };
   window.addEventListener("beforeunload", antesDeSalir);
   try { bloqueo = await navigator.wakeLock?.request("screen"); } catch (_) { /* no soportado */ }
-  const fila = (x) => {
+  const subidosDe = (x) => x.archivos.reduce((a, f) => a + f.subidos, 0);
+  const fila = (x, detalle = "") => {
     const el = capa.querySelector(`#su-${x.i}`); if (!el) return;
     const [ic, color] = { espera: ["clock", "var(--arena)"], subiendo: ["audifonos", "var(--oro)"], listo: ["check", "var(--verde)"], error: ["x", "var(--alerta-texto)"] }[x.estado];
     el.querySelector(".su-ic").innerHTML = icono(ic, 16); el.querySelector(".su-ic").style.color = color;
-    el.querySelector(".su-pct").textContent = x.estado === "listo" ? "Listo" : x.estado === "error" ? "Error" : x.estado === "subiendo" ? Math.floor((x.subidos / (x.file.size || 1)) * 100) + "%" : "—";
+    el.querySelector(".su-pct").textContent = x.estado === "listo" ? "Listo" : x.estado === "error" ? "Error" : x.estado === "subiendo" ? (detalle || Math.floor((subidosDe(x) / (x.bytes || 1)) * 100) + "%") : "—";
   };
   const totalUI = () => {
-    const sub = items.reduce((a, x) => a + (x.estado === "listo" ? x.file.size : x.subidos), 0);
+    const sub = items.reduce((a, x) => a + (x.estado === "listo" ? x.bytes : subidosDe(x)), 0);
     const pct = Math.min(100, Math.floor((sub / (total || 1)) * 100));
     $("#su-barra").style.width = pct + "%"; $("#su-pct").textContent = pct + "%";
     $("#su-bytes").textContent = `${tamano(sub)} de ${tamano(total)}`;
@@ -192,12 +247,26 @@ async function ejecutarSubidaAudio(lista, { categoria, autor }, libros) {
     x.estado = "subiendo"; fila(x);
     $("#su-estado").textContent = `Subiendo ${x.i + 1} de ${items.length}…`;
     try {
-      const dur = await medirDuracion(URL.createObjectURL(x.file));
-      await datos.subirAudio(x.file, x.ruta, (cargado) => { x.subidos = cargado; fila(x); totalUI(); });
-      await datos.guardarAudiolibro({ titulo: x.titulo.trim(), autor, categoria, descripcion: null, portada_url: null, archivo: x.ruta, duracion_seg: dur, capitulos: [], publicado: false });
+      let inicio = 0;
+      const caps = [], lista = [];
+      for (const [k, f] of x.archivos.entries()) {
+        const dur = (await medirDuracion(URL.createObjectURL(f.file))) || 0;
+        await datos.subirAudio(f.file, f.ruta, (cargado) => { f.subidos = cargado; fila(x, x.archivos.length > 1 ? `${k + 1}/${x.archivos.length}` : ""); totalUI(); });
+        f.subidos = f.file.size;
+        caps.push({ t: Math.round(inicio), titulo: f.titulo });
+        lista.push({ ruta: f.ruta, dur, titulo: f.titulo });
+        inicio += dur;
+      }
+      const varios = lista.length > 1;
+      await datos.guardarAudiolibro({
+        titulo: x.titulo.trim(), autor, categoria, descripcion: null, portada_url: null,
+        archivo: lista[0].ruta, duracion_seg: Math.round(inicio) || null, publicado: false,
+        capitulos: varios ? caps : [], ...(varios ? { archivos: lista } : {}),
+      });
       x.estado = "listo"; ok++;
     } catch (e) {
-      console.error(e); x.estado = "error"; errores.push(`${x.titulo}: ${e.message}`);
+      console.error(e); x.estado = "error";
+      errores.push(`${x.titulo}: ${/archivos/.test(e.message) ? "falta correr el paso 6 de SQL (06_academia_audiolibros_capitulos.sql) para libros con capítulos" : e.message}`);
     }
     fila(x); totalUI();
   }
@@ -207,7 +276,6 @@ async function ejecutarSubidaAudio(lista, { categoria, autor }, libros) {
     <button class="btn btn-bloque" data-cerrar>Ver audiolibros</button>`;
   if (!errores.length) aviso(`${ok} audiolibro${ok === 1 ? "" : "s"} en borrador. Ahora asígnalos y publícalos.`, "ok");
   await new Promise((r) => capa.querySelector("[data-cerrar]").addEventListener("click", r, { once: true }));
-  capa.cerrar?.(true);
 }
 
 // Medir la duración real del archivo (lee solo el inicio del archivo).
@@ -245,6 +313,14 @@ async function agregarAudiolibro(libros, ctx) {
               ${usados.has(x.ruta) ? `<span class="pildora">Ya agregado</span>` : icono("next", 18)}</button>`).join("")
           : `<p class="texto-tenue">No hay archivos de audio en esta carpeta.</p>`}</div>
         <small class="ayuda">¿No ves tu archivo? Súbelo primero a tu Storage Zone en Bunny (arrastrar y soltar) y vuelve a abrir esta ventana.</small>`;
+      const audiosAqui = r.items.filter((x) => !x.carpeta && !usados.has(x.ruta));
+      if (c && audiosAqui.length > 1) {
+        cuerpo.insertAdjacentHTML("afterbegin", `<button class="btn btn-bloque" id="carpeta-libro" style="margin-bottom:8px">${icono("audifonos", 18)}Usar "${esc(c.split("/").pop())}" como un libro de ${audiosAqui.length} capítulos</button>`);
+        cuerpo.querySelector("#carpeta-libro").onclick = () => {
+          elegido = { carpeta: c, nombre: c.split("/").pop(), archivos: audiosAqui.sort((a, b2) => a.nombre.localeCompare(b2.nombre, "es", { numeric: true })) };
+          capa.cerrar("ok");
+        };
+      }
       cuerpo.querySelectorAll("[data-carpeta]").forEach((b) => (b.onclick = () => abrir(b.dataset.carpeta)));
       cuerpo.querySelectorAll("[data-archivo]").forEach((b) => (b.onclick = () => { elegido = { ruta: b.dataset.archivo, nombre: b.dataset.nombre }; capa.cerrar("ok"); }));
     } catch (e) {
@@ -277,10 +353,22 @@ async function agregarAudiolibro(libros, ctx) {
   ], "Agregar");
   if (!v) return;
   aviso("Midiendo la duración…");
-  let dur = null;
-  try { const f = await datos.audioRuta(elegido.ruta); dur = await medirDuracion(f.url); } catch (_) { /* se mide al primer uso */ }
+  let dur = null, extra = { capitulos: [] }, archivo = elegido.ruta;
+  if (elegido.archivos) {
+    let inicio = 0; const caps = [], lista = [];
+    for (const x of elegido.archivos) {
+      let d = 0;
+      try { d = (await medirDuracion((await datos.audioRuta(x.ruta)).url)) || 0; } catch (_) { /* sin duración */ }
+      caps.push({ t: Math.round(inicio), titulo: tituloDeArchivo(x.nombre) });
+      lista.push({ ruta: x.ruta, dur: d, titulo: tituloDeArchivo(x.nombre) });
+      inicio += d;
+    }
+    dur = Math.round(inicio) || null; archivo = lista[0].ruta; extra = { capitulos: caps, archivos: lista };
+  } else {
+    try { const f = await datos.audioRuta(elegido.ruta); dur = await medirDuracion(f.url); } catch (_) { /* se mide al primer uso */ }
+  }
   try {
-    const n = await datos.guardarAudiolibro({ ...v, autor: v.autor || null, descripcion: v.descripcion || null, portada_url: v.portada_url || null, archivo: elegido.ruta, duracion_seg: dur, capitulos: [], publicado: false });
+    const n = await datos.guardarAudiolibro({ ...v, autor: v.autor || null, descripcion: v.descripcion || null, portada_url: v.portada_url || null, archivo, duracion_seg: dur, publicado: false, ...extra });
     aviso(dur ? `Agregado · ${duracion(dur)}` : "Agregado (la duración se medirá al escucharlo)", "ok");
     ctx.ir(`/admin/audio/${n.id}/capitulos`);
   } catch (e) { aviso(e.message, "error"); }
@@ -361,14 +449,18 @@ export async function pintarEditorAudio(main, id, pestana = "capitulos", ctx) {
 
   // Reproductor para marcar capítulos.
   let reproductor = null;
+  const pistasAdmin = Array.isArray(b.archivos) && b.archivos.length > 1 ? b.archivos : null;
+  let pistaActual = 0;
+  const inicioPista = (k) => pistasAdmin ? pistasAdmin.slice(0, k).reduce((a, x) => a + (Number(x.dur) || 0), 0) : 0;
   datos.audioRuta(b.archivo).then((f) => {
     const caja = main.querySelector("#audio-admin"); if (!caja) return;
     caja.innerHTML = `<audio controls preload="metadata" src="${esc(f.url)}" style="width:100%"></audio>`;
     reproductor = caja.querySelector("audio");
-    main.querySelector("#cap-aqui").disabled = false;
+    main.querySelector("#cap-aqui").disabled = !!pistasAdmin;
+    if (pistasAdmin) caja.insertAdjacentHTML("beforeend", `<small class="ayuda">Este libro viene en ${pistasAdmin.length} archivos: cada archivo ya es un capítulo. Puedes renombrarlos o escucharlos con ${icono("play", 12)}.</small>`);
     reproductor.addEventListener("loadedmetadata", () => {
       const real = Math.round(reproductor.duration);
-      if (Number.isFinite(real) && real > 0 && Math.abs(real - (b.duracion_seg || 0)) > 2) datos.guardarAudiolibro({ id: b.id, duracion_seg: real }).catch(() => {});
+      if (!pistasAdmin && Number.isFinite(real) && real > 0 && Math.abs(real - (b.duracion_seg || 0)) > 2) datos.guardarAudiolibro({ id: b.id, duracion_seg: real }).catch(() => {});
     }, { once: true });
   }).catch((e) => { const caja = main.querySelector("#audio-admin"); if (caja) caja.innerHTML = `<p class="error-form" style="margin:0">No se pudo cargar el audio: ${esc(e.message)}</p>`; });
 
@@ -385,7 +477,18 @@ export async function pintarEditorAudio(main, id, pestana = "capitulos", ctx) {
   };
   main.querySelector("#cap-aqui").onclick = () => { if (reproductor) { reproductor.pause(); agregar(Math.floor(reproductor.currentTime)); } };
   main.querySelector("#cap-mano").onclick = () => agregar(0);
-  main.querySelectorAll("[data-oir]").forEach((x) => (x.onclick = () => { if (!reproductor) return; reproductor.currentTime = Number(x.dataset.oir); reproductor.play().catch(() => {}); }));
+  main.querySelectorAll("[data-oir]").forEach((x) => (x.onclick = async () => {
+    if (!reproductor) return;
+    const t = Number(x.dataset.oir);
+    if (pistasAdmin) {
+      let k = 0; for (let j = 0; j < pistasAdmin.length; j++) if (t >= inicioPista(j)) k = j;
+      if (k !== pistaActual) {
+        try { reproductor.src = (await datos.audioRuta(pistasAdmin[k].ruta)).url; pistaActual = k; } catch (e) { return aviso(e.message, "error"); }
+      }
+      reproductor.currentTime = Math.max(0, t - inicioPista(k));
+    } else reproductor.currentTime = t;
+    reproductor.play().catch(() => {});
+  }));
   main.querySelectorAll("[data-editar-c]").forEach((x) => (x.onclick = async () => {
     const i = Number(x.dataset.editarC), c = caps[i];
     const r = await pedirCapitulo(c.t, c.titulo, "Editar capítulo"); if (!r) return;

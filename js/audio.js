@@ -203,10 +203,8 @@ export async function pintarAudiolibro(ctx, id) {
 
   // ---- Elementos ----
   const $ = (s) => ctx.app.querySelector(s);
-  const audio = new Audio();
-  audio.preload = "metadata";
-  audio.src = fuente.url;
-  let dur = b.duracion_seg || 0;
+  const audio = crearLista(fuente, b.duracion_seg || 0);
+  let dur = Math.round(audio.duration) || b.duracion_seg || 0;
   let vel = Number(leer("academia-audio-vel", "1")) || 1;
   const inicio = b.completado && b.duracion_seg && (b.segundo_actual || 0) >= b.duracion_seg - 15 ? 0 : (b.segundo_actual || 0);
   let arrastrando = false;
@@ -242,7 +240,7 @@ export async function pintarAudiolibro(ctx, id) {
   audio.addEventListener("error", async () => {
     if (reintentos++ > 2) return aviso("No se pudo cargar el audio. Revisa tu conexión.", "error");
     const t = audio.currentTime, seguia = !audio.paused;
-    try { const f = await datos.audio(id); audio.src = f.url; audio.currentTime = t; audio.playbackRate = vel; if (seguia) audio.play().catch(() => {}); } catch (_) { /* sin red */ }
+    try { const f = await datos.audio(id); audio.renovar(f, t, seguia); } catch (_) { /* sin red */ }
   });
 
   // ---- Controles ----
@@ -413,8 +411,67 @@ export async function pintarAudiolibro(ctx, id) {
     window.removeEventListener("pagehide", alOcultar);
     audio.pause();
     await reportar(true);
-    audio.removeAttribute("src"); audio.load();
+    audio.liberar();
     if (ms) { try { ["play", "pause", "seekbackward", "seekforward", "seekto"].forEach((n) => ms.setActionHandler(n, null)); ms.metadata = null; } catch (_) { /* nada */ } }
+  };
+}
+
+// Reproduce un audiolibro de uno o varios archivos como si fuera uno solo:
+// el tiempo, la barra y los capítulos son del libro completo.
+function crearLista(fuente, durBase) {
+  const el = new Audio();
+  el.preload = "metadata";
+  let pistas = (fuente.pistas && fuente.pistas.length ? fuente.pistas : [{ url: fuente.url, dur: durBase }]).map((p) => ({ ...p }));
+  const multi = pistas.length > 1;
+  const calcular = () => { let acc = 0; pistas.forEach((p) => { p.inicio = acc; acc += Number(p.dur) || 0; }); };
+  calcular();
+  let i = 0, buscando = null, rate = 1;
+  const oyentes = {};
+  const emitir = (tipo) => (oyentes[tipo] || []).slice().forEach((o) => { o.fn(); if (o.once) oyentes[tipo] = oyentes[tipo].filter((x) => x !== o); });
+  const cargar = (k, t = 0, seguir = false) => { i = k; buscando = { t, seguir }; el.src = pistas[k].url; el.playbackRate = rate; };
+  const indice = (t) => { for (let k = pistas.length - 1; k >= 0; k--) if (t >= pistas[k].inicio) return k; return 0; };
+
+  el.addEventListener("loadedmetadata", () => {
+    if (Number.isFinite(el.duration) && el.duration > 0 && Math.abs(el.duration - (Number(pistas[i].dur) || 0)) > 1) { pistas[i].dur = el.duration; calcular(); }
+    if (buscando) {
+      const { t, seguir } = buscando; buscando = null;
+      if (t > 0) el.currentTime = Math.min(t, Math.max(0, el.duration - 0.5));
+      el.playbackRate = rate;
+      if (seguir) el.play().catch(() => {});
+    }
+    emitir("loadedmetadata");
+  });
+  el.addEventListener("ended", () => { if (i < pistas.length - 1) cargar(i + 1, 0, true); else emitir("ended"); });
+  el.addEventListener("pause", () => { if (buscando || (el.ended && i < pistas.length - 1)) return; emitir("pause"); });
+  ["timeupdate", "play", "error"].forEach((t) => el.addEventListener(t, () => emitir(t)));
+  cargar(0, 0, false);
+
+  return {
+    multi,
+    get duration() { return pistas.reduce((a, p) => a + (Number(p.dur) || 0), 0) || el.duration || 0; },
+    get currentTime() { return pistas[i].inicio + (buscando ? buscando.t : el.currentTime || 0); },
+    set currentTime(t) {
+      t = Math.max(0, Number(t) || 0);
+      const k = indice(t), local = t - pistas[k].inicio;
+      if (k === i && !buscando) el.currentTime = local;
+      else cargar(k, local, buscando ? buscando.seguir : !el.paused);
+    },
+    get paused() { return buscando ? !buscando.seguir : el.paused; },
+    play() { if (buscando) { buscando.seguir = true; return Promise.resolve(); } return el.play(); },
+    pause() { if (buscando) buscando.seguir = false; el.pause(); },
+    get playbackRate() { return rate; },
+    set playbackRate(v) { rate = v; el.playbackRate = v; },
+    set defaultPlaybackRate(v) { el.defaultPlaybackRate = v; },
+    get volume() { return el.volume; },
+    set volume(v) { el.volume = v; },
+    addEventListener(tipo, fn, opciones) { (oyentes[tipo] ||= []).push({ fn, once: !!opciones?.once }); },
+    // Links nuevos (el anterior caducó): sigue en el mismo segundo.
+    renovar(f, t, seguir) {
+      const nuevas = f.pistas && f.pistas.length ? f.pistas : [{ url: f.url }];
+      pistas.forEach((p, k) => { if (nuevas[k]) p.url = nuevas[k].url; });
+      const k = indice(t); cargar(k, t - pistas[k].inicio, seguir);
+    },
+    liberar() { el.pause(); el.removeAttribute("src"); try { el.load(); } catch (_) { /* nada */ } },
   };
 }
 
