@@ -420,10 +420,35 @@ async function pintarInicio() {
   try { vista = localStorage.getItem(llaveBienvenida) === "1"; } catch (_) { /* sin almacenamiento */ }
   if (!vista) {
     await mostrarBienvenida(r);
-    try { localStorage.setItem(llaveBienvenida, "1"); } catch (_) { /* nada */ }
+    try { localStorage.setItem(llaveBienvenida, "1"); localStorage.setItem(`academia-novedad-audio-${r.usuario}`, "1"); } catch (_) { /* nada */ }
   }
+  if (vista) await novedadAudiolibros(r);
   await anunciarNuevos(r, cursos, audios);
   if (r.insignias_sin_ver?.length) celebrar(r.insignias_sin_ver);
+}
+
+// Aviso único para quien ya conocía la Academia: llegaron los audiolibros.
+async function novedadAudiolibros(r) {
+  const llave = `academia-novedad-audio-${r.usuario}`;
+  try { if (localStorage.getItem(llave)) return; localStorage.setItem(llave, "1"); } catch (_) { return; }
+  confeti({ cantidad: 80, duracion: 2200, origenY: 0.25 });
+  const v = await modal(`
+    <div class="anuncio-nuevo">
+      <div class="anuncio-icono">${icono("audifonos", 34)}</div>
+      <div class="etiqueta" style="text-align:center;color:var(--oro)">Novedad en tu Academia</div>
+      <h2 class="modal-titulo" style="text-align:center">¡Llegaron los audiolibros!</h2>
+      <p class="texto-tenue" style="text-align:center;margin:0">Ahora también puedes aprender escuchando: en el camino, en el gimnasio o antes de dormir.</p>
+      <div class="pila" style="gap:10px">
+        <div class="fila" style="gap:12px;align-items:flex-start"><span style="flex:none;width:22px;color:var(--oro);display:flex;justify-content:center">${icono("moon", 20)}</span><span style="font-size:14px">Suenan con la pantalla apagada y tienen temporizador para dormir.</span></div>
+        <div class="fila" style="gap:12px;align-items:flex-start"><span style="flex:none;width:22px;color:var(--oro);display:flex;justify-content:center">${icono("bolt", 20)}</span><span style="font-size:14px">Elige la velocidad y salta entre capítulos.</span></div>
+        <div class="fila" style="gap:12px;align-items:flex-start"><span style="flex:none;width:22px;color:var(--oro);display:flex;justify-content:center">${icono("marcador", 20)}</span><span style="font-size:14px">Guarda marcadores con tus notas.</span></div>
+        <div class="fila" style="gap:12px;align-items:flex-start"><span style="flex:none;width:22px;color:var(--oro);display:flex;justify-content:center">${icono("star", 20)}</span><span style="font-size:14px">Suman puntos por cada minuto que escuches.</span></div>
+        <div class="fila" style="gap:12px;align-items:flex-start"><span style="flex:none;width:22px;color:var(--oro);display:flex;justify-content:center">${icono("biblioteca", 20)}</span><span style="font-size:14px">En la nueva pestaña <b>Biblioteca</b> ves todo lo que tiene la Academia.</span></div>
+      </div>
+      <button class="btn btn-bloque" data-cerrar="bib">${icono("biblioteca", 18)}Ver la Biblioteca</button>
+      <button class="btn-texto" data-cerrar style="align-self:center">Después</button>
+    </div>`);
+  if (v === "bib") ir("/biblioteca");
 }
 
 // Un curso es "nuevo" mientras no hayas visto ni un segundo de él.
@@ -517,9 +542,20 @@ function mostrarBienvenida(r) {
       icono: "play", titulo: "Así funciona",
       cuerpo: `<div class="pila" style="gap:14px">
         ${punto("book", "Tus cursos te esperan en Inicio", "Cada curso tiene capítulos con videos cortos, pensados para verlos en tus ratos libres.")}
+        ${punto("biblioteca", "Explora la Biblioteca", "Ahí está todo lo que tiene la Academia, en video y en audio. Lo que tienes asignado lo abres; lo demás, pídeselo a Gustavo.")}
         ${punto("video", "Aprende cuando y donde quieras", "En tu celular, la tablet o la compu. Tu avance se guarda solo, aunque se vaya la señal.")}
         ${punto("lock", "Paso a paso", "Las lecciones se abren en orden: terminas una y se desbloquea la siguiente.")}
         ${punto("target", "Demuestra lo que aprendiste", "Algunos cursos cierran con un quiz corto. Si no sale a la primera, lo vuelves a intentar.")}
+      </div>`,
+    },
+    {
+      icono: "audifonos", titulo: "Audiolibros: aprende mientras vas",
+      cuerpo: `<div class="pila" style="gap:14px">
+        ${punto("audifonos", "Escucha libros completos", "Liderazgo, servicio, cocina y más. Ideales para el camino, el gimnasio o antes de dormir.")}
+        ${punto("moon", "Con la pantalla apagada", "Siguen sonando aunque bloquees el celular o uses otra app. Hay temporizador para dormir.")}
+        ${punto("bolt", "A tu velocidad", "Escucha más lento o hasta al doble de rápido, y salta entre capítulos.")}
+        ${punto("marcador", "Guarda lo importante", "Pon marcadores con notas para volver a las ideas que más te gustaron.")}
+        ${punto("star", "También suman puntos", "Ganas por cada minuto que escuches, más un bono al terminar el libro.")}
       </div>`,
     },
     {
@@ -533,7 +569,7 @@ function mostrarBienvenida(r) {
     {
       icono: "gift", titulo: "Lo que ganas",
       cuerpo: `<div class="pila" style="gap:14px">
-        ${punto("coffee", "Puntos", "Por cada lección, cada curso terminado, cada quiz perfecto y por entregar a tiempo.")}
+        ${punto("coffee", "Puntos", "Por cada lección, cada curso terminado, cada quiz perfecto, cada minuto de audiolibro y por entregar a tiempo.")}
         ${punto("medal", "Insignias", "Llénalas en tu vitrina. Algunas son secretas… a ver quién las descubre primero.")}
         ${punto("flame", "Niveles", "Empiezas como Grano verde y puedes llegar a Maestro tostador.")}
         ${punto("gift", "Premios reales", "Canjea tus puntos por los premios del catálogo: comida, días libres y más.")}
@@ -544,10 +580,10 @@ function mostrarBienvenida(r) {
       icono: "key", titulo: "Las reglas del juego",
       cuerpo: `<div class="pila" style="gap:14px">
         ${punto("key", "Tu PIN es solo tuyo", "No lo compartas. Si alguien entra con tu cuenta en otro celular, la tuya se cierra y ese avance no cuenta.")}
-        ${punto("eye", "De vez en cuando: “¿Sigues ahí?”", "Te lo preguntaremos mientras ves un video, para que cada minuto cuente de verdad.")}
+        ${punto("eye", "De vez en cuando: “¿Sigues ahí?”", "Te lo preguntaremos mientras ves un video o escuchas un audiolibro, para que cada minuto cuente de verdad. Adelantar no suma puntos.")}
         ${punto("heart", "Lo importante es aprender", "No se trata de terminar rápido, sino de que lo apliques en tu día a día.")}
       </div>
-      <p class="modal-texto serif" style="font-size:19px;text-align:center;margin-top:6px">Gracias por ser parte de Mozzafiato.<br>¡Vamos por ese primer curso!</p>
+      <p class="modal-texto serif" style="font-size:19px;text-align:center;margin-top:6px">Gracias por ser parte de Mozzafiato.<br>¡Vamos por ese primer curso o audiolibro!</p>
       <p class="texto-tenue" style="text-align:center;margin:0">— Gustavo y el equipo Mozzafiato</p>`,
     },
   ];
@@ -563,7 +599,7 @@ function mostrarBienvenida(r) {
             <div class="fila" style="gap:6px" aria-label="Paso ${i + 1} de ${pasos.length}">${pasos.map((_, k) => `<i style="display:block;height:6px;border-radius:3px;width:${k === i ? 22 : 6}px;background:${k <= i ? "var(--cobre)" : "var(--linea)"};transition:width .3s"></i>`).join("")}</div>
             ${ultimo ? "" : `<button class="btn-texto" id="bv-saltar">Saltar</button>`}
           </div>
-          ${i === 0 ? `<img src="${LOGO}" alt="Mozzafiato" style="width:150px;align-self:center;margin:4px 0">` : `<div class="medalla medalla-cobre" style="width:64px;height:64px;align-self:center">${icono(p.icono, 30)}</div>`}
+          ${i === 0 ? `<img src="${ISOTIPO}" alt="Mozzafiato" style="width:110px;align-self:center;margin:4px 0">` : `<div class="medalla medalla-cobre" style="width:64px;height:64px;align-self:center">${icono(p.icono, 30)}</div>`}
           <h2 class="modal-titulo" style="text-align:center">${p.titulo}</h2>
           ${p.cuerpo}
           <div class="fila-botones">
