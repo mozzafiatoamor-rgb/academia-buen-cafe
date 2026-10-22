@@ -345,7 +345,7 @@ export function crearDemo() {
     },
     async catalogoCursos() {
       await espera(); const u = exigir();
-      return db.cursos.filter((c) => c.publicado).map((c) => ({ id: c.id, titulo: c.titulo, descripcion: c.descripcion, categoria: c.categoria,
+      return db.cursos.filter((c) => c.publicado).map((c) => ({ id: c.id, titulo: c.titulo, descripcion: c.descripcion, categoria: c.categoria, portada_url: c.portada_url || null,
         lecciones: leccionesDe(c.id).length, duracion_seg: leccionesDe(c.id).reduce((a, l) => a + (l.duracion_seg || 0), 0),
         asignado: asignado(u, c.id), terminado: terminado(u.user_id, c.id) }));
     },
@@ -630,6 +630,10 @@ export function crearDemo() {
     async audiosBunny(carpeta = "") {
       await espera(); exigirAdmin();
       return { carpeta, items: (AUDIOS_BUNNY[carpeta] || []).map((x) => ({ ...x, ruta: (carpeta ? carpeta + "/" : "") + x.nombre })) };
+    },
+    async subirPortada(blob) {
+      exigirAdmin();
+      return new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(blob); });
     },
     async probarAudio(ruta) { await espera(300); return { ruta, storage: 206, cdn_sin_firma: 403, firmas: { sha256: 206 }, funciona: "sha256" }; },
     async diagnosticoAudio() { return { BUNNY_STORAGE_ZONE: "demo", BUNNY_STORAGE_KEY: "ok (demo)", BUNNY_STORAGE_HOST: "storage.bunnycdn.com (por defecto)", BUNNY_AUDIO_HOST: "demo.b-cdn.net", BUNNY_AUDIO_TOKEN_KEY: "ok (demo)" }; },

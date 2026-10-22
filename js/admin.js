@@ -8,6 +8,7 @@ import { panelQuiz, panelMateriales } from "./contenido.js";
 import { pintarConfiguracion } from "./configuracion.js";
 import { valorCurso, valorAudio } from "./puntos.js";
 import { pintarAudiolibrosAdmin, pintarEditorAudio } from "./admin-audio.js";
+import { cambiarPortada, quitarPortada } from "./portadas.js";
 
 const LOGO = "img/logo.png";
 let ctx; // { ir, salir }
@@ -499,6 +500,7 @@ async function pintarCursos(main) {
   if (huerfanos.length) grupos.push({ id: "_otros", nombre: "Sin categoría", cursos: huerfanos });
   const tarjeta = (c) => `
       <a class="tarjeta-borde pila" href="#/admin/curso/${c.id}" style="gap:8px">
+        ${c.portada_url ? `<img class="portada-tarjeta" src="${esc(c.portada_url)}" alt="" loading="lazy">` : ""}
         <div class="fila-entre" style="align-items:flex-start"><b style="font-size:16px">${esc(c.titulo)}</b>
           <span class="pildora ${c.publicado ? "pildora-ok" : ""}">${c.publicado ? "Publicado" : "Borrador"}</span></div>
         <span class="texto-tenue">${c.lecciones} lecciones · ${duracion(c.duracion_seg)}</span>
@@ -629,6 +631,14 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
 
   main.innerHTML = `
     <a href="#/admin/cursos" class="btn-texto" style="display:inline-flex;align-items:center;gap:4px;align-self:flex-start">${icono("back", 16)}Cursos</a>
+    <div class="portada-editar">
+      ${c.portada_url ? `<img class="portada-curso" src="${esc(c.portada_url)}" alt="Portada">` : `<div class="portada-curso portada-vacia">${icono("video", 28)}<span>Sin portada</span></div>`}
+      <div class="pila" style="gap:6px">
+        <button class="btn btn-sec btn-chico" id="portada-cambiar">${icono("edit", 16)}${c.portada_url ? "Cambiar portada" : "Subir portada"}</button>
+        ${c.portada_url ? `<button class="btn-texto" id="portada-quitar" style="min-height:32px">Quitar portada</button>` : ""}
+        <small class="ayuda">Horizontal (16:9). Se recorta al centro.</small>
+      </div>
+    </div>
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-start">
       <div class="pila" style="gap:4px;flex:1 1 320px">
         <span class="etiqueta">${esc(nombreCategoria(c.categoria))} · ${c.publicado ? "Publicado" : "Borrador"}</span>
@@ -705,6 +715,8 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
     if (mt) main.querySelector('[data-cuenta="materiales"]').textContent = ` · ${mt.length}`;
   });
 
+  main.querySelector("#portada-cambiar").onclick = async () => { if (await cambiarPortada("curso", c.id)) recargar(); };
+  main.querySelector("#portada-quitar")?.addEventListener("click", async () => { if (await quitarPortada("curso", c.id)) recargar(); });
   main.querySelector("#editar").onclick = async () => {
     const v = await formulario("Datos del curso", [
       { nombre: "titulo", etiqueta: "Título", valor: c.titulo, requerido: true },

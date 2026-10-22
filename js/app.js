@@ -364,7 +364,7 @@ async function pintarInicio() {
     <section class="pila">
       <div class="etiqueta">Continúa donde te quedaste</div>
       <button class="continuar" data-ir="/leccion/${enCurso.id}/${enCurso.continuar.leccion_id}">
-        <div class="continuar-arte">
+        <div class="continuar-arte" ${enCurso.portada_url ? `style="background-image:linear-gradient(180deg, rgba(20,15,13,.35), rgba(20,15,13,.75)), url('${esc(enCurso.portada_url)}');background-size:cover;background-position:center"` : ""}>
           <span class="etiqueta">${esc(enCurso.titulo)}</span>
           <span class="boton-play">${icono("play", 24)}</span>
           <div class="barra"><i style="width:${enCurso.continuar.duracion_seg ? Math.round((enCurso.continuar.segundo / enCurso.continuar.duracion_seg) * 100) : 0}%"></i></div>
@@ -468,6 +468,7 @@ function tarjetaCurso(c) {
     : c.fecha_limite ? `<span class="pildora ${diasHasta(c.fecha_limite) <= 5 ? "pildora-alerta" : ""}">Vence ${fechaCorta(c.fecha_limite)}</span>` : "";
   return `
   <button class="tarjeta-borde pila" data-ir="/curso/${c.id}" style="gap:10px">
+    ${c.portada_url ? `<img class="portada-tarjeta" src="${esc(c.portada_url)}" alt="" loading="lazy">` : ""}
     <div class="fila-entre" style="align-items:flex-start">
       <div><b style="font-size:15px">${esNuevo(c) ? `<span class="etiqueta-nuevo">Nuevo</span>` : ""}${esc(c.titulo)}</b>
         <div class="texto-tenue" style="font-size:12px">${esc(nombreCategoria(c.categoria))} · ${c.lecciones} lecciones · ${duracion(c.duracion_seg)}${c.obligatorio ? " · obligatorio" : ""}</div></div>
@@ -611,6 +612,7 @@ async function pintarCurso(id) {
   <main class="vista vista-completa">
     <header class="curso-cabeza">
       <div class="fila-iso"><button class="btn-icono" id="volver" aria-label="Volver">${icono("back")}</button><img class="cabeza-iso" src="${ISOTIPO}" alt="Mozzafiato"><span style="width:44px"></span></div>
+      ${d.curso.portada_url ? `<img class="portada-curso" src="${esc(d.curso.portada_url)}" alt="">` : ""}
       <div class="etiqueta" style="color:var(--oro)">${esc(nombreCategoria(d.curso.categoria))}${d.curso.quiz_obligatorio ? " · con quiz" : ""}</div>
       <h1>${esc(d.curso.titulo)}</h1>
       ${d.curso.descripcion ? `<p style="margin:0;color:var(--crema-2)">${esc(d.curso.descripcion)}</p>` : ""}

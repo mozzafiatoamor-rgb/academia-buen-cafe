@@ -93,7 +93,7 @@ export async function pintarBiblioteca(ctx) {
       : x.terminado ? `<span class="pildora pildora-ok">${x.tipo === "curso" ? "Completado" : "Terminado"}</span>`
       : `<span class="pildora pildora-oro">${x.pct}%</span>`;
     return `<button class="item-bib ${bloq ? "bloqueado" : ""}" data-tipo="${x.tipo}" data-id="${x.id}">
-      ${x.tipo === "audio" ? portadaHTML(x, "chica") : `<div class="portada portada-chica portada-video"><span class="portada-icono">${icono("video", 20)}</span></div>`}
+      ${x.tipo === "audio" ? portadaHTML(x, "chica") : x.portada_url ? `<div class="portada portada-chica"><img src="${esc(x.portada_url)}" alt="" loading="lazy"></div>` : `<div class="portada portada-chica portada-video"><span class="portada-icono">${icono("video", 20)}</span></div>`}
       <div style="flex:1;min-width:0;text-align:left"><b>${esc(x.titulo)}</b><small>${meta}</small>
         <small class="item-cat">${esc(nombreCategoria(x.categoria))}</small></div>
       ${estadoX}
@@ -126,7 +126,7 @@ export async function pintarBiblioteca(ctx) {
     if (x.asignado) return ctx.ir(x.tipo === "curso" ? `/curso/${x.id}` : `/audio/${x.id}`);
     await modal(`
       <div class="pila" style="align-items:center;text-align:center;gap:10px">
-        ${x.tipo === "audio" ? portadaHTML(x, "media") : `<div class="portada portada-media portada-video"><span class="portada-icono">${icono("video", 30)}</span></div>`}
+        ${x.tipo === "audio" ? portadaHTML(x, "media") : x.portada_url ? `<img class="portada-curso" src="${esc(x.portada_url)}" alt="">` : `<div class="portada portada-media portada-video"><span class="portada-icono">${icono("video", 30)}</span></div>`}
         <div class="etiqueta">${x.tipo === "curso" ? "Curso en video" : "Audiolibro"} · ${esc(nombreCategoria(x.categoria))}</div>
         <h2 class="modal-titulo">${esc(x.titulo)}</h2>
         ${x.descripcion ? `<p class="modal-texto">${esc(x.descripcion)}</p>` : ""}

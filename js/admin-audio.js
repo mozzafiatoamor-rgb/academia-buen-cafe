@@ -7,6 +7,7 @@ import { icono, esc, num, duracion, reloj, fechaCorta, aviso, modal, confirmar, 
 import { valorAudio } from "./puntos.js";
 import { recargar, elegirAsignacion, avisarCurso } from "./admin.js";
 import { portadaHTML } from "./audio.js";
+import { cambiarPortada, quitarPortada } from "./portadas.js";
 
 const pesoMB = (b) => (b ? `${(b / 1048576).toFixed(b > 104857600 ? 0 : 1)} MB` : "");
 // "02-el_arte-de-servir.m4b" → "El arte de servir"
@@ -349,7 +350,6 @@ async function agregarAudiolibro(libros, ctx) {
     { nombre: "autor", etiqueta: "Autor (opcional)" },
     { nombre: "categoria", etiqueta: "Categoría", tipo: "select", opciones: opcionesCategoria(), valor: "general" },
     { nombre: "descripcion", etiqueta: "¿De qué trata? (opcional)", tipo: "area" },
-    { nombre: "portada_url", etiqueta: "Link de la portada (opcional)", placeholder: "https://…/portada.jpg", ayuda: "Si lo dejas vacío, se genera una portada con los colores de la Academia." },
   ], "Agregar");
   if (!v) return;
   aviso("Midiendo la duración…");
@@ -368,7 +368,7 @@ async function agregarAudiolibro(libros, ctx) {
     try { const f = await datos.audioRuta(elegido.ruta); dur = await medirDuracion(f.url); } catch (_) { /* se mide al primer uso */ }
   }
   try {
-    const n = await datos.guardarAudiolibro({ ...v, autor: v.autor || null, descripcion: v.descripcion || null, portada_url: v.portada_url || null, archivo, duracion_seg: dur, publicado: false, ...extra });
+    const n = await datos.guardarAudiolibro({ ...v, autor: v.autor || null, descripcion: v.descripcion || null, portada_url: null, archivo, duracion_seg: dur, publicado: false, ...extra });
     aviso(dur ? `Agregado · ${duracion(dur)}` : "Agregado (la duración se medirá al escucharlo)", "ok");
     ctx.ir(`/admin/audio/${n.id}/capitulos`);
   } catch (e) { aviso(e.message, "error"); }
@@ -388,7 +388,11 @@ export async function pintarEditorAudio(main, id, pestana = "capitulos", ctx) {
   main.innerHTML = `
     <a href="#/admin/audiolibros" class="btn-texto" style="display:inline-flex;align-items:center;gap:4px;align-self:flex-start">${icono("back", 16)}Audiolibros</a>
     <div class="fila" style="gap:16px;align-items:flex-start;flex-wrap:wrap">
-      ${portadaHTML(b, "media")}
+      <div class="pila" style="gap:6px;align-items:center">
+        ${portadaHTML(b, "media")}
+        <button class="btn-texto" id="portada-cambiar" style="min-height:30px">${b.portada_url ? "Cambiar portada" : "Subir portada"}</button>
+        ${b.portada_url ? `<button class="btn-texto" id="portada-quitar" style="min-height:26px;font-size:12px;color:var(--arena)">Quitar</button>` : ""}
+      </div>
       <div class="pila" style="gap:4px;flex:1 1 260px">
         <span class="etiqueta">${esc(nombreCategoria(b.categoria))} · ${b.publicado ? "Publicado" : "Borrador"}</span>
         <h1 class="titulo-pagina">${esc(b.titulo)}</h1>
@@ -519,15 +523,16 @@ export async function pintarEditorAudio(main, id, pestana = "capitulos", ctx) {
     } catch (e) { caja.innerHTML = `<p class="error-form">${esc(e.message)}</p>`; }
     await p;
   };
+  main.querySelector("#portada-cambiar").onclick = async () => { if (await cambiarPortada("audio", b.id)) recargar(); };
+  main.querySelector("#portada-quitar")?.addEventListener("click", async () => { if (await quitarPortada("audio", b.id)) recargar(); });
   main.querySelector("#editar").onclick = async () => {
     const r = await formulario("Datos del audiolibro", [
       { nombre: "titulo", etiqueta: "Título", valor: b.titulo, requerido: true },
       { nombre: "autor", etiqueta: "Autor", valor: b.autor },
       { nombre: "categoria", etiqueta: "Categoría", tipo: "select", opciones: opcionesCategoria(), valor: b.categoria },
       { nombre: "descripcion", etiqueta: "¿De qué trata?", tipo: "area", valor: b.descripcion },
-      { nombre: "portada_url", etiqueta: "Link de la portada", valor: b.portada_url, placeholder: "https://…/portada.jpg" },
     ]);
-    if (r) guardar({ ...r, autor: r.autor || null, descripcion: r.descripcion || null, portada_url: r.portada_url || null }, "Guardado");
+    if (r) guardar({ ...r, autor: r.autor || null, descripcion: r.descripcion || null }, "Guardado");
   };
   main.querySelector("#publicar").onclick = async () => {
     if (b.publicado) return guardar({ publicado: false }, "Pasó a borrador");

@@ -345,6 +345,11 @@ function crearNube() {
     audioRuta: (ruta) => funcion("academia-audio", { accion: "url_ruta", ruta }),
     diagnosticoAudio: () => funcion("academia-audio", { accion: "diagnostico" }),
     probarAudio: (ruta) => funcion("academia-audio", { accion: "probar", ruta }),
+    async subirPortada(blob, ruta) {
+      const r = await sb.storage.from("academia-portadas").upload(ruta, blob, { contentType: blob.type, upsert: true, cacheControl: "31536000" });
+      if (r.error) throw new ErrorAcademia(r.error.message);
+      return `${sb.storage.from("academia-portadas").getPublicUrl(ruta).data.publicUrl}?v=${Date.now()}`;
+    },
     // Sube un archivo de audio a Bunny Storage desde el navegador del admin.
     // 1º directo a Bunny (rápido, cualquier tamaño); si el navegador lo bloquea, pasa por la función.
     async subirAudio(archivo, ruta, alProgreso = () => {}) {
