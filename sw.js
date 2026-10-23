@@ -1,6 +1,6 @@
 // Service worker: la app abre al instante y funciona con señal débil.
 // Sube el número de VERSION cada vez que publiques cambios.
-const VERSION = "academia-v1.11.1";
+const VERSION = "academia-v1.11.2";
 const NUCLEO = [
   "./", "index.html", "style.css", "config.js", "manifest.webmanifest",
   "js/app.js", "js/admin.js", "js/datos.js", "js/demo.js", "js/ui.js", "js/subir.js", "js/contenido.js", "js/certificado.js", "js/visor.js", "js/puntos.js", "js/fiesta.js", "js/configuracion.js", "js/audio.js", "js/admin-audio.js", "js/portadas.js", "js/avatar.js", "js/avatar-editor.js",
@@ -8,7 +8,8 @@ const NUCLEO = [
 ];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(NUCLEO)).then(() => self.skipWaiting()));
+  // cache: "reload" → baja los archivos frescos del servidor, no los que el navegador guardó.
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(NUCLEO.map((u) => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (e) => {
@@ -25,7 +26,8 @@ self.addEventListener("fetch", (e) => {
   // Archivos propios: red primero (para recibir cambios), caché si no hay señal.
   if (url.origin === location.origin) {
     e.respondWith(
-      fetch(e.request).then((r) => {
+      // "no-cache": siempre pregunta al servidor si hay versión nueva (GitHub guarda copias 10 min).
+      fetch(e.request, { cache: "no-cache" }).then((r) => {
         if (r.ok) { const copia = r.clone(); caches.open(VERSION).then((c) => c.put(e.request, copia)); }
         return r;
       }).catch(() => caches.match(e.request).then((r) => r || caches.match("index.html")))
