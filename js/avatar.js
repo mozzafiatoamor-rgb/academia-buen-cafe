@@ -429,9 +429,24 @@ function brazos(cfg, c) {
     </g>`;
   };
   const taza = cfg.extra === "taza" || cfg.extra === "taza-oro";
-  const izq = brazo([[70, 164], [58, 204], [56, 242]], "av-brazo-izq");
-  const der = taza ? brazo([[130, 164], [146, 202], [124, 214]], "av-brazo-der") : brazo([[130, 164], [142, 204], [144, 242]], "av-brazo-der");
-  return { izq, der, taza };
+  // Brazo levantado para saludar (oculto hasta que saluda). Con taza, saluda con la izquierda.
+  const arriba = (() => {
+    const d = taza ? -1 : 1, h = [100 + 30 * d, 164], co = [100 + 62 * d, 140], ma = [100 + 64 * d, 102];
+    const linea = (a2, b2, w, col) => `<path d="M${a2[0]} ${a2[1]} L${b2[0]} ${b2[1]}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/>`;
+    const mangaCol = cfg.ropa === "chef" ? "#FFFFFF" : cfg.ropa === "rayas" ? "#F2F0EC" : c.ropa;
+    const mitad = [(h[0] + co[0]) / 2, (h[1] + co[1]) / 2];
+    return `<g class="av-brazo-arriba ${taza ? "izq" : ""}">
+      ${linea(h, co, 19, "#2B1A14")}${linea(h, co, 14, c.piel)}
+      <g class="av-antebrazo">${linea(co, ma, 19, "#2B1A14")}${linea(co, ma, 14, c.piel)}
+        ${largo ? linea(co, [co[0] + (ma[0] - co[0]) * 0.7, co[1] + (ma[1] - co[1]) * 0.7], 23, "#2B1A14") + linea(co, [co[0] + (ma[0] - co[0]) * 0.7, co[1] + (ma[1] - co[1]) * 0.7], 18, cfg.ropa === "mono" ? c.ropa : mangaCol) : ""}
+        <circle cx="${ma[0]}" cy="${ma[1]}" r="9.5" fill="${c.piel}" ${T}/>
+        <path d="M${ma[0] - 4 * d} ${ma[1] - 6} l${-2 * d} -5 M${ma[0]} ${ma[1] - 8} l0 -5 M${ma[0] + 4 * d} ${ma[1] - 6} l${2 * d} -5" ${T2} stroke-width="1.6"/></g>
+      ${largo ? linea(h, co, 23, "#2B1A14") + linea(h, co, 18, cfg.ropa === "mono" ? c.ropa : mangaCol) : linea(h, mitad, 23, "#2B1A14") + linea(h, mitad, 18, mangaCol)}
+    </g>`;
+  })();
+  const izq = brazo([[70, 164], [58, 204], [56, 242]], `av-brazo-izq ${taza ? "baja" : ""}`);
+  const der = taza ? brazo([[130, 164], [146, 202], [124, 214]], "av-brazo-der") : brazo([[130, 164], [142, 204], [144, 242]], "av-brazo-der baja");
+  return { izq, der, taza, arriba };
 }
 
 function extraCuerpo(cfg, orejas) {
@@ -476,6 +491,7 @@ export function avatarCuerpoSVG(cfgEntrada, alto = 260, { animado = false } = {}
         ${extraCuerpo(cfg, geo.orejas)}
         ${capasCabeza(cfg, c)}
         ${br.taza ? br.der + tazaMano(cfg) : ""}
+        ${br.arriba}
       </g>
     </g>
     ${cfg.marco !== "nada" ? marco(cfg).replace(/<circle cx="100" cy="100" r="95"/g, '<rect x="4" y="4" width="192" height="372" rx="26"') : ""}

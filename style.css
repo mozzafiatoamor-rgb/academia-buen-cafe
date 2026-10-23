@@ -597,11 +597,18 @@ button.avatar-grande { border: 0; padding: 0; background: transparent; cursor: p
 .av-anim .av-personaje { animation: av-respira 3.4s ease-in-out infinite; transform-box: view-box; transform-origin: 100px 190px; }
 .av-anim .av-ojos { animation: av-parpadeo 4.8s infinite; transform-box: view-box; transform-origin: 100px 98px; }
 .av-anim .av-vapor { animation: av-vapor 2.2s ease-in-out infinite; }
-.av-saluda .av-brazo-der { animation: av-saluda 1.7s ease-in-out; transform-box: view-box; transform-origin: 130px 164px; }
+.av-brazo-arriba { opacity: 0; }
+.av-saluda .baja { animation: av-ocultar 1.9s linear; }
+.av-saluda .av-brazo-arriba { animation: av-mostrar 1.9s linear; }
+.av-saluda .av-antebrazo { animation: av-mano .38s ease-in-out .15s 4 alternate; transform-box: view-box; transform-origin: 162px 140px; }
+.av-saluda .av-brazo-arriba.izq .av-antebrazo { transform-origin: 38px 140px; animation-name: av-mano-izq; }
 .av-salta .av-personaje { animation: av-salta .8s cubic-bezier(.3, 1.4, .5, 1); }
 @keyframes av-respira { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-1.5px) scale(1.008); } }
 @keyframes av-parpadeo { 0%, 91%, 97%, 100% { transform: scaleY(1); } 94% { transform: scaleY(.08); } }
 @keyframes av-vapor { 0% { transform: translateY(2px); opacity: .25; } 50% { opacity: 1; } 100% { transform: translateY(-4px); opacity: .1; } }
-@keyframes av-saluda { 0% { transform: rotate(0); } 18% { transform: rotate(-160deg); } 32% { transform: rotate(-130deg); } 46% { transform: rotate(-160deg); } 60% { transform: rotate(-130deg); } 74% { transform: rotate(-160deg); } 100% { transform: rotate(0); } }
+@keyframes av-ocultar { 0%, 100% { opacity: 1; } 6%, 94% { opacity: 0; } }
+@keyframes av-mostrar { 0%, 100% { opacity: 0; } 6%, 94% { opacity: 1; } }
+@keyframes av-mano { from { transform: rotate(-6deg); } to { transform: rotate(22deg); } }
+@keyframes av-mano-izq { from { transform: rotate(6deg); } to { transform: rotate(-22deg); } }
 @keyframes av-salta { 0% { transform: translateY(0); } 35% { transform: translateY(-14px) rotate(-3deg); } 65% { transform: translateY(0) rotate(2deg); } 80% { transform: translateY(-4px); } 100% { transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .av-anim .av-personaje, .av-anim .av-ojos, .av-anim .av-vapor, .av-saluda .av-brazo-der, .av-salta .av-personaje { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .av-anim .av-personaje, .av-anim .av-ojos, .av-anim .av-vapor, .av-saluda .baja, .av-saluda .av-brazo-arriba, .av-saluda .av-antebrazo, .av-salta .av-personaje { animation: none !important; } }
