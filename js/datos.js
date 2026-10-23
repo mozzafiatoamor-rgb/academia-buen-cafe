@@ -121,6 +121,21 @@ function crearNube() {
     enviarQuiz: (cursoId, respuestas) => rpc("academia_enviar_quiz", { p_curso: cursoId, p_respuestas: respuestas }),
     video: (leccionId) => funcion("academia-video", { leccion_id: leccionId }),
 
+    // ---------- Avatar ----------
+    async miAvatar() {
+      try {
+        const { data } = await sb.auth.getSession();
+        const uid = data?.session?.user?.id; if (!uid) return null;
+        const r = await sb.from("academia_perfiles").select("avatar").eq("user_id", uid).maybeSingle();
+        return r.error ? null : r.data?.avatar || null;
+      } catch (_) { return null; }
+    },
+    guardarAvatar: (avatar) => rpc("academia_guardar_avatar", { p_avatar: avatar }),
+    async avatares() {
+      try { return (await rpc("academia_avatares")) || {}; }
+      catch (_) { return {}; }
+    },
+
     // ---------- Audiolibros y catálogo ----------
     async misAudiolibros() {
       try { return await rpc("academia_mis_audiolibros"); }

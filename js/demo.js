@@ -82,8 +82,10 @@ function semilla() {
   return {
     usuarios: [
       { user_id: ana, usuario: "ana.barra", pin: "482913", nombre: "Ana P.", area: "barra", sede: "Mozzafiato", turno: "AM", rol: "empleado", activo: true, gestor_id: "mozza:1" },
-      { user_id: luis, usuario: "luis.piso", pin: "551820", nombre: "Luis M.", area: "piso", sede: "Mozzafiato", turno: "PM", rol: "empleado", activo: true },
-      { user_id: karla, usuario: "karla.barra", pin: "730264", nombre: "Karla C.", area: "barra", sede: "Mozzafiato", turno: "AM", rol: "empleado", activo: true },
+      { user_id: luis, usuario: "luis.piso", pin: "551820", nombre: "Luis M.", area: "piso", sede: "Mozzafiato", turno: "PM", rol: "empleado", activo: true,
+        avatar: { pelo: "copete", colorPelo: 0, vello: "candado", lentes: "sol", ropa: "sudadera", colorRopa: 5, fondo: "estrellas", colorFondo: 5, piel: 4, cabeza: "gorra-reves", colorGorro: 4 } },
+      { user_id: karla, usuario: "karla.barra", pin: "730264", nombre: "Karla C.", area: "barra", sede: "Mozzafiato", turno: "AM", rol: "empleado", activo: true,
+        avatar: { pelo: "largo", colorPelo: 6, ojos: "pestanas", boca: "dientes", extra: "aretes", fondo: "rayos", colorFondo: 2, piel: 2, marco: "oro" } },
       { user_id: admin, usuario: "admin@demo", pin: "demo1234", nombre: "Gustavo", rol: "admin", activo: true },
     ],
     cursos: [
@@ -329,6 +331,11 @@ export function crearDemo() {
       return { completado: p.completado, recien_completado: recien, max_segundo: p.max_segundo, puntos_ganados: pts,
                insignias_nuevas: nuevas, curso_terminado: recien ? terminado(u.user_id, l.curso_id) : null };
     },
+    // ---------- Avatar ----------
+    async miAvatar() { const u = exigir(); return u.avatar ? deshacer(u.avatar) : null; },
+    async guardarAvatar(avatar) { const u = exigir(); u.avatar = avatar; guardar(); },
+    async avatares() { return Object.fromEntries(db.usuarios.filter((u) => u.avatar && u.activo).map((u) => [u.user_id, u.avatar])); },
+
     // ---------- Audiolibros y catálogo ----------
     async misAudiolibros() {
       await espera(); const u = exigir();

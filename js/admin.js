@@ -9,6 +9,7 @@ import { pintarConfiguracion } from "./configuracion.js";
 import { valorCurso, valorAudio } from "./puntos.js";
 import { pintarAudiolibrosAdmin, pintarEditorAudio } from "./admin-audio.js";
 import { cambiarPortada, quitarPortada } from "./portadas.js";
+import { avatarOIniciales } from "./avatar.js";
 
 const LOGO = "img/logo.png";
 let ctx; // { ir, salir }
@@ -228,7 +229,7 @@ function conectarCanjes(main) {
 //  EMPLEADOS · alta con usuario + PIN
 // ---------------------------------------------------------------------
 async function pintarEmpleados(main) {
-  const equipo = await datos.adminAvance();
+  const [equipo, avs] = await Promise.all([datos.adminAvance(), datos.avatares()]);
   main.innerHTML = `
     <div class="fila-entre" style="flex-wrap:wrap;align-items:flex-end">
       <h1 class="titulo-pagina">Empleados</h1>
@@ -242,7 +243,7 @@ async function pintarEmpleados(main) {
     <section class="panel">
       ${equipo.length ? `<div class="tabla-caja"><table class="tabla"><thead><tr><th>Nombre</th><th>Usuario</th><th>Área</th><th>Sede · turno</th><th>Avance</th><th>Dispositivos</th><th></th></tr></thead><tbody>
       ${equipo.map((e) => `<tr class="${e.activo ? "" : "inactivo"}">
-        <td><b>${esc(e.nombre)}</b>${e.activo ? "" : ' <span class="pildora">Inactivo</span>'}</td>
+        <td><span class="fila" style="gap:8px">${avatarOIniciales(avs[e.user_id], e.nombre, 30)}<b>${esc(e.nombre)}</b></span>${e.activo ? "" : ' <span class="pildora">Inactivo</span>'}</td>
         <td>@${esc(e.usuario)}</td><td>${esc(nombreArea(e.area))}</td>
         <td>${esc(e.sede || "—")}${e.turno ? " · " + esc(e.turno) : ""}</td>
         <td>${pct(e)}% · ${num(e.puntos)} pts</td>

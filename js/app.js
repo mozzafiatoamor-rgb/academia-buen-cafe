@@ -9,6 +9,8 @@ import { abrirVisor } from "./visor.js";
 import { confeti, momento, subidaDeNivel, fraseLeccion, hitoCurso, fraseInicio, animarBarras } from "./fiesta.js";
 import { fijarCfgPuntos, valorCurso, puntosLeccion } from "./puntos.js";
 import { pintarAudiolibro, pintarBiblioteca, tarjetaAudio, esNuevoAudio } from "./audio.js";
+import { avatarOIniciales, avatarSVG } from "./avatar.js";
+import { pintarEditorAvatar, invitarAvatar } from "./avatar-editor.js";
 
 const app = document.getElementById("app");
 const LOGO = "img/logo.png";
@@ -58,6 +60,7 @@ async function enrutar() {
       case "quiz": return await pintarQuiz(a);
       case "audio": return await pintarAudiolibro(ctxAudio(), a);
       case "biblioteca": return await pintarBiblioteca(ctxAudio());
+      case "avatar": return await pintarEditorAvatar(ctxAudio());
       case "insignias": return await pintarInsignias();
       case "ranking": return await pintarRanking();
       case "premios": return await pintarPremios();
@@ -175,6 +178,7 @@ async function revisarNivelYRacha() {
   }
   if (antes && nuevo.nivel_orden > (antes.nivel_orden || 1)) {
     await subidaDeNivel(nuevo.nivel, nuevo.siguiente_nivel, (nuevo.siguiente_min || 0) - nuevo.puntos_ganados);
+    momento({ icono: "user", titulo: "¡Nuevas piezas para tu avatar!", texto: "Entra a tu perfil → Editar mi avatar para estrenarlas.", tono: "oro", duracion: 4200 });
   }
   estado.perfil = { ...antes, ...nuevo };
 }
@@ -322,7 +326,8 @@ async function salir() {
 async function pintarInicio() {
   cargando();
   vaciarCola().catch(() => {});
-  const [r, cursos, audiosTodos] = await Promise.all([datos.resumen(), datos.misCursos(), datos.misAudiolibros().catch(() => [])]);
+  const [r, cursos, audiosTodos, miAv] = await Promise.all([datos.resumen(), datos.misCursos(), datos.misAudiolibros().catch(() => []), datos.miAvatar().catch(() => null)]);
+  estado.miAvatar = miAv;
   const audios = audiosTodos.filter((x) => x.asignado);
   estado.perfil = r;
   const avancePct = r.siguiente_min ? Math.round(((r.puntos_ganados - r.nivel_min) / (r.siguiente_min - r.nivel_min)) * 100) : 100;
@@ -341,7 +346,7 @@ async function pintarInicio() {
         <div class="texto-tenue">${saludo()},</div>
         <h1>${esc(nombreCorto)}</h1>
       </div>
-      <button class="btn-icono avatar yo" id="perfil" aria-label="Mi perfil" style="width:48px;height:48px">${esc(iniciales(r.nombre))}</button>
+      <button class="btn-icono boton-avatar ${miAv ? "con-avatar" : "avatar yo"}" id="perfil" aria-label="Mi perfil" style="width:52px;height:52px">${miAv ? avatarSVG(miAv, 52) : esc(iniciales(r.nombre))}</button>
     </header>
     <p class="frase-inicio">${icono("coffee", 16)}<span>${esc(fraseInicio(r, cursos))}</span></p>
 
@@ -424,6 +429,7 @@ async function pintarInicio() {
   }
   if (vista) await novedadAudiolibros(r);
   await anunciarNuevos(r, cursos, audios);
+  await invitarAvatar(ctxAudio(), r);
   if (r.insignias_sin_ver?.length) celebrar(r.insignias_sin_ver);
 }
 
@@ -507,7 +513,7 @@ const diasHasta = (iso) => Math.round((new Date(iso + "T12:00:00") - new Date(ho
 
 function abrirPerfil(r) {
   modal(`
-    <div class="fila"><div class="avatar yo" style="width:56px;height:56px;font-size:18px">${esc(iniciales(r.nombre))}</div>
+    <div class="fila">${estado.miAvatar ? `<span class="avatar avatar-svg" style="width:72px;height:72px">${avatarSVG(estado.miAvatar, 72)}</span>` : `<div class="avatar yo" style="width:56px;height:56px;font-size:18px">${esc(iniciales(r.nombre))}</div>`}
       <div><h2 class="modal-titulo" style="font-size:24px">${esc(r.nombre)}</h2>
       <div class="texto-tenue">@${esc(r.usuario)} · ${esc(nombreArea(r.area))}${r.sede ? " · " + esc(r.sede) : ""}</div></div></div>
     <div class="info-chips">
@@ -516,10 +522,11 @@ function abrirPerfil(r) {
       <div><b>${r.racha_maxima}</b><small>mejor racha</small></div>
     </div>
     ${pendientesCola() ? `<p class="texto-tenue">${pendientesCola()} avance(s) esperando señal para enviarse.</p>` : ""}
+    <button class="btn btn-bloque" data-cerrar="avatar">${icono("user", 18)}${estado.miAvatar ? "Editar mi avatar" : "Crear mi avatar"}</button>
     <button class="btn btn-sec btn-bloque" data-cerrar="bienvenida">${icono("book", 18)}Cómo funciona la Academia</button>
     <button class="btn btn-peligro btn-bloque" data-cerrar="salir">${icono("logout", 18)}Cerrar sesión</button>
     <button class="btn btn-sec btn-bloque" data-cerrar>Cerrar</button>
-  `).then((v) => { if (v === "salir") salir(); if (v === "bienvenida") mostrarBienvenida(r); });
+  `).then((v) => { if (v === "salir") salir(); if (v === "bienvenida") mostrarBienvenida(r); if (v === "avatar") ir("/avatar"); });
 }
 
 // ---------------------------------------------------------------------
@@ -1026,12 +1033,12 @@ async function pintarInsignias() {
 // ---------------------------------------------------------------------
 async function pintarRanking(periodo = "semana") {
   cargando();
-  const filas = await datos.ranking(periodo);
+  const [filas, avs] = await Promise.all([datos.ranking(periodo), datos.avatares()]);
   const [p1, p2, p3] = filas;
   const lugar = (f, n, clase, alto) => f ? `
     <div class="podio-lugar ${clase}">
       ${n === 1 ? `<span style="color:var(--oro)">${icono("crown", 24)}</span>` : ""}
-      <div class="avatar ${f.soy_yo ? "yo" : ""}">${esc(iniciales(f.nombre))}</div>
+      ${avs[f.user_id] ? `<span class="avatar avatar-svg">${avatarSVG(avs[f.user_id], n === 1 ? 64 : 54)}</span>` : `<div class="avatar ${f.soy_yo ? "yo" : ""}">${esc(iniciales(f.nombre))}</div>`}
       <b style="font-size:13px">${esc(f.nombre)}${f.soy_yo ? " (tú)" : ""}</b>
       <div class="podio-base" style="height:${alto}px;${n === 1 ? "background:var(--linea)" : ""}"><b style="${n === 1 ? "color:var(--oro)" : ""}">${f.posicion}</b><small>${num(f.puntos)} pts</small></div>
     </div>` : `<div class="podio-lugar"></div>`;
@@ -1045,7 +1052,7 @@ async function pintarRanking(periodo = "semana") {
       <div class="podio">${lugar(p2, 2, "", 72)}${lugar(p1, 1, "primero", 100)}${lugar(p3, 3, "", 56)}</div>
       <div class="pila" style="gap:8px">
         ${filas.slice(3).map((f) => `<div class="fila-rank ${f.soy_yo ? "yo" : ""}"><span class="pos">${f.posicion}</span>
-          <div class="avatar ${f.soy_yo ? "yo" : ""}" style="width:34px;height:34px;font-size:12px">${esc(iniciales(f.nombre))}</div>
+          ${avs[f.user_id] ? `<span class="avatar avatar-svg" style="width:38px;height:38px">${avatarSVG(avs[f.user_id], 38)}</span>` : `<div class="avatar ${f.soy_yo ? "yo" : ""}" style="width:34px;height:34px;font-size:12px">${esc(iniciales(f.nombre))}</div>`}
           <div style="flex:1"><b style="font-size:14px">${esc(f.nombre)}${f.soy_yo ? " (tú)" : ""}</b><div class="texto-tenue" style="font-size:12px">${esc(nombreArea(f.area))}</div></div>
           <b style="color:var(--oro)">${num(f.puntos)}</b></div>`).join("")}
       </div>` : `<div class="vacio"><strong>Nadie ha sumado puntos ${periodo === "semana" ? "esta semana" : periodo === "mes" ? "este mes" : "todavía"}</strong>Termina una lección y sé el primero.</div>`}
