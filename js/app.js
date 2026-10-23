@@ -9,7 +9,7 @@ import { abrirVisor } from "./visor.js";
 import { confeti, momento, subidaDeNivel, fraseLeccion, hitoCurso, fraseInicio, animarBarras } from "./fiesta.js";
 import { fijarCfgPuntos, valorCurso, puntosLeccion } from "./puntos.js";
 import { pintarAudiolibro, pintarBiblioteca, tarjetaAudio, esNuevoAudio } from "./audio.js";
-import { avatarOIniciales, avatarSVG } from "./avatar.js";
+import { avatarOIniciales, avatarSVG, avatarCuerpoSVG } from "./avatar.js";
 import { pintarEditorAvatar, invitarAvatar } from "./avatar-editor.js";
 
 const app = document.getElementById("app");
@@ -346,7 +346,7 @@ async function pintarInicio() {
         <div class="texto-tenue">${saludo()},</div>
         <h1>${esc(nombreCorto)}</h1>
       </div>
-      <button class="btn-icono boton-avatar ${miAv ? "con-avatar" : "avatar yo"}" id="perfil" aria-label="Mi perfil" style="width:52px;height:52px">${miAv ? avatarSVG(miAv, 52) : esc(iniciales(r.nombre))}</button>
+      <button class="btn-icono boton-avatar ${miAv ? "con-avatar" : "avatar yo"}" id="perfil" aria-label="Mi perfil" style="width:52px;height:52px">${miAv ? avatarSVG(miAv, 52, "", { animado: true }) : esc(iniciales(r.nombre))}</button>
     </header>
     <p class="frase-inicio">${icono("coffee", 16)}<span>${esc(fraseInicio(r, cursos))}</span></p>
 
@@ -513,7 +513,8 @@ const diasHasta = (iso) => Math.round((new Date(iso + "T12:00:00") - new Date(ho
 
 function abrirPerfil(r) {
   modal(`
-    <div class="fila">${estado.miAvatar ? `<span class="avatar avatar-svg" style="width:72px;height:72px">${avatarSVG(estado.miAvatar, 72)}</span>` : `<div class="avatar yo" style="width:56px;height:56px;font-size:18px">${esc(iniciales(r.nombre))}</div>`}
+    ${estado.miAvatar ? `<button class="avatar-cuerpo-modal" id="perfil-cuerpo" aria-label="Tu avatar">${avatarCuerpoSVG(estado.miAvatar, 220, { animado: true })}</button>` : ""}
+    <div class="fila">${estado.miAvatar ? "" : `<div class="avatar yo" style="width:56px;height:56px;font-size:18px">${esc(iniciales(r.nombre))}</div>`}
       <div><h2 class="modal-titulo" style="font-size:24px">${esc(r.nombre)}</h2>
       <div class="texto-tenue">@${esc(r.usuario)} · ${esc(nombreArea(r.area))}${r.sede ? " · " + esc(r.sede) : ""}</div></div></div>
     <div class="info-chips">
@@ -527,6 +528,11 @@ function abrirPerfil(r) {
     <button class="btn btn-peligro btn-bloque" data-cerrar="salir">${icono("logout", 18)}Cerrar sesión</button>
     <button class="btn btn-sec btn-bloque" data-cerrar>Cerrar</button>
   `).then((v) => { if (v === "salir") salir(); if (v === "bienvenida") mostrarBienvenida(r); if (v === "avatar") ir("/avatar"); });
+  const cuerpo = modal.actual?.querySelector("#perfil-cuerpo svg");
+  if (cuerpo) {
+    setTimeout(() => cuerpo.classList.add("av-saluda"), 350);
+    modal.actual.querySelector("#perfil-cuerpo").onclick = () => { cuerpo.classList.remove("av-saluda"); void cuerpo.getBoundingClientRect(); cuerpo.classList.add("av-saluda"); };
+  }
 }
 
 // ---------------------------------------------------------------------

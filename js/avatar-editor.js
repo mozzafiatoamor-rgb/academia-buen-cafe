@@ -5,7 +5,7 @@
 import { datos } from "./datos.js";
 import { icono, esc, aviso, modal } from "./ui.js";
 import { confeti } from "./fiesta.js";
-import { CATEGORIAS, AVATAR_BASE, avatarSVG, avatarAlAzar, desbloqueada, textoReq } from "./avatar.js";
+import { CATEGORIAS, AVATAR_BASE, avatarSVG, avatarCuerpoSVG, avatarAlAzar, desbloqueada, textoReq } from "./avatar.js";
 
 export async function logrosDe(perfil) {
   const [ins, niveles] = await Promise.all([
@@ -26,6 +26,8 @@ export async function pintarEditorAvatar(ctx) {
   const primeraVez = !guardado;
   let cfg = { ...AVATAR_BASE, ...(guardado || {}) };
   let cat = CATEGORIAS[0].id;
+  let vista = "retrato";
+  const dibujo = (c, anim = true) => (vista === "cuerpo" ? avatarCuerpoSVG(c, 250, { animado: anim }) : avatarSVG(c, 200, "", { animado: anim }));
   const total = CATEGORIAS.reduce((a, c) => a + c.opciones.length, 0);
   const libres = CATEGORIAS.reduce((a, c) => a + c.opciones.filter((o) => desbloqueada(o, logros)).length, 0);
 
@@ -36,7 +38,11 @@ export async function pintarEditorAvatar(ctx) {
       <span class="texto-tenue" style="flex:1">Mi avatar</span>
       <button class="btn btn-sec btn-chico" id="azar">🎲 Sorpréndeme</button>
     </div>
-    <div class="avatar-escenario"><div id="av-grande" class="avatar-grande">${avatarSVG(cfg, 200)}</div></div>
+    <div class="pestanas av-vistas" id="av-vistas" style="max-width:320px;align-self:center;width:100%">
+      <button class="activo" data-vista="retrato">Retrato</button><button data-vista="cuerpo">Cuerpo completo</button>
+    </div>
+    <div class="avatar-escenario"><button id="av-grande" class="avatar-grande" aria-label="Tócame">${avatarSVG(cfg, 200, "", { animado: true })}</button></div>
+    <p class="texto-tenue" style="text-align:center;margin:-6px 0 0;font-size:11.5px">Tócalo 👆</p>
     <p class="texto-tenue" style="text-align:center;margin:0;font-size:13px">Tienes <b style="color:var(--oro)">${libres} de ${total}</b> piezas. ${libres < total ? "Las de candado se ganan subiendo de nivel, con rachas e insignias." : "¡Las tienes todas!"}</p>
     <div class="chips chips-scroll" id="av-cats">${CATEGORIAS.map((c) => `<button class="chip ${c.id === cat ? "activo" : ""}" data-cat="${c.id}">${esc(c.nombre)}</button>`).join("")}</div>
     <div id="av-colores" class="av-colores"></div>
@@ -47,7 +53,8 @@ export async function pintarEditorAvatar(ctx) {
   const app = ctx.app;
   const grande = app.querySelector("#av-grande");
   const pintarGrande = () => {
-    grande.innerHTML = avatarSVG(cfg, 200);
+    grande.innerHTML = dibujo(cfg);
+    grande.classList.toggle("cuerpo", vista === "cuerpo");
     grande.classList.remove("rebote"); void grande.offsetWidth; grande.classList.add("rebote");
   };
   const pintarOpciones = () => {
@@ -57,8 +64,8 @@ export async function pintarEditorAvatar(ctx) {
     cajaCol.hidden = !c.color;
     app.querySelector("#av-ops").innerHTML = c.opciones.map((o) => {
       const ok = desbloqueada(o, logros), sel = cfg[c.id] === o.id;
-      return `<button class="av-op ${sel ? "activa" : ""} ${ok ? "" : "bloq"}" data-op="${o.id}" title="${esc(ok ? o.nombre : textoReq(o, logros.niveles))}">
-        ${avatarSVG({ ...cfg, [c.id]: o.id }, 76)}
+      return `<button class="av-op ${sel ? "activa" : ""} ${ok ? "" : "bloq"} ${c.cuerpo ? "cuerpo" : ""}" data-op="${o.id}" title="${esc(ok ? o.nombre : textoReq(o, logros.niveles))}">
+        ${c.cuerpo ? avatarCuerpoSVG({ ...cfg, [c.id]: o.id }, 110) : avatarSVG({ ...cfg, [c.id]: o.id }, 76)}
         <span>${esc(o.nombre)}</span>
         ${ok ? "" : `<i class="candado">${icono("lock", 14)}</i>`}
       </button>`;
@@ -70,6 +77,7 @@ export async function pintarEditorAvatar(ctx) {
     const b = e.target.closest("[data-cat]"); if (!b) return;
     cat = b.dataset.cat;
     app.querySelectorAll("#av-cats .chip").forEach((x) => x.classList.toggle("activo", x === b));
+    if (CATEGORIAS.find((x) => x.id === cat)?.cuerpo && vista !== "cuerpo") ponerVista("cuerpo");
     b.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
     pintarOpciones();
   };
@@ -89,6 +97,18 @@ export async function pintarEditorAvatar(ctx) {
     cfg[c.id] = o.id;
     pintarGrande(); pintarOpciones();
   };
+  const ponerVista = (v) => {
+    vista = v;
+    app.querySelectorAll("#av-vistas button").forEach((x) => x.classList.toggle("activo", x.dataset.vista === v));
+    pintarGrande();
+  };
+  app.querySelector("#av-vistas").onclick = (e) => { const b = e.target.closest("[data-vista]"); if (b) ponerVista(b.dataset.vista); };
+  grande.onclick = () => {
+    const svg = grande.querySelector("svg"); if (!svg) return;
+    const clase = vista === "cuerpo" ? "av-saluda" : "av-salta";
+    svg.classList.remove(clase); void svg.getBoundingClientRect(); svg.classList.add(clase);
+    setTimeout(() => svg.classList.remove(clase), 1900);
+  };
   app.querySelector("#azar").onclick = () => { cfg = avatarAlAzar(logros, { piel: cfg.piel }); pintarGrande(); pintarOpciones(); };
   app.querySelector("#volver").onclick = () => ctx.ir("/inicio");
   app.querySelector("#guardar").onclick = async (e) => {
@@ -102,7 +122,7 @@ export async function pintarEditorAvatar(ctx) {
         await modal(`
           <div class="pila desbloqueo" style="align-items:center;text-align:center;gap:12px">
             <div class="etiqueta" style="color:var(--oro)">¡Así te verá el equipo!</div>
-            <div class="avatar-grande rebote">${avatarSVG(cfg, 160)}</div>
+            <div class="avatar-cuerpo-modal rebote">${avatarCuerpoSVG(cfg, 230, { animado: true }).replace('class="av-anim"', 'class="av-anim av-saluda"')}</div>
             <p class="modal-texto">Aparecerás así en el ranking y en tu perfil. Cada nivel, racha e insignia te da piezas nuevas para presumir.</p>
             <button class="btn btn-bloque" data-cerrar>¡Vamos!</button>
           </div>`, { clase: "desbloqueo" });

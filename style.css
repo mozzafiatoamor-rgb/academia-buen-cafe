@@ -586,3 +586,22 @@ button.tarjeta-borde.tarjeta-audio, a.tarjeta-borde.fila { display: flex; flex-d
 .avatar-muestra svg { display: block; }
 @keyframes av-flota { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .rebote, .sacude, .avatar-muestra { animation: none !important; } }
+
+/* ---------- Avatares animados y de cuerpo completo (v1.11.0) ---------- */
+button.avatar-grande { border: 0; padding: 0; background: transparent; cursor: pointer; }
+.avatar-grande.cuerpo { width: auto; height: 250px; border-radius: 28px; }
+.avatar-grande.cuerpo svg { width: auto; height: 250px; }
+.avatar-cuerpo-modal { display: block; margin: 0 auto 4px; border: 0; padding: 0; background: transparent; cursor: pointer; filter: drop-shadow(0 14px 28px rgba(0, 0, 0, .45)); }
+.avatar-cuerpo-modal svg { display: block; }
+.av-op.cuerpo > svg { width: auto; height: 110px; }
+.av-anim .av-personaje { animation: av-respira 3.4s ease-in-out infinite; transform-box: view-box; transform-origin: 100px 190px; }
+.av-anim .av-ojos { animation: av-parpadeo 4.8s infinite; transform-box: view-box; transform-origin: 100px 98px; }
+.av-anim .av-vapor { animation: av-vapor 2.2s ease-in-out infinite; }
+.av-saluda .av-brazo-der { animation: av-saluda 1.7s ease-in-out; transform-box: view-box; transform-origin: 130px 164px; }
+.av-salta .av-personaje { animation: av-salta .8s cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes av-respira { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-1.5px) scale(1.008); } }
+@keyframes av-parpadeo { 0%, 91%, 97%, 100% { transform: scaleY(1); } 94% { transform: scaleY(.08); } }
+@keyframes av-vapor { 0% { transform: translateY(2px); opacity: .25; } 50% { opacity: 1; } 100% { transform: translateY(-4px); opacity: .1; } }
+@keyframes av-saluda { 0% { transform: rotate(0); } 18% { transform: rotate(-160deg); } 32% { transform: rotate(-130deg); } 46% { transform: rotate(-160deg); } 60% { transform: rotate(-130deg); } 74% { transform: rotate(-160deg); } 100% { transform: rotate(0); } }
+@keyframes av-salta { 0% { transform: translateY(0); } 35% { transform: translateY(-14px) rotate(-3deg); } 65% { transform: translateY(0) rotate(2deg); } 80% { transform: translateY(-4px); } 100% { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .av-anim .av-personaje, .av-anim .av-ojos, .av-anim .av-vapor, .av-saluda .av-brazo-der, .av-salta .av-personaje { animation: none !important; } }

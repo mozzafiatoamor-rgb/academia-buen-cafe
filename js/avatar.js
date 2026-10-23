@@ -10,6 +10,7 @@ const T2 = 'stroke="#2B1A14" stroke-width="2" stroke-linejoin="round" stroke-lin
 export const PIELES = ["#FFE0C7", "#F6CBA4", "#E5AE80", "#CB8C5E", "#A86C47", "#7E4E33", "#5B3624"];
 export const COLORES_PELO = ["#1E1512", "#3B2416", "#6B3F22", "#A0612F", "#D9A84E", "#F1D592", "#B5502A", "#A8A29E", "#F2F0EC", "#E58BB0", "#5B8DEF", "#8B5CF6", "#2FA37A"];
 export const COLORES_ROPA = ["#C9824B", "#3B2416", "#2B1A14", "#F2E4CF", "#B23A3A", "#2F5D8A", "#3E7C59", "#E3B66B", "#7A4E9E", "#E86F9A", "#F2F0EC", "#4A4A4A"];
+export const COLORES_PANTALON = ["#2F5D8A", "#1F3A5F", "#2B1A14", "#4A4A4A", "#6B3F22", "#C9B48A", "#3E7C59", "#B23A3A", "#E86F9A", "#F2F0EC"];
 export const COLORES_FONDO = ["#3A2A22", "#C9824B", "#E3B66B", "#F2E4CF", "#7FA77A", "#5B8DEF", "#E86F9A", "#8B5CF6", "#B23A3A", "#2B1A14", "#2FA37A", "#F59E0B"];
 
 const oscurecer = (hex, f = 0.72) => {
@@ -17,6 +18,20 @@ const oscurecer = (hex, f = 0.72) => {
   const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.round(v * f));
   return "#" + c.map((v) => v.toString(16).padStart(2, "0")).join("");
 };
+
+// Isotipo Mozzafiato (manos + grano) en el mismo estilo caricatura.
+// (x, y) = centro; w = ancho en px del avatar.
+export function logoMozz(x, y, w = 20, color = "#E3B66B") {
+  const k = w / 100, tr = Math.max(2, 2.6 / k * 0.9);
+  return `<g transform="translate(${x - 50 * k} ${y - 43 * k}) scale(${k})"><g fill="${color}" stroke="#2B1A14" stroke-width="${Math.min(tr, 9)}" stroke-linejoin="round">
+    <path d="M12 16 C2 32 4 54 20 66 C30 74 42 76 49 84 C46 74 38 68 30 62 C20 54 16 42 16 30 C16 24 15 19 12 16 Z"/>
+    <path d="M88 16 C98 32 96 54 80 66 C70 74 58 76 51 84 C54 74 62 68 70 62 C80 54 84 42 84 30 C84 24 85 19 88 16 Z"/>
+    <path d="M20 50 C26 62 38 68 48 78 C46 68 40 62 34 58 C28 54 24 52 20 50 Z"/>
+    <path d="M80 50 C74 62 62 68 52 78 C54 68 60 62 66 58 C72 54 76 52 80 50 Z"/>
+    <path d="M24 10 C20 32 32 50 50 66 C68 50 80 32 76 10 C72 24 64 32 58 36 C55 40 45 40 42 36 C36 32 28 24 24 10 Z"/>
+    <ellipse cx="50" cy="20" rx="9.5" ry="16"/></g>
+    <path d="M50 5 C44 14 56 26 50 35" stroke="#2B1A14" stroke-width="${Math.min(tr, 9)}" fill="none" stroke-linecap="round"/></g>`;
+}
 
 // ---------------------------------------------------------------------
 //  Catálogo. "req": { nivel } | { racha } | { insignia: id, nombre }
@@ -59,6 +74,10 @@ export const CATEGORIAS = [
     { id: "delantal", nombre: "Delantal barista" }, { id: "playera", nombre: "Playera" }, { id: "sudadera", nombre: "Sudadera" },
     { id: "chef", nombre: "Filipina chef" }, { id: "mono", nombre: "Camisa y moño" }, { id: "rayas", nombre: "Rayas" },
     { id: "capa", nombre: "Capa de héroe", req: { insignia: "barra_completa", nombre: "Barra completa" } }] },
+  { id: "pantalon", nombre: "Pantalón", cuerpo: true, color: "colorPantalon", colores: COLORES_PANTALON, opciones: [
+    { id: "jeans", nombre: "Jeans" }, { id: "pans", nombre: "Pants" }, { id: "short", nombre: "Short" }, { id: "falda", nombre: "Falda" }] },
+  { id: "zapatos", nombre: "Zapatos", cuerpo: true, color: "colorZapato", colores: COLORES_ROPA, opciones: [
+    { id: "tenis", nombre: "Tenis" }, { id: "botas", nombre: "Botas" }, { id: "zapatos", nombre: "Zapatos" }, { id: "chanclas", nombre: "Chanclas" }] },
   { id: "extra", nombre: "Extras", opciones: [
     { id: "nada", nombre: "Nada" }, { id: "taza", nombre: "Taza de café" }, { id: "aretes", nombre: "Aretes" },
     { id: "collar", nombre: "Collar" }, { id: "flor", nombre: "Flor" }, { id: "pin", nombre: "Pin estrella" },
@@ -76,6 +95,7 @@ export const AVATAR_BASE = {
   cara: "redonda", piel: 1, detalle: "rubor", pelo: "corto", colorPelo: 1, ojos: "normales", cejas: "normales",
   boca: "sonrisa", vello: "nada", lentes: "nada", cabeza: "nada", colorGorro: 0, ropa: "delantal", colorRopa: 3,
   extra: "nada", fondo: "granos", colorFondo: 1, marco: "nada",
+  pantalon: "jeans", colorPantalon: 0, zapatos: "tenis", colorZapato: 4,
 };
 
 // ¿Está desbloqueada? logros = { nivel, racha, insignias:Set }
@@ -105,7 +125,7 @@ const cabezaGeo = {
   cuadrada: { forma: (c) => `<rect x="55" y="50" width="90" height="92" rx="32" fill="${c}" ${T}/>`, orejas: [55, 145], menton: 142 },
 };
 
-function fondo(cfg) {
+function fondo(cfg, soloPatron = false) {
   const c = COLORES_FONDO[cfg.colorFondo] ?? COLORES_FONDO[0];
   const claro = "rgba(255,255,255,.16)", osc = "rgba(0,0,0,.14)";
   let p = "";
@@ -127,6 +147,7 @@ function fondo(cfg) {
       return `<rect x="${x}" y="${y}" width="7" height="4" rx="1.5" fill="${cols[i % cols.length]}" transform="rotate(${(i * 47) % 180} ${x + 3} ${y + 2})"/>`;
     }).join("");
   }
+  if (soloPatron) return p;
   const base = cfg.fondo === "galaxia"
     ? `<defs><radialGradient id="gx" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#8B5CF6"/><stop offset=".55" stop-color="#2E1B5B"/><stop offset="1" stop-color="#120A24"/></radialGradient></defs><rect width="200" height="200" fill="url(#gx)"/>`
     : `<rect width="200" height="200" fill="${c}"/>`;
@@ -240,11 +261,11 @@ function lentes(cfg) {
 function sombrero(cfg, c) {
   const o = oscurecer(c, 0.75);
   switch (cfg.cabeza) {
-    case "gorra": return `<path d="M54 80 C52 50 74 36 100 36 C126 36 148 50 146 80 Z" fill="${c}" ${T}/><path d="M138 78 C158 74 178 80 180 88 C160 92 144 90 132 86 Z" fill="${o}" ${T}/><path d="M54 80 L146 80" ${T}/><circle cx="100" cy="58" r="7" fill="#E3B66B" ${T2}/><path d="M97 58 C99 55 101 61 103 58" stroke="#3B2416" stroke-width="1.6" fill="none"/>`;
+    case "gorra": return `<path d="M54 80 C52 50 74 36 100 36 C126 36 148 50 146 80 Z" fill="${c}" ${T}/><path d="M138 78 C158 74 178 80 180 88 C160 92 144 90 132 86 Z" fill="${o}" ${T}/><path d="M54 80 L146 80" ${T}/>${logoMozz(100, 60, 20)}`;
     case "gorra-reves": return `<path d="M60 78 C44 76 30 80 28 87 C44 90 58 88 66 84 Z" fill="${o}" ${T}/><path d="M54 80 C52 50 74 36 100 36 C126 36 148 50 146 80 Z" fill="${c}" ${T}/><path d="M54 80 L146 80" ${T}/>`;
     case "boina": return `<ellipse cx="96" cy="56" rx="54" ry="18" fill="${c}" ${T} transform="rotate(-8 96 56)"/><path d="M96 38 L98 30" ${T} stroke-width="3.4"/>`;
     case "chef": return `<g fill="#FFFFFF" ${T}><circle cx="74" cy="42" r="17"/><circle cx="126" cy="42" r="17"/><circle cx="100" cy="30" r="22"/><rect x="62" y="48" width="76" height="24" rx="7"/></g><path d="M78 58 L78 68 M92 58 L92 68 M108 58 L108 68 M122 58 L122 68" stroke="#E3D6C2" stroke-width="2"/>`;
-    case "lana": return `<path d="M54 78 C52 46 74 32 100 32 C126 32 148 46 146 78 Z" fill="${c}" ${T}/><rect x="50" y="70" width="100" height="16" rx="8" fill="${o}" ${T}/><circle cx="100" cy="26" r="10" fill="#F2E4CF" ${T}/><path d="M70 50 L70 70 M85 42 L85 70 M100 40 L100 70 M115 42 L115 70 M130 50 L130 70" stroke="${o}" stroke-width="2" opacity=".6"/>`;
+    case "lana": return `<path d="M54 78 C52 46 74 32 100 32 C126 32 148 46 146 78 Z" fill="${c}" ${T}/><rect x="50" y="70" width="100" height="16" rx="8" fill="${o}" ${T}/><circle cx="100" cy="26" r="10" fill="#F2E4CF" ${T}/>${logoMozz(100, 78, 12)}<path d="M70 50 L70 70 M85 42 L85 70 M100 40 L100 70 M115 42 L115 70 M130 50 L130 70" stroke="${o}" stroke-width="2" opacity=".6"/>`;
     case "audifonos": return `<path d="M52 96 C48 44 152 44 148 96" stroke="#2B1A14" stroke-width="7" fill="none"/><path d="M52 96 C48 44 152 44 148 96" stroke="${c}" stroke-width="3.6" fill="none"/><rect x="40" y="84" width="16" height="28" rx="7" fill="${c}" ${T}/><rect x="144" y="84" width="16" height="28" rx="7" fill="${c}" ${T}/>`;
     case "flores": return [[60, 70, "#E86F9A"], [72, 54, "#F5C542"], [88, 46, "#FFFFFF"], [104, 44, "#E86F9A"], [120, 48, "#F5C542"], [134, 58, "#FFFFFF"], [142, 74, "#E86F9A"]]
       .map(([x, y, col]) => `<g transform="translate(${x} ${y})">${[0, 72, 144, 216, 288].map((a) => `<circle cx="${5 * Math.cos(a * Math.PI / 180)}" cy="${5 * Math.sin(a * Math.PI / 180)}" r="4.2" fill="${col}" ${T2} stroke-width="1.2"/>`).join("")}<circle r="2.8" fill="#C9824B"/></g>`).join("");
@@ -260,19 +281,19 @@ function ropa(cfg, c, piel) {
   const cuello = `<path d="M88 130 L88 152 Q100 160 112 152 L112 130 Z" fill="${piel}" ${T}/>`;
   const o = oscurecer(c, 0.78);
   switch (cfg.ropa) {
-    case "playera": return cuello + `<path d="${cuerpo}" fill="${c}" ${T}/><path d="M84 151 Q100 166 116 151" ${T} fill="none"/>`;
-    case "sudadera": return `<path d="M64 158 C62 132 84 124 100 124 C116 124 138 132 136 158 Z" fill="${o}" ${T}/>` + cuello + `<path d="${cuerpo}" fill="${c}" ${T}/><path d="M80 152 Q100 172 120 152" ${T} fill="${o}"/><path d="M92 166 L90 186 M108 166 L110 186" ${T}/><circle cx="90" cy="187" r="2.6" fill="#F2E4CF"/><circle cx="110" cy="187" r="2.6" fill="#F2E4CF"/>`;
-    case "chef": return cuello + `<path d="${cuerpo}" fill="#FFFFFF" ${T}/><path d="M86 152 L100 166 L114 152" ${T} fill="none"/><g fill="${c}" ${T2}>${[176, 192].map((y) => `<circle cx="88" cy="${y}" r="3.2"/><circle cx="112" cy="${y}" r="3.2"/>`).join("")}</g>`;
+    case "playera": return cuello + `<path d="${cuerpo}" fill="${c}" ${T}/><path d="M84 151 Q100 166 116 151" ${T} fill="none"/>${logoMozz(100, 184, 22)}`;
+    case "sudadera": return `<path d="M64 158 C62 132 84 124 100 124 C116 124 138 132 136 158 Z" fill="${o}" ${T}/>` + cuello + `<path d="${cuerpo}" fill="${c}" ${T}/><path d="M80 152 Q100 172 120 152" ${T} fill="${o}"/><path d="M92 166 L90 186 M108 166 L110 186" ${T}/><circle cx="90" cy="187" r="2.6" fill="#F2E4CF"/><circle cx="110" cy="187" r="2.6" fill="#F2E4CF"/>${logoMozz(128, 180, 15)}`;
+    case "chef": return cuello + `<path d="${cuerpo}" fill="#FFFFFF" ${T}/><path d="M86 152 L100 166 L114 152" ${T} fill="none"/><g fill="${c}" ${T2}>${[176, 192].map((y) => `<circle cx="88" cy="${y}" r="3.2"/><circle cx="112" cy="${y}" r="3.2"/>`).join("")}</g>${logoMozz(130, 172, 14)}`;
     case "mono": return cuello + `<path d="${cuerpo}" fill="${c}" ${T}/><path d="M86 151 L100 200 L114 151 Q100 158 86 151 Z" fill="#FFFFFF" ${T}/><path d="M88 156 L100 162 L88 168 Z M112 156 L100 162 L112 168 Z" fill="#B23A3A" ${T2}/><circle cx="100" cy="162" r="3" fill="#8E2A2A"/>`;
     case "rayas": return cuello + `<defs><clipPath id="cp-ropa"><path d="${cuerpo}"/></clipPath></defs><path d="${cuerpo}" fill="#F2F0EC"/><g clip-path="url(#cp-ropa)" fill="${c}">${[164, 180, 196].map((y) => `<rect x="30" y="${y}" width="140" height="8"/>`).join("")}</g><path d="${cuerpo}" fill="none" ${T}/><path d="M84 151 Q100 166 116 151" ${T} fill="none"/>`;
     case "capa": return `<path d="M50 158 C30 180 26 200 24 210 L176 210 C174 200 170 180 150 158 Z" fill="#B23A3A" ${T}/>` + cuello + `<path d="${cuerpo}" fill="${c}" ${T}/><path d="M84 151 Q100 166 116 151" ${T} fill="none"/><path transform="translate(100 182)" d="M0 -11 L3.2 -3.6 L11 -3 L5 2 L6.8 10 L0 5.8 L-6.8 10 L-5 2 L-11 -3 L-3.2 -3.6 Z" fill="#F5C542" ${T2}/>`;
     default: // delantal barista
-      return cuello + `<path d="${cuerpo}" fill="${c}" ${T}/><path d="M84 151 Q100 162 116 151" ${T} fill="none"/><path d="M72 170 L128 170 L132 210 L68 210 Z" fill="#3B2416" ${T}/><path d="M78 170 L86 151 M122 170 L114 151" stroke="#3B2416" stroke-width="4"/><g transform="translate(100 188)"><ellipse rx="5.5" ry="7.5" fill="#E3B66B"/><path d="M0 -6 C-3 -2 3 2 0 6" stroke="#3B2416" stroke-width="1.6" fill="none"/></g>`;
+      return cuello + `<path d="${cuerpo}" fill="${c}" ${T}/><path d="M84 151 Q100 162 116 151" ${T} fill="none"/><path d="M72 170 L128 170 L132 210 L68 210 Z" fill="#3B2416" ${T}/><path d="M78 170 L86 151 M122 170 L114 151" stroke="#3B2416" stroke-width="4"/>${logoMozz(100, 190, 24)}`;
   }
 }
 
 function extra(cfg, orejas) {
-  const taza = (oro) => `<g transform="translate(140 178) rotate(-8)"><path d="M-14 -12 L14 -12 L11 14 Q0 18 -11 14 Z" fill="${oro ? "#F5C542" : "#F2E4CF"}" ${T}/><path d="M14 -6 C24 -6 24 8 12 8" ${T} fill="none"/><path d="M-6 -20 Q-2 -26 -6 -32 M4 -20 Q8 -26 4 -32" stroke="${oro ? "#F5C542" : "rgba(255,255,255,.8)"}" stroke-width="2.2" fill="none" stroke-linecap="round"/>${oro ? `<path d="M-4 0 L0 -6 L4 0 L0 6 Z" fill="#fff" opacity=".8"/>` : `<rect x="-11" y="-2" width="22" height="6" fill="#C9824B"/>`}</g>`;
+  const taza = (oro) => `<g transform="translate(140 178) rotate(-8)"><path d="M-14 -12 L14 -12 L11 14 Q0 18 -11 14 Z" fill="${oro ? "#F5C542" : "#F2E4CF"}" ${T}/><path d="M14 -6 C24 -6 24 8 12 8" ${T} fill="none"/><path class="av-vapor" d="M-6 -20 Q-2 -26 -6 -32 M4 -20 Q8 -26 4 -32" stroke="${oro ? "#F5C542" : "rgba(255,255,255,.8)"}" stroke-width="2.2" fill="none" stroke-linecap="round"/>${oro ? `<path d="M-4 0 L0 -6 L4 0 L0 6 Z" fill="#fff" opacity=".8"/>` : logoMozz(0, 2, 13, "#C9824B")}</g>`;
   switch (cfg.extra) {
     case "taza": return taza(false);
     case "taza-oro": return taza(true);
@@ -296,43 +317,170 @@ function marco(cfg) {
 }
 
 let contador = 0;
-// Devuelve el SVG del avatar. cfg = receta (se completa con la base).
-export function avatarSVG(cfgEntrada, tam = 64, extraAttr = "") {
-  const cfg = { ...AVATAR_BASE, ...(cfgEntrada || {}) };
-  const piel = PIELES[cfg.piel] ?? PIELES[1];
-  const cPelo = COLORES_PELO[cfg.colorPelo] ?? COLORES_PELO[1];
-  const cRopa = COLORES_ROPA[cfg.colorRopa] ?? COLORES_ROPA[3];
-  const cGorro = COLORES_ROPA[cfg.colorGorro] ?? COLORES_ROPA[0];
+const colores = (cfg) => ({
+  piel: PIELES[cfg.piel] ?? PIELES[1],
+  pelo: COLORES_PELO[cfg.colorPelo] ?? COLORES_PELO[1],
+  ropa: COLORES_ROPA[cfg.colorRopa] ?? COLORES_ROPA[3],
+  gorro: COLORES_ROPA[cfg.colorGorro] ?? COLORES_ROPA[0],
+  pantalon: COLORES_PANTALON[cfg.colorPantalon] ?? COLORES_PANTALON[0],
+  zapato: COLORES_ROPA[cfg.colorZapato] ?? COLORES_ROPA[4],
+});
+
+// Todo lo de la cabeza (de orejas a sombrero).
+function capasCabeza(cfg, c) {
   const geo = cabezaGeo[cfg.cara] || cabezaGeo.redonda;
-  const pielO = oscurecer(piel, 0.85);
-  const v = vello(cfg, cPelo, geo.menton);
+  const pielO = oscurecer(c.piel, 0.85);
+  const v = vello(cfg, c.pelo, geo.menton);
+  return `${geo.orejas.map((x) => `<circle cx="${x}" cy="100" r="9" fill="${c.piel}" ${T}/><path d="M${x + (x < 100 ? 2 : -2)} 96 q${x < 100 ? -3 : 3} 4 0 8" stroke="${pielO}" stroke-width="2" fill="none"/>`).join("")}
+    ${geo.forma(c.piel)}
+    ${detalle(cfg)}
+    ${v.atras}
+    ${cejas(cfg, c.pelo)}
+    <g class="av-ojos">${ojos(cfg)}</g>
+    <path d="M97 106 Q100 110 103 106" stroke="${pielO}" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+    ${boca(cfg)}
+    ${v.frente}
+    ${peloFrente(cfg, c.pelo)}
+    ${lentes(cfg)}
+    ${sombrero(cfg, c.gorro)}`;
+}
+
+const unicos = (svg, id) => svg.replace(/id="mk-/g, `id="${id}-mk-`).replace(/url\(#mk-/g, `url(#${id}-mk-`)
+  .replace(/id="gx"/g, `id="${id}-gx"`).replace(/url\(#gx\)/g, `url(#${id}-gx)`)
+  .replace(/id="cp-ropa"/g, `id="${id}-cpr"`).replace(/url\(#cp-ropa\)/g, `url(#${id}-cpr)`);
+
+// Retrato circular. opciones: { animado }
+export function avatarSVG(cfgEntrada, tam = 64, extraAttr = "", { animado = false } = {}) {
+  const cfg = { ...AVATAR_BASE, ...(cfgEntrada || {}) };
+  const c = colores(cfg);
+  const geo = cabezaGeo[cfg.cara] || cabezaGeo.redonda;
   const id = "av" + (++contador);
-  // Ids únicos (varios avatares en la misma página).
-  const svg = `<svg viewBox="0 0 200 200" width="${tam}" height="${tam}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Avatar" ${extraAttr}>
+  const svg = `<svg viewBox="0 0 200 200" width="${tam}" height="${tam}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Avatar" class="${animado ? "av-anim" : ""}" ${extraAttr}>
     <defs><clipPath id="${id}"><circle cx="100" cy="100" r="100"/></clipPath></defs>
     <g clip-path="url(#${id})">
       ${fondo(cfg)}
-      ${peloAtras(cfg, cPelo)}
-      ${ropa(cfg, cRopa, piel)}
-      ${geo.orejas.map((x) => `<circle cx="${x}" cy="100" r="9" fill="${piel}" ${T}/><path d="M${x + (x < 100 ? 2 : -2)} 96 q${x < 100 ? -3 : 3} 4 0 8" stroke="${pielO}" stroke-width="2" fill="none"/>`).join("")}
-      ${geo.forma(piel)}
-      ${detalle(cfg)}
-      ${v.atras}
-      ${cejas(cfg, cPelo)}
-      ${ojos(cfg)}
-      <path d="M97 106 Q100 110 103 106" stroke="${pielO}" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-      ${boca(cfg)}
-      ${v.frente}
-      ${peloFrente(cfg, cPelo)}
-      ${lentes(cfg)}
-      ${sombrero(cfg, cGorro)}
-      ${extra(cfg, geo.orejas)}
+      <g class="av-personaje">
+        ${peloAtras(cfg, c.pelo)}
+        ${ropa(cfg, c.ropa, c.piel)}
+        ${capasCabeza(cfg, c)}
+        ${extra(cfg, geo.orejas)}
+      </g>
     </g>
     ${marco(cfg)}
   </svg>`;
-  return svg.replace(/id="mk-/g, `id="${id}-mk-`).replace(/url\(#mk-/g, `url(#${id}-mk-`)
-    .replace(/id="gx"/g, `id="${id}-gx"`).replace(/url\(#gx\)/g, `url(#${id}-gx)`)
-    .replace(/id="cp-ropa"/g, `id="${id}-cpr"`).replace(/url\(#cp-ropa\)/g, `url(#${id}-cpr)`);
+  return unicos(svg, id);
+}
+
+// ---------------------------------------------------------------------
+//  Cuerpo completo
+// ---------------------------------------------------------------------
+function piernas(cfg, c) {
+  const p = c.pantalon, po = oscurecer(p, 0.8), piel = c.piel;
+  const pierna = (x, hasta, col) => `<path d="M${x} 250 L${x} ${hasta}" stroke="#2B1A14" stroke-width="26" stroke-linecap="round"/><path d="M${x} 250 L${x} ${hasta}" stroke="${col}" stroke-width="21" stroke-linecap="round"/>`;
+  switch (cfg.pantalon) {
+    case "short": return pierna(86, 336, piel) + pierna(114, 336, piel) + `<path d="M70 246 L130 246 L132 290 L104 290 L100 270 L96 290 L68 290 Z" fill="${p}" ${T}/>`;
+    case "falda": return pierna(88, 336, piel) + pierna(112, 336, piel) + `<path d="M72 244 L128 244 L142 300 Q100 310 58 300 Z" fill="${p}" ${T}/><path d="M86 252 L80 302 M100 252 L100 306 M114 252 L120 302" stroke="${po}" stroke-width="2" opacity=".6"/>`;
+    case "pans": return pierna(86, 334, p) + pierna(114, 334, p) + `<path d="M70 244 L130 244 L130 258 L70 258 Z" fill="${po}" ${T}/><path d="M76 270 L76 330 M124 270 L124 330" stroke="#F2F0EC" stroke-width="3"/>`;
+    default: // jeans
+      return pierna(86, 334, p) + pierna(114, 334, p) + `<path d="M70 244 L130 244 L130 256 L70 256 Z" fill="${po}" ${T}/><path d="M100 256 L100 290" stroke="${po}" stroke-width="2"/><path d="M78 300 L94 300 M106 300 L122 300" stroke="${po}" stroke-width="1.6" opacity=".5"/>`;
+  }
+}
+
+function zapatos(cfg, c) {
+  const z = c.zapato;
+  const par = (dibujo) => dibujo(84, -1) + dibujo(116, 1);
+  switch (cfg.zapatos) {
+    case "botas": return par((x, d) => `<path d="M${x - 11} 322 L${x + 11} 322 L${x + 12} 342 C${x + 12 + d * 8} 342 ${x + 14 + d * 10} 350 ${x + 12 + d * 8} 354 L${x - 12} 354 Z" fill="#6B3F22" ${T}/><path d="M${x - 11} 330 L${x + 11} 330" stroke="#3B2416" stroke-width="2"/>`);
+    case "zapatos": return par((x, d) => `<path d="M${x - 12} 340 C${x - 12} 332 ${x + 10} 332 ${x + 14 + d * 6} 344 C${x + 18 + d * 6} 352 ${x + 8} 354 ${x - 12} 354 Z" fill="#1E1512" ${T}/><path d="M${x - 6} 340 L${x + 6} 338" stroke="rgba(255,255,255,.35)" stroke-width="2" stroke-linecap="round"/>`);
+    case "chanclas": return par((x, d) => `<ellipse cx="${x + d * 3}" cy="350" rx="15" ry="6" fill="${z}" ${T}/><path d="M${x - 4 + d * 3} 344 L${x + d * 3} 336 L${x + 4 + d * 3} 344" stroke="#2B1A14" stroke-width="3" fill="none"/><ellipse cx="${x + d * 3}" cy="340" rx="7" ry="4" fill="${c.piel}" ${T2}/>`);
+    default: // tenis
+      return par((x, d) => `<path d="M${x - 13} 340 C${x - 13} 330 ${x + 6} 330 ${x + 10 + d * 4} 338 C${x + 18 + d * 6} 342 ${x + 18 + d * 6} 352 ${x + 12} 354 L${x - 13} 354 Z" fill="#FFFFFF" ${T}/><path d="M${x - 13} 348 L${x + 18 + d * 4} 348" stroke="${z}" stroke-width="4"/><path d="M${x - 4} 336 L${x + 4} 340" stroke="${z}" stroke-width="2.4" stroke-linecap="round"/>`);
+  }
+}
+
+function torso(cfg, c) {
+  const col = c.ropa, o = oscurecer(col, 0.78), piel = c.piel;
+  const forma = "M66 156 C76 150 88 148 100 148 C112 148 124 150 134 156 L140 250 L60 250 Z";
+  const cuello = `<path d="M88 130 L88 152 Q100 160 112 152 L112 130 Z" fill="${piel}" ${T}/>`;
+  switch (cfg.ropa) {
+    case "playera": return cuello + `<path d="${forma}" fill="${col}" ${T}/><path d="M86 151 Q100 164 114 151" ${T} fill="none"/>${logoMozz(100, 196, 30)}`;
+    case "sudadera": return `<path d="M66 160 C64 134 84 126 100 126 C116 126 136 134 134 160 Z" fill="${o}" ${T}/>` + cuello + `<path d="${forma}" fill="${col}" ${T}/><path d="M82 152 Q100 170 118 152" ${T} fill="${o}"/><path d="M92 164 L90 184 M108 164 L110 184" ${T}/><path d="M76 212 L124 212 L120 238 L80 238 Z" fill="${o}" ${T2}/>${logoMozz(100, 190, 22)}`;
+    case "chef": return cuello + `<path d="${forma}" fill="#FFFFFF" ${T}/><path d="M86 152 L100 166 L114 152" ${T} fill="none"/><g fill="${col}" ${T2}>${[180, 200, 220].map((y) => `<circle cx="90" cy="${y}" r="3.4"/><circle cx="110" cy="${y}" r="3.4"/>`).join("")}</g>${logoMozz(126, 174, 16)}`;
+    case "mono": return cuello + `<path d="${forma}" fill="#FFFFFF" ${T}/><path d="M66 156 C76 150 86 150 90 152 L100 236 L60 250 Z M134 156 C124 150 114 150 110 152 L100 236 L140 250 Z" fill="${col}" ${T}/><path d="M88 156 L100 162 L88 168 Z M112 156 L100 162 L112 168 Z" fill="#B23A3A" ${T2}/><circle cx="100" cy="162" r="3" fill="#8E2A2A"/><circle cx="100" cy="190" r="2.6" fill="#2B1A14"/><circle cx="100" cy="210" r="2.6" fill="#2B1A14"/>`;
+    case "rayas": return cuello + `<path d="${forma}" fill="#F2F0EC"/><g clip-path="url(#cp-ropa)" fill="${col}">${[166, 186, 206, 226].map((y) => `<rect x="50" y="${y}" width="100" height="9"/>`).join("")}</g><path d="${forma}" fill="none" ${T}/><path d="M86 151 Q100 164 114 151" ${T} fill="none"/><defs><clipPath id="cp-ropa"><path d="${forma}"/></clipPath></defs>`;
+    case "capa": return cuello + `<path d="${forma}" fill="${col}" ${T}/><path d="M86 151 Q100 164 114 151" ${T} fill="none"/><path transform="translate(100 196)" d="M0 -14 L4 -4.6 L14 -4 L6.4 2.6 L8.8 13 L0 7.4 L-8.8 13 L-6.4 2.6 L-14 -4 L-4 -4.6 Z" fill="#F5C542" ${T2}/>`;
+    default: // delantal
+      return cuello + `<path d="${forma}" fill="${col}" ${T}/><path d="M86 151 Q100 162 114 151" ${T} fill="none"/><path d="M74 176 L126 176 L134 262 L66 262 Z" fill="#3B2416" ${T}/><path d="M80 176 L88 152 M120 176 L112 152" stroke="#3B2416" stroke-width="4.5"/><path d="M78 226 L122 226 L120 246 L80 246 Z" fill="none" stroke="#5A3A26" stroke-width="2"/>${logoMozz(100, 200, 30)}`;
+  }
+}
+
+function brazos(cfg, c) {
+  const manga = cfg.ropa === "chef" || cfg.ropa === "mono" && false ? "#FFFFFF" : cfg.ropa === "rayas" ? "#F2F0EC" : c.ropa;
+  const largo = cfg.ropa === "sudadera" || cfg.ropa === "chef" || cfg.ropa === "mono";
+  const brazo = (pts, cls = "") => {
+    const [h, co, ma] = pts; // hombro, codo, mano
+    const mitad = largo ? `M${h[0]} ${h[1]} L${co[0]} ${co[1]} L${ma[0]} ${ma[1]}` : `M${h[0]} ${h[1]} L${(h[0] + co[0]) / 2} ${(h[1] + co[1]) / 2}`;
+    return `<g class="${cls}">
+      <path d="M${h[0]} ${h[1]} L${co[0]} ${co[1]} L${ma[0]} ${ma[1]}" stroke="#2B1A14" stroke-width="19" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M${h[0]} ${h[1]} L${co[0]} ${co[1]} L${ma[0]} ${ma[1]}" stroke="${c.piel}" stroke-width="14" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="${mitad}" stroke="#2B1A14" stroke-width="23" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="${mitad}" stroke="${cfg.ropa === "mono" ? c.ropa : manga}" stroke-width="18" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${ma[0]}" cy="${ma[1]}" r="9" fill="${c.piel}" ${T}/>
+    </g>`;
+  };
+  const taza = cfg.extra === "taza" || cfg.extra === "taza-oro";
+  const izq = brazo([[70, 164], [58, 204], [56, 242]], "av-brazo-izq");
+  const der = taza ? brazo([[130, 164], [146, 202], [124, 214]], "av-brazo-der") : brazo([[130, 164], [142, 204], [144, 242]], "av-brazo-der");
+  return { izq, der, taza };
+}
+
+function extraCuerpo(cfg, orejas) {
+  switch (cfg.extra) {
+    case "aretes": case "flor": return extra(cfg, orejas);
+    case "collar": return `<path d="M86 152 Q100 174 114 152" stroke="#F5C542" stroke-width="2.6" fill="none"/><circle cx="100" cy="168" r="4.4" fill="#5B8DEF" ${T2} stroke-width="1.4"/>`;
+    case "pin": return `<path transform="translate(118 184)" d="M0 -8 L2.4 -2.6 L8 -2.2 L3.6 1.4 L5 7.2 L0 4 L-5 7.2 L-3.6 1.4 L-8 -2.2 L-2.4 -2.6 Z" fill="#F5C542" ${T2} stroke-width="1.6"/>`;
+    default: return "";
+  }
+}
+
+function tazaMano(cfg) {
+  const oro = cfg.extra === "taza-oro";
+  return `<g transform="translate(118 206)"><path d="M-12 -12 L12 -12 L10 12 Q0 16 -10 12 Z" fill="${oro ? "#F5C542" : "#F2E4CF"}" ${T}/><path d="M12 -6 C21 -6 21 7 11 7" ${T} fill="none"/>
+    <path class="av-vapor" d="M-5 -18 Q-1 -24 -5 -30 M4 -18 Q8 -24 4 -30" stroke="${oro ? "#F5C542" : "rgba(255,255,255,.85)"}" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    ${oro ? `<path d="M-4 0 L0 -6 L4 0 L0 6 Z" fill="#fff" opacity=".8"/>` : logoMozz(0, 1, 12, "#C9824B")}</g>`;
+}
+
+// Cuerpo completo (para el perfil y el editor). Alto = 1.9 × ancho.
+export function avatarCuerpoSVG(cfgEntrada, alto = 260, { animado = false } = {}) {
+  const cfg = { ...AVATAR_BASE, ...(cfgEntrada || {}) };
+  const c = colores(cfg);
+  const geo = cabezaGeo[cfg.cara] || cabezaGeo.redonda;
+  const id = "avc" + (++contador);
+  const br = brazos(cfg, c);
+  const svg = `<svg viewBox="0 0 200 380" width="${Math.round(alto * 200 / 380)}" height="${alto}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Avatar de cuerpo completo" class="${animado ? "av-anim" : ""}">
+    <defs><clipPath id="${id}"><rect width="200" height="380" rx="28"/></clipPath></defs>
+    <g clip-path="url(#${id})">
+      ${cfg.fondo === "galaxia"
+        ? `<defs><radialGradient id="gx" cx="35%" cy="25%" r="90%"><stop offset="0" stop-color="#8B5CF6"/><stop offset=".55" stop-color="#2E1B5B"/><stop offset="1" stop-color="#120A24"/></radialGradient></defs><rect width="200" height="380" fill="url(#gx)"/>`
+        : `<rect width="200" height="380" fill="${COLORES_FONDO[cfg.colorFondo] ?? COLORES_FONDO[0]}"/>`}
+      ${cfg.fondo === "rayos" ? `<g transform="translate(0 40) scale(1 1.2)">${fondo(cfg, true)}</g>` : fondo(cfg, true) + `<g transform="translate(0 190)">${fondo(cfg, true)}</g>`}
+      <ellipse cx="100" cy="356" rx="58" ry="9" fill="rgba(0,0,0,.25)"/>
+      <g class="av-personaje">
+        ${cfg.ropa === "capa" ? `<path d="M66 158 C40 200 34 280 30 330 L170 330 C166 280 160 200 134 158 Z" fill="#B23A3A" ${T}/>` : ""}
+        ${peloAtras(cfg, c.pelo)}
+        ${piernas(cfg, c)}
+        ${zapatos(cfg, c)}
+        ${br.izq}
+        ${torso(cfg, c)}
+        ${br.taza ? "" : br.der}
+        ${extraCuerpo(cfg, geo.orejas)}
+        ${capasCabeza(cfg, c)}
+        ${br.taza ? br.der + tazaMano(cfg) : ""}
+      </g>
+    </g>
+    ${cfg.marco !== "nada" ? marco(cfg).replace(/<circle cx="100" cy="100" r="95"/g, '<rect x="4" y="4" width="192" height="372" rx="26"') : ""}
+  </svg>`;
+  return unicos(svg, id);
 }
 
 // Avatar o iniciales (para listas, ranking, perfil).
