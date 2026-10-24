@@ -746,11 +746,13 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
     <div class="leccion-admin">
       ${icono("video", 18, 'style="color:var(--arena);flex:none"')}
       <div class="nombre"><b style="font-weight:600">${esc(l.titulo)}</b><small>${l.duracion_seg ? duracion(l.duracion_seg) : l.bunny_video_id ? "Bunny lo está procesando…" : ""}${l.bunny_video_id ? "" : "sin video"}</small></div>
+      <div class="acciones-leccion">
       ${l.bunny_video_id ? `<button class="mini-btn btn-cc" aria-label="Subtítulos" title="Subtítulos" data-subs-l="${l.id}">${icono("cc", 18)}</button>` : ""}
       <button class="mini-btn" aria-label="Subir" data-mover-l="${l.id}" data-dir="-1" ${i === 0 ? "disabled" : ""}>${icono("up", 18)}</button>
       <button class="mini-btn" aria-label="Bajar" data-mover-l="${l.id}" data-dir="1" ${i === lista.length - 1 ? "disabled" : ""}>${icono("down", 18)}</button>
       <button class="mini-btn" aria-label="Editar, mover o renombrar" title="Renombrar o cambiar posición" data-renombrar-l="${l.id}">${icono("edit", 18)}</button>
       <button class="mini-btn" aria-label="Quitar" data-borrar-l="${l.id}">${icono("trash", 18)}</button>
+      </div>
     </div>`;
 
   main.innerHTML = `
@@ -787,7 +789,7 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
         <div class="fila-entre"><h2>Capítulos y lecciones</h2><button class="btn btn-chico" id="nuevo-cap">${icono("plus", 16)}Capítulo</button></div>
         ${caps.map((cap, ci) => `
           <div class="capitulo-admin">
-            <div class="fila-entre">
+            <div class="fila-entre cabeza-capitulo">
               <b>Capítulo ${ci + 1} · ${esc(cap.titulo)}</b>
               <div class="fila" style="gap:0">
                 <button class="mini-btn" aria-label="Subir capítulo" data-mover-m="${cap.id}" data-dir="-1" ${ci === 0 ? "disabled" : ""}>${icono("up", 18)}</button>

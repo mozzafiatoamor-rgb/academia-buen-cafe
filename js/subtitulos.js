@@ -100,7 +100,7 @@ function parecido(archivo, leccion, pos) {
 }
 
 // Empareja archivos con lecciones: primero por nombre, lo que sobre en orden.
-export function emparejar(archivos, lecciones) {
+export function emparejar(archivos, lecciones, { porOrden = true } = {}) {
   const pares = [];
   archivos.forEach((f, i) => lecciones.forEach((l, j) => pares.push({ i, j, p: parecido(f.name, l, j) })));
   pares.sort((x, y) => y.p - x.p);
@@ -112,7 +112,7 @@ export function emparejar(archivos, lecciones) {
   const libres = lecciones.map((_, j) => j).filter((j) => !usadas.has(j));
   const ordenados = archivos.map((f, i) => i).filter((i) => deArchivo[i] === -1)
     .sort((x, y) => archivos[x].name.localeCompare(archivos[y].name, "es", { numeric: true }));
-  ordenados.forEach((i) => { if (libres.length) deArchivo[i] = libres.shift(); });
+  if (porOrden || (archivos.length === 1 && lecciones.length === 1)) ordenados.forEach((i) => { if (libres.length) deArchivo[i] = libres.shift(); });
   return deArchivo;
 }
 

@@ -8,13 +8,17 @@
 //      02 Capítulo dos/
 //        ...
 //  Cada subcarpeta = un capítulo; cada video = una lección (en orden por nombre).
+//  Si junto al video hay un .srt o .vtt con el mismo nombre, se sube como
+//  sus subtítulos en español.
 //  Los videos se suben directo de tu computadora a Bunny (subida reanudable).
 // =====================================================================
 import { datos } from "./datos.js";
 import { icono, esc, modal, aviso, opcionesCategoria } from "./ui.js";
+import { aVTT, emparejar } from "./subtitulos.js";
 
 const EXT = /\.(mp4|mov|m4v|webm|mkv|avi)$/i;
 const DOC = /\.(pdf|png|jpe?g|webp)$/i;
+const SUB = /\.(srt|vtt)$/i;
 const MAX_DOC = 20 * 1024 * 1024;
 const MIME = { mp4: "video/mp4", mov: "video/quicktime", m4v: "video/x-m4v", webm: "video/webm", mkv: "video/x-matroska", avi: "video/x-msvideo" };
 const SIMULTANEOS = 2;
@@ -33,12 +37,13 @@ export function tamano(bytes) {
 
 // Convierte la lista de archivos de la carpeta en curso → capítulos → videos.
 export function analizarCarpeta(archivos) {
-  const videos = [], otros = [], docs = [];
+  const videos = [], otros = [], docs = [], subs = [];
   for (const f of archivos) {
     const ruta = f.webkitRelativePath || f.name;
     const partes = ruta.split("/");
     if (partes.some((p) => p.startsWith("."))) continue; // .DS_Store y ocultos
     if (EXT.test(f.name)) videos.push({ file: f, partes, ruta });
+    else if (SUB.test(f.name)) subs.push({ file: f, partes, ruta });
     else if (DOC.test(f.name) && f.size <= MAX_DOC) docs.push({ file: f, ruta });
     else otros.push(ruta);
   }
@@ -53,15 +58,40 @@ export function analizarCarpeta(archivos) {
   const capitulos = [...grupos.keys()].sort(natural).map((clave) => ({
     nombre: clave ? limpiarNombre(clave) : "Lecciones",
     videos: grupos.get(clave).sort((a, b) => natural(a.ruta, b.ruta)).map((v) => ({
-      file: v.file, titulo: limpiarNombre(v.file.name), bytes: v.file.size,
+      file: v.file, titulo: limpiarNombre(v.file.name), bytes: v.file.size, carpeta: v.partes.slice(0, -1).join("/"),
     })),
   }));
+  // Subtítulos: mismo nombre que el video en la misma carpeta; si no, el más parecido de esa carpeta.
+  const base = (n) => n.replace(/\.[^.]+$/, "").toLowerCase().trim();
+  const porCarpeta = new Map();
+  for (const sub of subs) {
+    const carpeta = sub.partes.slice(0, -1).join("/");
+    if (!porCarpeta.has(carpeta)) porCarpeta.set(carpeta, []);
+    porCarpeta.get(carpeta).push(sub.file);
+  }
+  let conSubs = 0;
+  for (const [carpeta, archivos] of porCarpeta) {
+    const vids = capitulos.flatMap((c) => c.videos).filter((v) => v.carpeta === carpeta);
+    if (!vids.length) { otros.push(...archivos.map((f) => f.name)); continue; }
+    const libres = [];
+    for (const f of archivos) {
+      const v = vids.find((x) => !x.subtitulo && base(x.file.name) === base(f.name));
+      if (v) v.subtitulo = f; else libres.push(f);
+    }
+    const sinSub = vids.filter((v) => !v.subtitulo);
+    if (libres.length && sinSub.length) {
+      const asignado = emparejar(libres, sinSub, { porOrden: libres.length === sinSub.length });
+      libres.forEach((f, i) => { if (asignado[i] >= 0) sinSub[asignado[i]].subtitulo = f; else otros.push(f.name); });
+    } else otros.push(...libres.map((f) => f.name));
+  }
+  capitulos.forEach((c) => c.videos.forEach((v) => { if (v.subtitulo) conSubs++; }));
   return {
     curso: limpiarNombre(nombreCurso),
     capitulos,
     otros: otros.length,
     docs: docs.sort((a, b) => natural(a.ruta, b.ruta)).map((d) => ({ file: d.file, titulo: limpiarNombre(d.file.name.replace(DOC, "")) || d.file.name, bytes: d.file.size })),
     total: videos.length,
+    subtitulos: conSubs,
     bytes: videos.reduce((a, v) => a + v.file.size, 0),
   };
 }
@@ -98,12 +128,13 @@ export async function subirCursoDesdeCarpeta({ alTerminar }) {
         <details class="capitulo-admin" ${i === 0 ? "open" : ""}>
           <summary style="cursor:pointer;font-weight:700">Capítulo ${i + 1} · ${esc(c.nombre)} <span class="texto-tenue" style="font-weight:400">(${c.videos.length})</span></summary>
           <ol style="margin:8px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:4px;font-size:13.5px">
-            ${c.videos.map((v) => `<li>${esc(v.titulo)} <span class="texto-tenue">· ${tamano(v.bytes)}</span></li>`).join("")}
+            ${c.videos.map((v) => `<li>${esc(v.titulo)} <span class="texto-tenue">· ${tamano(v.bytes)}</span>${v.subtitulo ? ` <span class="chip-cc si" title="${esc(v.subtitulo.name)}">CC</span>` : ""}</li>`).join("")}
           </ol>
         </details>`).join("")}
     </div>
+    ${plan.subtitulos ? `<p class="texto-tenue" style="margin:0">${icono("cc", 14)} ${plan.subtitulos} video(s) llevan su archivo de <b>subtítulos</b> (.srt/.vtt): se suben con el video y en la app arrancan encendidos.</p>` : ""}
     ${plan.docs.length ? `<p class="texto-tenue" style="margin:0">${icono("file", 14)} ${plan.docs.length} PDF/imagen(es) se agregarán como <b>materiales</b> del curso: ${plan.docs.map((d) => esc(d.titulo)).join(", ")}.</p>` : ""}
-    ${plan.otros ? `<p class="texto-tenue" style="margin:0">${plan.otros} archivo(s) se omiten (no son video, PDF ni imagen, o pesan más de 20 MB).</p>` : ""}
+    ${plan.otros ? `<p class="texto-tenue" style="margin:0">${plan.otros} archivo(s) se omiten (no son video, subtítulo, PDF ni imagen, o pesan más de 20 MB).</p>` : ""}
     <p class="texto-tenue" style="margin:0">El curso se crea en <b>borrador</b>: nadie lo ve hasta que lo publiques. Después puedes renombrar y reordenar todo.</p>
     <div class="fila-botones"><button class="btn btn-sec" data-cerrar>Cancelar</button><button class="btn" id="sc-ok">${icono("video", 18)}Crear y subir ${plan.total} videos</button></div>`, { clase: "modal-ancho" });
   const capa = modal.actual;
@@ -161,6 +192,7 @@ async function ejecutarSubida(plan, titulo, categoria, alTerminar) {
     $("#sp-bytes").textContent = `${tamano(sub)} de ${tamano(plan.bytes)} · ${items.filter((i) => i.estado === "listo").length} de ${items.length} videos`;
   };
 
+  const avisosSubs = [];
   let curso, coleccion;
   try {
     // Curso, colección en Bunny y capítulos
@@ -196,6 +228,10 @@ async function ejecutarSubida(plan, titulo, categoria, alTerminar) {
         await datos.agregarLecciones([{ curso_id: curso.id, modulo_id: it.modulo_id, titulo: it.titulo, bunny_video_id: firma.video_id, orden: it.vi + 1 }]);
       }
       await enviarArchivo(it, firma, () => { pintarFila(it); pintarTotal(); });
+      if (it.subtitulo && !it.subListo) {
+        try { await datos.subirSubtitulo(it.video_id, aVTT(await it.subtitulo.text())); it.subListo = true; }
+        catch (e) { avisosSubs.push(`${it.titulo}: ${e.message}`); }
+      }
       it.estado = "listo";
     } catch (e) {
       console.error(e);
@@ -218,7 +254,8 @@ async function ejecutarSubida(plan, titulo, categoria, alTerminar) {
     $("#sp-estado").textContent = fallidos.length ? `${fallidos.length} video(s) no se subieron` : "¡Listo! Todos los videos se subieron";
     $("#sp-aviso").textContent = fallidos.length
       ? "Revisa tu conexión y dale Reintentar. Los que ya subieron no se repiten."
-      : "Bunny los está procesando (unos minutos por video). Las duraciones aparecen solas en el editor. Cuando quieras, asígnalo y publícalo.";
+      : "Bunny los está procesando (unos minutos por video). Las duraciones aparecen solas en el editor. Cuando quieras, asígnalo y publícalo."
+        + (avisosSubs.length ? ` Ojo, estos subtítulos no se subieron (súbelos con el botón CC de la lección): ${avisosSubs.join(" · ")}` : "");
     $("#sp-botones").innerHTML = `${fallidos.length ? `<button class="btn btn-sec" id="sp-reintentar">${icono("refresh", 18)}Reintentar ${fallidos.length}</button>` : ""}
       <button class="btn" id="sp-ir">Ir al curso</button>`;
     $("#sp-ir").onclick = () => {
