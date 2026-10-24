@@ -4,6 +4,8 @@
 //  tiene ese curso asignado. El link caduca en 6 horas: aunque alguien lo
 //  copie y lo comparta, deja de funcionar.
 //
+//  Si el video tiene subtítulos en español, arrancan encendidos.
+//
 //  Body: { leccion_id: "<uuid>" }
 //  Secretos que necesita (Edge Functions → Secrets):
 //    BUNNY_LIBRARY_ID, BUNNY_TOKEN_KEY  (la "Token authentication key" de Bunny)
@@ -77,6 +79,8 @@ Deno.serve(async (req) => {
     autoplay: "false",
     preload: "true",
     responsive: "true",
+    captions: "es", // subtítulos en español encendidos desde el inicio (si el video los tiene)
+    lang: "es",     // botones del reproductor en español
   });
 
   return json({

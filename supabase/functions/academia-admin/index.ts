@@ -11,6 +11,9 @@
 //    listar_videos       → videos de Bunny (opcional: de una colección)
 //    crear_coleccion     → crea (o reutiliza) una colección en Bunny
 //    preparar_subida     → crea un video en Bunny y firma la subida directa
+//    subtitulos          → qué videos ya tienen subtítulos ({ videos: [ids] })
+//    subir_subtitulo     → sube/reemplaza los subtítulos de un video (.srt/.vtt)
+//    borrar_subtitulo    → quita los subtítulos de un video
 //
 //  Secretos que necesita (Edge Functions → Secrets):
 //    BUNNY_LIBRARY_ID, BUNNY_API_KEY
@@ -134,8 +137,12 @@ Deno.serve(async (req) => {
       headers: { AccessKey: key, accept: "application/json", "content-type": "application/json" },
       body: cuerpo ? JSON.stringify(cuerpo) : undefined,
     });
-    if (!r.ok) throw new Error(`Bunny respondió ${r.status}`);
-    return await r.json();
+    if (!r.ok) {
+      const det = (await r.text().catch(() => "")).slice(0, 200);
+      throw new Error(`Bunny respondió ${r.status}${det ? ": " + det : ""}`);
+    }
+    const t = await r.text();
+    try { return t ? JSON.parse(t) : {}; } catch { return {}; }
   }
 
   async function sha256Hex(texto: string) {
@@ -156,6 +163,20 @@ Deno.serve(async (req) => {
       firma: await sha256Hex(lib + key + expira + videoId),
     };
   }
+
+  // Texto UTF-8 → base64 (por pedazos, para archivos grandes).
+  function aBase64(texto: string) {
+    const bytes = new TextEncoder().encode(texto);
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  const IDIOMA_OK = /^[a-z]{2,3}(-[a-z0-9]{2,8})?$/i;
+  const idVideo = (v: unknown) => {
+    const id = String(v ?? "").trim();
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("video_id inválido");
+    return id;
+  };
 
   // ---------------------------------------------------------------
   try {
@@ -256,6 +277,45 @@ Deno.serve(async (req) => {
           videoId = v.guid;
         }
         return json(await firmarSubida(videoId));
+      }
+
+      case "subtitulos": {
+        const ids: string[] = [...new Set((Array.isArray(body.videos) ? body.videos : []).map((x: unknown) => String(x)))]
+          .filter((x) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 300);
+        const out: Record<string, string[]> = {};
+        let i = 0;
+        const trabajador = async () => {
+          while (i < ids.length) {
+            const id = ids[i++];
+            try {
+              const v = await bunny(`/videos/${id}`);
+              out[id] = (v.captions ?? []).map((c: any) => String(c.srclang));
+            } catch { out[id] = []; }
+          }
+        };
+        await Promise.all(Array.from({ length: Math.min(6, ids.length) }, trabajador));
+        return json(out);
+      }
+
+      case "subir_subtitulo": {
+        const id = idVideo(body.video_id);
+        const idioma = IDIOMA_OK.test(String(body.idioma ?? "")) ? String(body.idioma) : "es";
+        const contenido = String(body.contenido ?? "");
+        if (!contenido.includes("-->")) return json({ error: "Ese archivo no parece de subtítulos (.srt o .vtt)" }, 400);
+        if (contenido.length > 3_000_000) return json({ error: "El archivo de subtítulos es demasiado grande" }, 400);
+        await bunny(`/videos/${id}/captions/${idioma}`, "POST", {
+          srclang: idioma,
+          label: String(body.etiqueta ?? "").trim() || "Español",
+          captionsFile: aBase64(contenido),
+        });
+        return json({ ok: true });
+      }
+
+      case "borrar_subtitulo": {
+        const id = idVideo(body.video_id);
+        const idioma = IDIOMA_OK.test(String(body.idioma ?? "")) ? String(body.idioma) : "es";
+        await bunny(`/videos/${id}/captions/${idioma}`, "DELETE");
+        return json({ ok: true });
       }
 
       default:

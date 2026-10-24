@@ -551,6 +551,21 @@ export function crearDemo() {
     },
     async bunnyColecciones() { await espera(); return [{ id: "c1", nombre: "Barismo nivel 1 (demo)", videos: 4 }]; },
     async bunnyVideos() { await espera(); return VIDEOS_BUNNY; },
+    async subtitulosVideos(ids) {
+      await espera(); exigirAdmin();
+      const subs = db.subtitulos || {};
+      return Object.fromEntries(ids.map((id) => [id, subs[id] ? ["es"] : []]));
+    },
+    async subirSubtitulo(videoId, contenido) {
+      await espera(); exigirAdmin();
+      if (!String(contenido).includes("-->")) throw new Error("Ese archivo no parece de subtítulos (.srt o .vtt)");
+      db.subtitulos = { ...(db.subtitulos || {}), [videoId]: true }; guardar();
+    },
+    async borrarSubtitulo(videoId) {
+      await espera(); exigirAdmin();
+      if (db.subtitulos) delete db.subtitulos[videoId];
+      guardar();
+    },
     async gestorEmpleados() {
       await espera();
       const l = [

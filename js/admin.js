@@ -10,6 +10,7 @@ import { valorCurso, valorAudio } from "./puntos.js";
 import { pintarAudiolibrosAdmin, pintarEditorAudio } from "./admin-audio.js";
 import { cambiarPortada, quitarPortada } from "./portadas.js";
 import { avatarOIniciales, avatarCuerpoSVG } from "./avatar.js";
+import { estadoSubtitulos, subtitulosLeccion, subtitulosCapitulo } from "./subtitulos.js";
 
 const LOGO = "img/logo.png";
 let ctx; // { ir, salir }
@@ -745,6 +746,7 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
     <div class="leccion-admin">
       ${icono("video", 18, 'style="color:var(--arena);flex:none"')}
       <div class="nombre"><b style="font-weight:600">${esc(l.titulo)}</b><small>${l.duracion_seg ? duracion(l.duracion_seg) : l.bunny_video_id ? "Bunny lo está procesando…" : ""}${l.bunny_video_id ? "" : "sin video"}</small></div>
+      ${l.bunny_video_id ? `<button class="mini-btn btn-cc" aria-label="Subtítulos" title="Subtítulos" data-subs-l="${l.id}">${icono("cc", 18)}</button>` : ""}
       <button class="mini-btn" aria-label="Subir" data-mover-l="${l.id}" data-dir="-1" ${i === 0 ? "disabled" : ""}>${icono("up", 18)}</button>
       <button class="mini-btn" aria-label="Bajar" data-mover-l="${l.id}" data-dir="1" ${i === lista.length - 1 ? "disabled" : ""}>${icono("down", 18)}</button>
       <button class="mini-btn" aria-label="Editar, mover o renombrar" title="Renombrar o cambiar posición" data-renombrar-l="${l.id}">${icono("edit", 18)}</button>
@@ -795,9 +797,13 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
               </div>
             </div>
             ${cap.lecciones.map((l, i) => leccionHTML(l, cap.lecciones, i)).join("") || `<span class="texto-tenue">Sin videos todavía.</span>`}
-            <button class="btn btn-sec btn-chico" data-agregar="${cap.id}" style="align-self:flex-start">${icono("plus", 16)}Agregar videos</button>
+            <div class="fila" style="flex-wrap:wrap;gap:8px">
+              <button class="btn btn-sec btn-chico" data-agregar="${cap.id}">${icono("plus", 16)}Agregar videos</button>
+              ${cap.lecciones.some((l) => l.bunny_video_id) ? `<button class="btn btn-sec btn-chico" data-subs-m="${cap.id}">${icono("cc", 16)}Subtítulos</button>` : ""}
+            </div>
           </div>`).join("")}
-        ${sueltas.length ? `<div class="capitulo-admin"><b>Sin capítulo</b>${sueltas.map((l, i) => leccionHTML(l, sueltas, i)).join("")}</div>` : ""}
+        ${sueltas.length ? `<div class="capitulo-admin"><b>Sin capítulo</b>${sueltas.map((l, i) => leccionHTML(l, sueltas, i)).join("")}${sueltas.some((l) => l.bunny_video_id) ? `<button class="btn btn-sec btn-chico" data-subs-m="" style="align-self:flex-start">${icono("cc", 16)}Subtítulos</button>` : ""}</div>` : ""}
+        ${d.lecciones.some((l) => l.bunny_video_id) ? `<p class="texto-tenue subs-ayuda" style="margin:0;font-size:12.5px">${icono("cc", 14, 'style="vertical-align:-2px"')} <span id="subs-resumen">Revisando subtítulos…</span></p>` : ""}
         ${!caps.length && !sueltas.length ? `<div class="vacio"><strong>Empieza con un capítulo</strong>Por ejemplo "El grano y el café". Luego eliges sus videos de Bunny.</div>` : ""}
       </section>
 
@@ -929,6 +935,31 @@ async function pintarEditorCurso(main, id, pestana = "lecciones") {
     conError(() => datos.borrarLeccion(b.dataset.borrarL));
   }));
   main.querySelectorAll("[data-agregar]").forEach((b) => (b.onclick = () => elegirVideos(c.id, b.dataset.agregar, d.lecciones)));
+
+  // Subtítulos: marca en dorado los videos que ya tienen
+  let subs = {};
+  const pintarSubs = async () => {
+    const r = await estadoSubtitulos(d.lecciones);
+    const res = main.querySelector("#subs-resumen");
+    if (r === null) { if (res) res.textContent = "No pude revisar los subtítulos (¿falta actualizar la función academia-admin?)."; return; }
+    subs = r;
+    main.querySelectorAll("[data-subs-l]").forEach((b) => {
+      const l = d.lecciones.find((x) => x.id === b.dataset.subsL), si = !!subs[l?.bunny_video_id];
+      b.classList.toggle("con-subs", si);
+      b.title = si ? "Tiene subtítulos · cambiar o quitar" : "Subir subtítulos";
+    });
+    const conVideo = d.lecciones.filter((l) => l.bunny_video_id), n = conVideo.filter((l) => subs[l.bunny_video_id]).length;
+    if (res) res.innerHTML = n ? `<b style="color:var(--oro)">${n} de ${conVideo.length}</b> videos con subtítulos. En la app arrancan encendidos.` : "Ningún video tiene subtítulos todavía. Toca CC en un video o \"Subtítulos\" en un capítulo.";
+  };
+  pintarSubs();
+  main.querySelectorAll("[data-subs-l]").forEach((b) => (b.onclick = () => {
+    const l = d.lecciones.find((x) => x.id === b.dataset.subsL);
+    subtitulosLeccion(l, !!subs[l.bunny_video_id], pintarSubs);
+  }));
+  main.querySelectorAll("[data-subs-m]").forEach((b) => (b.onclick = () => {
+    const cap = caps.find((x) => x.id === b.dataset.subsM);
+    subtitulosCapitulo(cap ? cap.titulo : "Sin capítulo", cap ? cap.lecciones : sueltas, subs, pintarSubs);
+  }));
   main.querySelector("#asignar").onclick = async () => {
     const v = await elegirAsignacion(c, d.asignaciones);
     if (!v) return;

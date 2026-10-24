@@ -654,3 +654,14 @@ button.avatar-grande { border: 0; padding: 0; background: transparent; cursor: p
 .galeria-item { display: flex; flex-direction: column; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--crema); font: inherit; cursor: pointer; padding: 4px; border-radius: 16px; }
 .galeria-item svg { width: 100%; height: auto; max-width: 110px; filter: drop-shadow(0 8px 16px rgba(0, 0, 0, .35)); }
 .galeria-item b { font-size: 13px; } .galeria-item small { color: var(--oro); font-size: 11.5px; font-weight: 700; }
+
+/* ---------- Subtítulos (v1.14.0) ---------- */
+.btn-cc { color: var(--arena); opacity: .55; }
+.btn-cc.con-subs { color: var(--oro); opacity: 1; }
+.chip-cc { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 26px; height: 18px; padding: 0 4px; border-radius: 5px; border: 1px solid var(--linea); font-size: 10px; font-weight: 800; letter-spacing: .04em; color: var(--arena); opacity: .6; }
+.chip-cc.si { border-color: var(--oro); color: var(--oro); opacity: 1; }
+.subs-fila > span { display: flex; align-items: center; gap: 6px; word-break: break-all; }
+.subs-fila.ok > span { color: var(--oro); }
+.subs-fila.ok > span::after { content: "✓"; font-weight: 800; }
+.subs-fila.mal > span { color: #e08a7a; }
+.btn.ocupado { opacity: .6; pointer-events: none; }

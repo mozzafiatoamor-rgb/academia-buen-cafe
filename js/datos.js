@@ -283,6 +283,10 @@ function crearNube() {
     actualizarEmpleado: (userId, cambios) => funcion("academia-admin", { accion: "actualizar_empleado", user_id: userId, ...cambios }),
     bunnyColecciones: () => funcion("academia-admin", { accion: "listar_colecciones" }),
     bunnyVideos: (coleccion) => funcion("academia-admin", { accion: "listar_videos", coleccion: coleccion || undefined }),
+    // Subtítulos (Bunny Stream): { videoId: ["es", ...] }
+    subtitulosVideos: (ids) => funcion("academia-admin", { accion: "subtitulos", videos: ids }),
+    subirSubtitulo: (videoId, contenido) => funcion("academia-admin", { accion: "subir_subtitulo", video_id: videoId, idioma: "es", etiqueta: "Español", contenido }),
+    borrarSubtitulo: (videoId) => funcion("academia-admin", { accion: "borrar_subtitulo", video_id: videoId, idioma: "es" }),
     // Lee a los empleados del Gestor de Descansos (misma cuenta de Supabase, solo lectura).
     async gestorEmpleados() {
       const { data: s } = await sb.auth.getSession();
