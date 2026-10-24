@@ -63,17 +63,24 @@ export const CATEGORIAS = [
   { id: "lentes", nombre: "Lentes", opciones: [
     { id: "nada", nombre: "Nada" }, { id: "redondos", nombre: "Redondos" }, { id: "cuadrados", nombre: "Cuadrados" },
     { id: "sol", nombre: "De sol" }, { id: "aviador", nombre: "Aviador", req: { racha: 7 } },
-    { id: "corazon", nombre: "Corazón", req: { nivel: 2 } }, { id: "estrella", nombre: "Estrella rock", req: { nivel: 3 } }] },
+    { id: "corazon", nombre: "Corazón", req: { nivel: 2 } }, { id: "estrella", nombre: "Estrella rock", req: { nivel: 3 } },
+    { id: "parche", nombre: "Parche pirata" }] },
   { id: "cabeza", nombre: "Gorros", color: "colorGorro", colores: COLORES_ROPA, opciones: [
     { id: "nada", nombre: "Nada" }, { id: "gorra", nombre: "Gorra" }, { id: "gorra-reves", nombre: "Gorra al revés" },
     { id: "boina", nombre: "Boina" }, { id: "chef", nombre: "Gorro chef" }, { id: "lana", nombre: "Gorro de lana" },
     { id: "audifonos", nombre: "Audífonos" }, { id: "flores", nombre: "Corona de flores" }, { id: "palma", nombre: "Sombrero" },
+    { id: "charro", nombre: "Sombrero charro" }, { id: "pirata", nombre: "Pirata" }, { id: "luchador", nombre: "Máscara de luchador" },
     { id: "aureola", nombre: "Aureola", req: { insignia: "a_la_primera", nombre: "A la primera" } },
     { id: "corona", nombre: "Corona", req: { nivel: 5 } }] },
   { id: "ropa", nombre: "Ropa", color: "colorRopa", colores: COLORES_ROPA, opciones: [
     { id: "delantal", nombre: "Delantal barista" }, { id: "playera", nombre: "Playera" }, { id: "sudadera", nombre: "Sudadera" },
     { id: "chef", nombre: "Filipina chef" }, { id: "mono", nombre: "Camisa y moño" }, { id: "rayas", nombre: "Rayas" },
     { id: "capa", nombre: "Capa de héroe", req: { insignia: "barra_completa", nombre: "Barra completa" } }] },
+  { id: "disfraz", nombre: "Disfraces", opciones: [
+    { id: "nada", nombre: "Ninguno" }, { id: "grano", nombre: "Grano de café" }, { id: "taco", nombre: "Taco" },
+    { id: "aguacate", nombre: "Aguacate" }, { id: "dino", nombre: "Dinosaurio" },
+    { id: "camote", nombre: "Camote", req: { insignia: "maraton", nombre: "Maratón (3 lecciones en un día)" } },
+    { id: "unicornio", nombre: "Unicornio", req: { nivel: 2 } }, { id: "astronauta", nombre: "Astronauta", req: { nivel: 3 } }] },
   { id: "pantalon", nombre: "Pantalón", cuerpo: true, color: "colorPantalon", colores: COLORES_PANTALON, opciones: [
     { id: "jeans", nombre: "Jeans" }, { id: "pans", nombre: "Pants" }, { id: "short", nombre: "Short" }, { id: "falda", nombre: "Falda" }] },
   { id: "zapatos", nombre: "Zapatos", cuerpo: true, color: "colorZapato", colores: COLORES_ROPA, opciones: [
@@ -95,7 +102,7 @@ export const AVATAR_BASE = {
   cara: "redonda", piel: 1, detalle: "rubor", pelo: "corto", colorPelo: 1, ojos: "normales", cejas: "normales",
   boca: "sonrisa", vello: "nada", lentes: "nada", cabeza: "nada", colorGorro: 0, ropa: "delantal", colorRopa: 3,
   extra: "nada", fondo: "granos", colorFondo: 1, marco: "nada",
-  pantalon: "jeans", colorPantalon: 0, zapatos: "tenis", colorZapato: 4,
+  pantalon: "jeans", colorPantalon: 0, zapatos: "tenis", colorZapato: 4, disfraz: "nada",
 };
 
 // ¿Está desbloqueada? logros = { nivel, racha, insignias:Set }
@@ -254,6 +261,7 @@ function lentes(cfg) {
     case "aviador": return `<g fill="rgba(80,60,40,.55)" stroke="#D4A13A" stroke-width="2.4"><path d="M68 90 L95 90 C96 104 90 112 81 112 C70 112 66 102 68 90 Z"/><path d="M105 90 L132 90 C134 102 130 112 119 112 C110 112 104 104 105 90 Z"/></g><path d="M95 91 Q100 88 105 91 M68 91 L56 89 M132 91 L144 89" stroke="#D4A13A" stroke-width="2.4" fill="none"/>`;
     case "corazon": return `<g fill="#E86F9A" fill-opacity=".75" ${T}>${[82, 118].map((x) => `<path transform="translate(${x} 98) scale(1.25)" d="M0 8 C-13 -1 -9 -11 -3.5 -10 C-1.5 -9.6 0 -8 0 -6 C0 -8 1.5 -9.6 3.5 -10 C9 -11 13 -1 0 8 Z"/>`).join("")}</g><path d="M94 95 L106 95 M68 94 L56 91 M132 94 L144 91" ${T}/>`;
     case "estrella": return `<g fill="#F5C542" fill-opacity=".85" ${T}>${[82, 118].map((x) => `<path transform="translate(${x} 98) scale(1.5)" d="M0 -9 L2.6 -3 L9 -2.6 L4 1.6 L5.6 8 L0 4.6 L-5.6 8 L-4 1.6 L-9 -2.6 L-2.6 -3 Z"/>`).join("")}</g><path d="M95 96 L105 96" ${T}/>`;
+    case "parche": return `<path d="M56 84 C80 76 120 72 146 80" stroke="#1E1512" stroke-width="2.6" fill="none"/><path d="M106 88 C112 84 128 84 131 92 C133 102 126 110 118 110 C110 110 105 102 106 88 Z" fill="#1E1512" ${T2}/>`;
     default: return "";
   }
 }
@@ -270,6 +278,11 @@ function sombrero(cfg, c) {
     case "flores": return [[60, 70, "#E86F9A"], [72, 54, "#F5C542"], [88, 46, "#FFFFFF"], [104, 44, "#E86F9A"], [120, 48, "#F5C542"], [134, 58, "#FFFFFF"], [142, 74, "#E86F9A"]]
       .map(([x, y, col]) => `<g transform="translate(${x} ${y})">${[0, 72, 144, 216, 288].map((a) => `<circle cx="${5 * Math.cos(a * Math.PI / 180)}" cy="${5 * Math.sin(a * Math.PI / 180)}" r="4.2" fill="${col}" ${T2} stroke-width="1.2"/>`).join("")}<circle r="2.8" fill="#C9824B"/></g>`).join("");
     case "palma": return `<ellipse cx="100" cy="66" rx="74" ry="16" fill="#E5C27A" ${T}/><path d="M68 64 C68 40 80 28 100 28 C120 28 132 40 132 64 Z" fill="#E5C27A" ${T}/><path d="M69 56 C88 60 112 60 131 56" stroke="${c}" stroke-width="6"/><path d="M40 66 C70 72 130 72 160 66" stroke="#B88D45" stroke-width="1.6" fill="none"/>`;
+    case "charro": return `<ellipse cx="100" cy="64" rx="86" ry="18" fill="#1E1512" ${T}/><ellipse cx="100" cy="64" rx="74" ry="13" fill="none" stroke="#E3B66B" stroke-width="2" stroke-dasharray="5 4"/><path d="M70 62 C68 32 82 18 100 18 C118 18 132 32 130 62 Z" fill="#1E1512" ${T}/><path d="M74 50 C88 56 112 56 126 50" stroke="#E3B66B" stroke-width="3" fill="none"/><path d="M80 40 L86 34 L92 40 L98 34 L104 40 L110 34 L116 40" stroke="#E3B66B" stroke-width="1.8" fill="none"/>`;
+    case "pirata": return `<path d="M36 72 C52 34 148 34 164 72 C146 62 124 76 100 58 C76 76 54 62 36 72 Z" fill="#1E1512" ${T}/><path d="M58 60 C80 66 120 66 142 60" stroke="#E3B66B" stroke-width="3" fill="none"/>${logoMozz(100, 46, 18, "#F2E4CF")}`;
+    case "luchador": return `<path fill-rule="evenodd" d="M100 45 C129 45 149 66 149 96 C149 125 129 145 100 145 C71 145 51 125 51 96 C51 66 71 45 100 45 Z M69 97 C68 86 80 81 92 89 C93 102 85 109 77 107 C72 105 69 101 69 97 Z M131 97 C132 86 120 81 108 89 C107 102 115 109 123 107 C128 105 131 101 131 97 Z M87 117 C91 112 109 112 113 117 C113 127 107 133 100 133 C93 133 87 127 87 117 Z" fill="${c}" ${T}/>
+      <g fill="none" stroke="#FFFFFF" stroke-width="3"><path d="M69 97 C68 86 80 81 92 89 C93 102 85 109 77 107 C72 105 69 101 69 97 Z"/><path d="M131 97 C132 86 120 81 108 89 C107 102 115 109 123 107 C128 105 131 101 131 97 Z"/><path d="M87 117 C91 112 109 112 113 117 C113 127 107 133 100 133 C93 133 87 127 87 117 Z"/></g>
+      <path d="M100 47 C94 58 94 70 100 80 C106 70 106 58 100 47 Z" fill="#F5C542" ${T2}/><path d="M60 70 C66 76 74 78 82 76 M140 70 C134 76 126 78 118 76" stroke="#FFFFFF" stroke-width="3" fill="none"/>`;
     case "aureola": return `<ellipse cx="100" cy="30" rx="32" ry="8" fill="none" stroke="#F5C542" stroke-width="6"/><ellipse cx="100" cy="30" rx="32" ry="8" fill="none" stroke="#FFF2B3" stroke-width="2"/>`;
     case "corona": return `<path d="M64 62 L60 30 L80 46 L100 22 L120 46 L140 30 L136 62 Z" fill="#F5C542" ${T}/><rect x="62" y="58" width="76" height="12" rx="4" fill="#E3A82B" ${T}/><circle cx="100" cy="64" r="4" fill="#E5484D"/><circle cx="80" cy="64" r="3" fill="#5B8DEF"/><circle cx="120" cy="64" r="3" fill="#2FA37A"/>`;
     default: return "";
@@ -327,11 +340,11 @@ const colores = (cfg) => ({
 });
 
 // Todo lo de la cabeza (de orejas a sombrero).
-function capasCabeza(cfg, c) {
+function capasCabeza(cfg, c, { capucha = false, sinSombrero = false } = {}) {
   const geo = cabezaGeo[cfg.cara] || cabezaGeo.redonda;
   const pielO = oscurecer(c.piel, 0.85);
   const v = vello(cfg, c.pelo, geo.menton);
-  return `${geo.orejas.map((x) => `<circle cx="${x}" cy="100" r="9" fill="${c.piel}" ${T}/><path d="M${x + (x < 100 ? 2 : -2)} 96 q${x < 100 ? -3 : 3} 4 0 8" stroke="${pielO}" stroke-width="2" fill="none"/>`).join("")}
+  return `${capucha ? "" : geo.orejas.map((x) => `<circle cx="${x}" cy="100" r="9" fill="${c.piel}" ${T}/><path d="M${x + (x < 100 ? 2 : -2)} 96 q${x < 100 ? -3 : 3} 4 0 8" stroke="${pielO}" stroke-width="2" fill="none"/>`).join("")}
     ${geo.forma(c.piel)}
     ${detalle(cfg)}
     ${v.atras}
@@ -340,10 +353,52 @@ function capasCabeza(cfg, c) {
     <path d="M97 106 Q100 110 103 106" stroke="${pielO}" stroke-width="2.4" fill="none" stroke-linecap="round"/>
     ${boca(cfg)}
     ${v.frente}
-    ${peloFrente(cfg, c.pelo)}
+    ${capucha ? "" : peloFrente(cfg, c.pelo)}
     ${lentes(cfg)}
-    ${sombrero(cfg, c.gorro)}`;
+    ${capucha || sinSombrero ? "" : sombrero(cfg, c.gorro)}`;
 }
+
+// ---------------------------------------------------------------------
+//  Disfraces. b = hasta dónde baja el traje (230 retrato, 300 cuerpo).
+// ---------------------------------------------------------------------
+const aroCara = (col, w = 9) => `<ellipse cx="100" cy="97" rx="50" ry="54" fill="none" stroke="${col}" stroke-width="${w + 3}" opacity=".9"/><ellipse cx="100" cy="97" rx="50" ry="54" fill="none" stroke="#2B1A14" stroke-width="2" transform="translate(0 0)" opacity=".0"/>`;
+const borde = (col) => `<ellipse cx="100" cy="97" rx="${50 + 7}" ry="${54 + 7}" fill="none" stroke="#2B1A14" stroke-width="2.4"/><ellipse cx="100" cy="97" rx="${50 - 6}" ry="${54 - 6}" fill="none" stroke="#2B1A14" stroke-width="2.2"/><ellipse cx="100" cy="97" rx="50" ry="54" fill="none" stroke="${col}" stroke-width="12"/>`;
+export const DISFRACES = {
+  camote: { capucha: true, color: "#9A4E6E", atras: (b) => `<path d="M100 22 C150 20 172 86 170 150 C168 ${b - 50} 146 ${b} 100 ${b + 4} C54 ${b} 32 ${b - 50} 30 150 C28 86 50 24 100 22 Z" fill="#9A4E6E" ${T}/>
+      <g fill="#B8708C">${[[52, 168, 9, 5], [146, 196, 8, 5], [64, b - 40, 10, 6], [134, b - 62, 7, 4], [150, 120, 6, 4], [46, 116, 6, 4]].map(([x, y, rx, ry]) => `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}"/>`).join("")}</g>
+      <g stroke="#5E2A40" stroke-width="2" stroke-linecap="round">${[[58, 140], [142, 160], [120, b - 30], [80, b - 70]].map(([x, y]) => `<path d="M${x - 3} ${y} L${x + 3} ${y + 1}"/>`).join("")}</g>
+      <path d="M100 24 C92 10 80 8 74 12 C82 16 90 20 100 24 Z M100 24 C106 8 118 4 126 8 C118 14 110 18 100 24 Z" fill="#5FA052" ${T2}/>
+      <path d="M100 ${b + 4} C102 ${b + 12} 108 ${b + 16} 112 ${b + 14}" stroke="#7E3C58" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+    aro: () => borde("#8A4262") },
+  grano: { capucha: true, color: "#6B3F22", atras: (b) => `<path d="M100 20 C152 20 174 84 172 150 C170 ${b - 46} 146 ${b} 100 ${b} C54 ${b} 30 ${b - 46} 28 150 C26 84 48 20 100 20 Z" fill="#6B3F22" ${T}/>
+      <path d="M48 120 C44 84 58 52 82 36" stroke="rgba(255,255,255,.18)" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <path d="M100 160 C86 ${160 + (b - 160) * 0.35} 114 ${160 + (b - 160) * 0.65} 100 ${b - 2}" stroke="#3B2416" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <path d="M100 22 C94 28 104 34 100 36" stroke="#3B2416" stroke-width="5" fill="none" stroke-linecap="round"/>`,
+    aro: () => borde("#5A3319") },
+  aguacate: { capucha: true, color: "#2F5D2F", atras: (b) => `<path d="M100 16 C140 16 160 60 164 110 C170 ${b - 60} 150 ${b} 100 ${b} C50 ${b} 30 ${b - 60} 36 110 C40 60 60 16 100 16 Z" fill="#2F5D2F" ${T}/>
+      <path d="M100 28 C134 28 150 66 153 112 C158 ${b - 62} 141 ${b - 12} 100 ${b - 12} C59 ${b - 12} 42 ${b - 62} 47 112 C50 66 66 28 100 28 Z" fill="#B5CF6E"/>
+      <circle cx="100" cy="${b - 58}" r="27" fill="#7A4B2A" ${T}/><path d="M88 ${b - 70} C92 ${b - 76} 100 ${b - 78} 106 ${b - 76}" stroke="rgba(255,255,255,.35)" stroke-width="4" fill="none" stroke-linecap="round"/>`,
+    aro: () => borde("#9CB85A") },
+  taco: { capucha: true, color: "#E8C27A", atras: (b) => `<path d="M22 ${b} C22 92 54 30 100 30 C146 30 178 92 178 ${b} Z" fill="#E8C27A" ${T}/>
+      <g fill="#C99A4E" opacity=".55">${[[48, 120], [150, 140], [60, 180], [140, 196], [96, b - 20]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="5" ry="3"/>`).join("")}</g>`,
+    aro: () => `${borde("#D9AE62")}${Array.from({ length: 9 }, (_, i) => { const a = (200 + i * 17.5) * Math.PI / 180, x = 100 + 62 * Math.cos(a), y = 97 + 66 * Math.sin(a); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9" fill="#6BBF59" ${T2} stroke-width="1.6"/>`; }).join("")}
+      ${[[56, 52], [100, 30], [144, 52]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="6" fill="#E5484D" ${T2} stroke-width="1.4"/>`).join("")}
+      ${[[78, 36], [122, 36]].map(([x, y]) => `<rect x="${x - 5}" y="${y - 3}" width="10" height="6" rx="1.5" fill="#F5C542" ${T2} stroke-width="1.2" transform="rotate(${x < 100 ? -20 : 20} ${x} ${y})"/>`).join("")}` },
+  dino: { capucha: true, color: "#3E9E5B", atras: (b) => `${[[48, 52, -40], [70, 30, -20], [100, 20, 0], [130, 30, 20], [152, 52, 40], [166, 84, 62]].map(([x, y, r]) => `<path transform="translate(${x} ${y}) rotate(${r})" d="M-10 6 L0 -14 L10 6 Z" fill="#F59E0B" ${T2}/>`).join("")}
+      <path d="M100 24 C150 24 170 80 168 140 C166 ${b - 40} 146 ${b} 100 ${b} C54 ${b} 34 ${b - 40} 32 140 C30 80 50 24 100 24 Z" fill="#3E9E5B" ${T}/>
+      <ellipse cx="100" cy="${b - 24}" rx="44" ry="52" fill="#A7D48B"/>${[0, 1, 2].map((i) => `<path d="M68 ${b - 54 + i * 18} C88 ${b - 48 + i * 18} 112 ${b - 48 + i * 18} 132 ${b - 54 + i * 18}" stroke="#7FB565" stroke-width="2" fill="none"/>`).join("")}
+      <circle cx="58" cy="76" r="4" fill="#2F7D46"/><circle cx="142" cy="76" r="4" fill="#2F7D46"/>`,
+    aro: () => `${borde("#2F7D46")}${Array.from({ length: 7 }, (_, i) => { const a = (212 + i * 19.3) * Math.PI / 180, x = 100 + 50 * Math.cos(a), y = 97 + 54 * Math.sin(a), dx = (100 - x) * 0.16, dy = (97 - y) * 0.16; return `<path d="M${(x - 5).toFixed(1)} ${y.toFixed(1)} L${(x + dx).toFixed(1)} ${(y + dy + 2).toFixed(1)} L${(x + 5).toFixed(1)} ${y.toFixed(1)} Z" fill="#FFFFFF" ${T2} stroke-width="1.4"/>`; }).join("")}` },
+  unicornio: { capucha: true, color: "#FBF7F2", atras: (b) => `<path d="M100 24 C150 24 170 80 168 140 C166 ${b - 40} 146 ${b} 100 ${b} C54 ${b} 34 ${b - 40} 32 140 C30 80 50 24 100 24 Z" fill="#FBF7F2" ${T}/>
+      ${["#E5484D", "#F59E0B", "#F5C542", "#2FA37A", "#5B8DEF", "#8B5CF6"].map((col, i) => `<path d="M${132 + i * 3} ${30 + i * 4} C${168 + i * 2} ${60 + i * 6} ${172 + i} ${110 + i * 8} ${160 - i * 2} ${b - 30 + i * 4}" stroke="${col}" stroke-width="7" fill="none" stroke-linecap="round"/>`).join("")}
+      <path d="M58 40 L50 14 L74 30 Z" fill="#FBF7F2" ${T2}/><path d="M60 34 L55 20 L68 30 Z" fill="#F7B6CF"/>`,
+    aro: () => `${borde("#F1C6D9")}<path d="M90 44 L100 4 L110 44 Z" fill="#F5C542" ${T2}/><path d="M93 34 L107 30 M95 24 L105 21 M97 14 L103 12" stroke="#C9922B" stroke-width="2"/>` },
+  astronauta: { capucha: false, casco: true, color: "#F2F0EC", atras: (b) => `<path d="M36 ${b + 10} C36 168 62 150 100 150 C138 150 164 168 164 ${b + 10} Z" fill="#F2F0EC" ${T}/>
+      <rect x="72" y="168" width="56" height="${Math.max(30, Math.min(48, b - 180))}" rx="8" fill="#CFD6DE" ${T2}/><circle cx="86" cy="182" r="4" fill="#E5484D"/><circle cx="100" cy="182" r="4" fill="#2FA37A"/><circle cx="114" cy="182" r="4" fill="#5B8DEF"/>
+      ${logoMozz(136, 166, 14)}<rect x="74" y="142" width="52" height="16" rx="6" fill="#CFD6DE" ${T}/>`,
+    aro: () => "",
+    frente: () => `<circle cx="100" cy="97" r="64" fill="rgba(170,215,255,.16)" stroke="#CFD6DE" stroke-width="7"/><circle cx="100" cy="97" r="64" fill="none" stroke="#2B1A14" stroke-width="2"/><path d="M58 70 C66 50 82 40 100 38" stroke="rgba(255,255,255,.7)" stroke-width="6" fill="none" stroke-linecap="round"/>` },
+};
 
 const unicos = (svg, id) => svg.replace(/id="mk-/g, `id="${id}-mk-`).replace(/url\(#mk-/g, `url(#${id}-mk-`)
   .replace(/id="gx"/g, `id="${id}-gx"`).replace(/url\(#gx\)/g, `url(#${id}-gx)`)
@@ -359,11 +414,12 @@ export function avatarSVG(cfgEntrada, tam = 64, extraAttr = "", { animado = fals
     <defs><clipPath id="${id}"><circle cx="100" cy="100" r="100"/></clipPath></defs>
     <g clip-path="url(#${id})">
       ${fondo(cfg)}
-      <g class="av-personaje">
-        ${peloAtras(cfg, c.pelo)}
-        ${ropa(cfg, c.ropa, c.piel)}
-        ${capasCabeza(cfg, c)}
-        ${extra(cfg, geo.orejas)}
+      <g class="av-personaje">${(() => {
+        const d = DISFRACES[cfg.disfraz];
+        if (!d) return `${peloAtras(cfg, c.pelo)}${ropa(cfg, c.ropa, c.piel)}${capasCabeza(cfg, c)}${extra(cfg, geo.orejas)}`;
+        return `${d.capucha ? "" : peloAtras(cfg, c.pelo)}${d.atras(230)}${d.capucha ? "" : `<path d="M88 130 L88 152 Q100 160 112 152 L112 130 Z" fill="${c.piel}" ${T}/>`}
+          ${capasCabeza(cfg, c, { capucha: d.capucha, sinSombrero: d.casco })}${d.aro()}${d.frente ? d.frente() : ""}${cfg.extra === "taza" || cfg.extra === "taza-oro" ? extra(cfg, geo.orejas) : ""}`;
+      })()}
       </g>
     </g>
     ${marco(cfg)}
@@ -414,7 +470,7 @@ function torso(cfg, c) {
   }
 }
 
-function brazos(cfg, c) {
+function brazos(cfg, c, abierto = false) {
   const manga = cfg.ropa === "chef" || cfg.ropa === "mono" && false ? "#FFFFFF" : cfg.ropa === "rayas" ? "#F2F0EC" : c.ropa;
   const largo = cfg.ropa === "sudadera" || cfg.ropa === "chef" || cfg.ropa === "mono";
   const brazo = (pts, cls = "") => {
@@ -431,11 +487,11 @@ function brazos(cfg, c) {
   const taza = cfg.extra === "taza" || cfg.extra === "taza-oro";
   // Brazo levantado para saludar (oculto hasta que saluda). Con taza, saluda con la izquierda.
   const arriba = (() => {
-    const d = taza ? -1 : 1, h = [100 + 30 * d, 164], co = [100 + 62 * d, 140], ma = [100 + 64 * d, 102];
+    const d = taza ? -1 : 1, h = abierto ? [100 + 60 * d, 176] : [100 + 30 * d, 164], co = abierto ? [100 + 80 * d, 150] : [100 + 62 * d, 140], ma = abierto ? [100 + 80 * d, 112] : [100 + 64 * d, 102];
     const linea = (a2, b2, w, col) => `<path d="M${a2[0]} ${a2[1]} L${b2[0]} ${b2[1]}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/>`;
     const mangaCol = cfg.ropa === "chef" ? "#FFFFFF" : cfg.ropa === "rayas" ? "#F2F0EC" : c.ropa;
     const mitad = [(h[0] + co[0]) / 2, (h[1] + co[1]) / 2];
-    return `<g class="av-brazo-arriba ${taza ? "izq" : ""}">
+    return `<g class="av-brazo-arriba ${taza ? "izq" : ""} ${abierto ? "abierto" : ""}">
       ${linea(h, co, 19, "#2B1A14")}${linea(h, co, 14, c.piel)}
       <g class="av-antebrazo">${linea(co, ma, 19, "#2B1A14")}${linea(co, ma, 14, c.piel)}
         ${largo ? linea(co, [co[0] + (ma[0] - co[0]) * 0.7, co[1] + (ma[1] - co[1]) * 0.7], 23, "#2B1A14") + linea(co, [co[0] + (ma[0] - co[0]) * 0.7, co[1] + (ma[1] - co[1]) * 0.7], 18, cfg.ropa === "mono" ? c.ropa : mangaCol) : ""}
@@ -444,6 +500,9 @@ function brazos(cfg, c) {
       ${largo ? linea(h, co, 23, "#2B1A14") + linea(h, co, 18, cfg.ropa === "mono" ? c.ropa : mangaCol) : linea(h, mitad, 23, "#2B1A14") + linea(h, mitad, 18, mangaCol)}
     </g>`;
   })();
+  if (abierto) {
+    return { izq: brazo([[40, 176], [28, 210], [28, 244]], "av-brazo-izq"), der: brazo([[160, 176], [172, 210], [172, 244]], "av-brazo-der baja"), taza: false, arriba };
+  }
   const izq = brazo([[70, 164], [58, 204], [56, 242]], `av-brazo-izq ${taza ? "baja" : ""}`);
   const der = taza ? brazo([[130, 164], [146, 202], [124, 214]], "av-brazo-der") : brazo([[130, 164], [142, 204], [144, 242]], "av-brazo-der baja");
   return { izq, der, taza, arriba };
@@ -465,6 +524,26 @@ function tazaMano(cfg) {
     ${oro ? `<path d="M-4 0 L0 -6 L4 0 L0 6 Z" fill="#fff" opacity=".8"/>` : logoMozz(0, 1, 12, "#C9824B")}</g>`;
 }
 
+function cuerpoDisfraz(cfg, c) {
+  const d = DISFRACES[cfg.disfraz];
+  const astro = cfg.disfraz === "astronauta";
+  const cfgB = { ...cfg, ropa: "sudadera", extra: "nada" };
+  const cB = { ...c, ropa: d.color };
+  const br = brazos(cfgB, cB, !astro);
+  const brAstro = astro ? brazos(cfgB, cB, false) : null;
+  const pierna = (x) => `<path d="M${x} 270 L${x} 334" stroke="#2B1A14" stroke-width="24" stroke-linecap="round"/><path d="M${x} 270 L${x} 334" stroke="${astro ? "#F2F0EC" : "#3B2416"}" stroke-width="19" stroke-linecap="round"/>`;
+  if (astro) {
+    return `${peloAtras(cfg, c.pelo)}${pierna(86)}${pierna(114)}${zapatos({ ...cfg, zapatos: "botas" }, c).replace(/#6B3F22/g, "#CFD6DE").replace(/#3B2416/g, "#9AA3AD")}
+      <path d="M60 248 L140 248 L136 282 L64 282 Z" fill="#F2F0EC" ${T}/>
+      ${brAstro.izq}<path d="M66 156 C76 150 88 148 100 148 C112 148 124 150 134 156 L140 252 L60 252 Z" fill="#F2F0EC" ${T}/>
+      <rect x="74" y="176" width="52" height="40" rx="8" fill="#CFD6DE" ${T2}/><circle cx="88" cy="190" r="4" fill="#E5484D"/><circle cx="100" cy="190" r="4" fill="#2FA37A"/><circle cx="112" cy="190" r="4" fill="#5B8DEF"/>${logoMozz(124, 166, 14)}
+      <rect x="74" y="142" width="52" height="16" rx="6" fill="#CFD6DE" ${T}/>${brAstro.der}
+      ${capasCabeza(cfg, c, { sinSombrero: true })}${d.frente()}${brAstro.arriba}`;
+  }
+  return `${pierna(84)}${pierna(116)}${zapatos(cfg, c)}${br.izq}${br.der}${d.atras(300)}
+    ${capasCabeza(cfg, c, { capucha: true })}${d.aro()}${br.arriba}`;
+}
+
 // Cuerpo completo (para el perfil y el editor). Alto = 1.9 × ancho.
 export function avatarCuerpoSVG(cfgEntrada, alto = 260, { animado = false } = {}) {
   const cfg = { ...AVATAR_BASE, ...(cfgEntrada || {}) };
@@ -480,7 +559,7 @@ export function avatarCuerpoSVG(cfgEntrada, alto = 260, { animado = false } = {}
         : `<rect width="200" height="380" fill="${COLORES_FONDO[cfg.colorFondo] ?? COLORES_FONDO[0]}"/>`}
       ${cfg.fondo === "rayos" ? `<g transform="translate(0 40) scale(1 1.2)">${fondo(cfg, true)}</g>` : fondo(cfg, true) + `<g transform="translate(0 190)">${fondo(cfg, true)}</g>`}
       <ellipse cx="100" cy="356" rx="58" ry="9" fill="rgba(0,0,0,.25)"/>
-      <g class="av-personaje">
+      <g class="av-personaje">${DISFRACES[cfg.disfraz] ? cuerpoDisfraz(cfg, c) : `
         ${cfg.ropa === "capa" ? `<path d="M66 158 C40 200 34 280 30 330 L170 330 C166 280 160 200 134 158 Z" fill="#B23A3A" ${T}/>` : ""}
         ${peloAtras(cfg, c.pelo)}
         ${piernas(cfg, c)}
@@ -491,7 +570,7 @@ export function avatarCuerpoSVG(cfgEntrada, alto = 260, { animado = false } = {}
         ${extraCuerpo(cfg, geo.orejas)}
         ${capasCabeza(cfg, c)}
         ${br.taza ? br.der + tazaMano(cfg) : ""}
-        ${br.arriba}
+        ${br.arriba}`}
       </g>
     </g>
     ${cfg.marco !== "nada" ? marco(cfg).replace(/<circle cx="100" cy="100" r="95"/g, '<rect x="4" y="4" width="192" height="372" rx="26"') : ""}
@@ -519,5 +598,6 @@ export function avatarAlAzar(logros, base = {}) {
   if (Math.random() < 0.55) cfg.vello = "nada";
   if (Math.random() < 0.4) cfg.lentes = "nada";
   if (Math.random() < 0.35) cfg.cabeza = "nada";
+  if (Math.random() < 0.8) cfg.disfraz = "nada";
   return cfg;
 }

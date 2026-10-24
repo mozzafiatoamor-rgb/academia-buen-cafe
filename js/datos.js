@@ -279,8 +279,8 @@ function crearNube() {
       const { data: s } = await sb.auth.getSession();
       const owner = s?.session?.user?.id;
       if (!owner) throw new ErrorAcademia("Tu sesión expiró. Vuelve a entrar.");
-      const filas = await q(sb.from("descansos_kv").select("k, v").eq("owner", owner).like("k", "desc.v1.%employees"));
-      filas.push(...await q(sb.from("descansos_kv").select("k, v").eq("owner", owner).eq("k", "desc.v1.sedes")));
+      const filas = await q(sb.from("descansos_kv").select("k, v, updated_at").eq("owner", owner).like("k", "desc.v1.%employees"));
+      filas.push(...await q(sb.from("descansos_kv").select("k, v, updated_at").eq("owner", owner).eq("k", "desc.v1.sedes")));
       return leerGestor(filas);
     },
     crearColeccion: (nombre) => funcion("academia-admin", { accion: "crear_coleccion", nombre }),
@@ -422,10 +422,12 @@ export function leerGestor(filas) {
     const d = new Date(); const dia = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dia);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   })();
-  const activo = (e) => {
-    const st = Array.isArray(e.stints) && e.stints.length ? e.stints : [{ start: e.start || null, end: e.end || null }];
-    return st.some((s) => (!s.start || lunes >= s.start) && (!s.end || lunes < s.end));
-  };
+  // Igual que el Gestor (activeInWeek): activo si algún periodo cubre el lunes de esta semana.
+  const periodos = (e) => (Array.isArray(e.stints) && e.stints.length ? e.stints : [{ start: e.start || null, end: e.end || null }]);
+  const activo = (e) => periodos(e).some((s) => (!s.start || lunes >= s.start) && (!s.end || lunes < s.end));
+  const entra = (e) => periodos(e).map((s) => s.start).filter((d) => d && d > lunes).sort()[0] || null;
+  const salio = (e) => periodos(e).map((s) => s.end).filter((d) => d && d <= lunes).sort().pop() || null;
+  const sale = (e) => periodos(e).find((s) => (!s.start || lunes >= s.start) && s.end && lunes < s.end)?.end || null;
   const lista = [];
   for (const s of sedes) {
     const clave = s.id === "mozza" ? "desc.v1.employees" : `desc.v1.${s.id}.employees`;
@@ -441,9 +443,14 @@ export function leerGestor(filas) {
         whatsapp: e.wa ? String(e.wa).replace(/\D/g, "") : null,
         encargado: !!e.mgr,
         activo: activo(e),
+        entra: activo(e) ? null : entra(e),   // empieza en una semana próxima
+        salio: activo(e) ? null : salio(e),   // fecha de baja (ya pasó)
+        sale: activo(e) ? sale(e) : null,     // baja programada
       });
     }
   }
+  lista.actualizado = (filas || []).filter((f) => /employees$/.test(f.k) && f.updated_at).map((f) => f.updated_at).sort().pop() || null;
+  lista.semana = lunes;
   return lista;
 }
 

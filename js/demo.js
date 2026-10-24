@@ -11,6 +11,7 @@ const ahora = () => new Date().toISOString();
 const diaLocal = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 const hoy = () => new Date().toISOString().slice(0, 10);
 const enDias = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+const hoyISOdemo = () => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const espera = (ms = 120) => new Promise((r) => setTimeout(r, ms));
 
 // Audio de prueba generado en el navegador (acordes suaves), para el modo demo.
@@ -555,7 +556,11 @@ export function crearDemo() {
         ["mozza:4", "Rosa May", "piso", "PM", "Mozzafiato", "529830000004", false],
         ["casaregina:1", "Lucía Pech", "casa_regina", "AM", "Casa Regina", "529830000005", true],
       ];
-      return l.map(([gestor_id, nombre, area, turno, sede, whatsapp, activo]) => ({ gestor_id, nombre, area, turno, sede, whatsapp, activo, encargado: false }));
+      const lista = l.map(([gestor_id, nombre, area, turno, sede, whatsapp, activo]) => ({ gestor_id, nombre, area, turno, sede, whatsapp, activo, encargado: false, salio: activo ? null : "2026-10-12" }));
+      lista.push({ gestor_id: "mozza:5", nombre: "Diego Canul", area: "barra", turno: "PM", sede: "Mozzafiato", whatsapp: null, activo: false, entra: "2026-11-02", encargado: false });
+      lista.actualizado = new Date(Date.now() - 36e5).toISOString();
+      lista.semana = hoyISOdemo();
+      return lista;
     },
     async crearColeccion(nombre) { await espera(); return { id: "col-" + uid(), nombre }; },
     async prepararSubida(titulo, coleccion, videoId) {

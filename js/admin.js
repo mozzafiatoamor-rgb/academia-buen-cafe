@@ -235,6 +235,7 @@ async function pintarEmpleados(main) {
       <h1 class="titulo-pagina">Empleados</h1>
       <div class="fila" style="flex-wrap:wrap">
         <a class="btn btn-whats" target="_blank" rel="noopener" href="${linkWhats(mensajeLinkApp(), null)}">${icono("share", 18)}Compartir link de la app</a>
+        <button class="btn btn-sec" id="reenviar">${icono("key", 18)}Reenviar accesos</button>
         <button class="btn" id="gestor">${icono("refresh", 18)}Importar del Gestor</button>
         <button class="btn btn-sec" id="lote">${icono("users", 18)}Alta en lote</button>
         <button class="btn btn-sec" id="nuevo">${icono("plus", 18)}Nuevo empleado</button>
@@ -249,7 +250,7 @@ async function pintarEmpleados(main) {
         <td>${pct(e)}% · ${num(e.puntos)} pts</td>
         <td><button class="btn-texto" data-disp="${e.user_id}" style="min-height:36px;color:var(--arena)">—</button></td>
         <td style="white-space:nowrap;text-align:right">
-          <button class="mini-btn" title="Nuevo PIN" aria-label="Nuevo PIN de ${esc(e.nombre)}" data-pin="${e.user_id}">${icono("key", 18)}</button>
+          <button class="mini-btn" title="Reenviar acceso (PIN nuevo)" aria-label="Reenviar acceso a ${esc(e.nombre)}" data-pin="${e.user_id}">${icono("key", 18)}</button>
           <button class="mini-btn" title="Editar" aria-label="Editar ${esc(e.nombre)}" data-editar="${e.user_id}">${icono("edit", 18)}</button>
           <button class="mini-btn" title="${e.activo ? "Desactivar" : "Activar"}" aria-label="${e.activo ? "Desactivar" : "Activar"} ${esc(e.nombre)}" data-activo="${e.user_id}">${icono(e.activo ? "x" : "check", 18)}</button>
         </td></tr>`).join("")}
@@ -286,9 +287,10 @@ async function pintarEmpleados(main) {
       b.onclick = () => verDispositivos(x);
     });
   }).catch(() => main.querySelectorAll("[data-disp]").forEach((b) => (b.textContent = "—")));
+  main.querySelector("#reenviar").onclick = () => reenviarAccesos(equipo.filter((e) => e.activo), avs);
   main.querySelectorAll("[data-pin]").forEach((b) => (b.onclick = async () => {
     const e = porId(b.dataset.pin);
-    if (!(await confirmar("¿Generar nuevo PIN?", `${e.nombre} ya no podrá entrar con su PIN anterior.`, "Generar"))) return;
+    if (!(await confirmar("¿Reenviar acceso?", `Por seguridad los PIN no se guardan, así que se genera uno nuevo para ${e.nombre}. El anterior deja de servir y, si tenía la sesión abierta, tendrá que entrar con el nuevo.`, "Generar y enviar"))) return;
     try {
       const r = await datos.cambiarPin(e.user_id);
       let wa = null;
@@ -344,6 +346,76 @@ async function copiar(texto) {
 
 const linkWhats = (msg, numero) => `https://wa.me/${numero ? String(numero).replace(/\D/g, "") : ""}?text=${encodeURIComponent(msg)}`;
 
+// Reenviar acceso a varios: elige a quién, genera PIN nuevo a cada uno y deja listo el WhatsApp.
+async function reenviarAccesos(equipo, avs = {}) {
+  let elegidos = new Set(), texto = "";
+  const p = modal(`
+    <h2 class="modal-titulo">Reenviar accesos</h2>
+    <p class="texto-tenue" style="margin:0">Por seguridad los PIN no se guardan, así que a cada persona elegida se le genera <b>un PIN nuevo</b> (el anterior deja de servir). Luego le mandas su invitación por WhatsApp.</p>
+    <input class="buscar-persona" type="search" id="ra-buscar" placeholder="Buscar por nombre…">
+    <div class="fila-entre"><span class="texto-tenue" style="font-size:12px" id="ra-cuenta">Nadie seleccionado</span><button type="button" class="btn-texto" id="ra-todos">Seleccionar todos</button></div>
+    <div class="lista-personas" id="ra-lista" style="max-height:42vh"></div>
+    <p class="error-form" hidden></p>
+    <div class="fila-botones"><button class="btn btn-sec" data-cerrar="">Cancelar</button><button class="btn" id="ra-ok">Generar PIN nuevos</button></div>`, { clase: "modal-ancho" });
+  const capa = modal.actual;
+  const visibles = () => equipo.filter((e) => !texto || e.nombre.toLowerCase().includes(texto) || e.usuario.toLowerCase().includes(texto));
+  const pintar = () => {
+    capa.querySelector("#ra-lista").innerHTML = visibles().map((e) => `
+      <label class="persona-check"><input type="checkbox" value="${e.user_id}" ${elegidos.has(e.user_id) ? "checked" : ""}>
+        ${avatarOIniciales(avs[e.user_id], e.nombre, 34)}
+        <span style="flex:1;min-width:0"><b>${esc(e.nombre)}</b><small>@${esc(e.usuario)} · ${esc(nombreArea(e.area))}</small></span></label>`).join("") || `<p class="texto-tenue">Nadie coincide.</p>`;
+    capa.querySelector("#ra-cuenta").textContent = elegidos.size ? `${elegidos.size} seleccionada${elegidos.size === 1 ? "" : "s"}` : "Nadie seleccionado";
+    capa.querySelector("#ra-ok").textContent = elegidos.size ? `Generar ${elegidos.size} PIN nuevo${elegidos.size === 1 ? "" : "s"}` : "Generar PIN nuevos";
+    const libres = visibles();
+    capa.querySelector("#ra-todos").textContent = libres.length && libres.every((e) => elegidos.has(e.user_id)) ? "Quitar todos" : "Seleccionar todos";
+  };
+  capa.querySelector("#ra-buscar").oninput = (ev) => { texto = ev.target.value.trim().toLowerCase(); pintar(); };
+  capa.querySelector("#ra-lista").onchange = (ev) => { const cb = ev.target.closest("input"); if (!cb) return; cb.checked ? elegidos.add(cb.value) : elegidos.delete(cb.value); pintar(); };
+  capa.querySelector("#ra-todos").onclick = () => { const v = visibles(); const todos = v.every((e) => elegidos.has(e.user_id)); v.forEach((e) => (todos ? elegidos.delete(e.user_id) : elegidos.add(e.user_id))); pintar(); };
+  let ir = false;
+  capa.querySelector("#ra-ok").onclick = () => {
+    if (!elegidos.size) { const er = capa.querySelector(".error-form"); er.textContent = "Elige al menos una persona"; er.hidden = false; return; }
+    ir = true; capa.cerrar("ok");
+  };
+  pintar();
+  await p;
+  if (!ir) return;
+  const lista = equipo.filter((e) => elegidos.has(e.user_id));
+  const r2 = modal(`<h2 class="modal-titulo">Accesos nuevos</h2><div id="ra-res"><div class="cargando" style="min-height:120px"><div class="taza-carga"></div></div></div>`, { cerrable: false, clase: "modal-ancho" });
+  const capaRes = modal.actual, caja = capaRes.querySelector("#ra-res");
+  let wa = {};
+  try {
+    const [perfiles, gestor] = await Promise.all([datos.adminPerfiles(), datos.gestorEmpleados().catch(() => [])]);
+    const tel = Object.fromEntries((gestor || []).filter((g) => g.whatsapp).map((g) => [g.gestor_id, g.whatsapp]));
+    wa = Object.fromEntries(perfiles.map((pf) => [pf.user_id, tel[pf.gestor_id] || null]));
+  } catch (_) { /* sin WhatsApp */ }
+  const res = [];
+  for (const e of lista) {
+    try { const r = await datos.cambiarPin(e.user_id); res.push({ ...e, pin: r.pin }); }
+    catch (err) { res.push({ ...e, error: err.message }); }
+    caja.innerHTML = `<p class="texto-tenue">Generando ${res.length} de ${lista.length}…</p>`;
+  }
+  caja.innerHTML = `
+    <p class="texto-tenue" style="margin:0 0 6px">Mándale a cada quien su mensaje. <b>Los PIN no se vuelven a mostrar</b> cuando cierres esta ventana.</p>
+    <div class="lista-aviso">${res.map((x) => `
+      <div class="fila-aviso" data-fila="${x.user_id}">
+        ${avatarOIniciales(avs[x.user_id], x.nombre, 38)}
+        <div style="flex:1;min-width:0"><b style="font-size:14px">${esc(x.nombre)}</b>
+          <div class="texto-tenue" style="font-size:12px">${x.error ? `<span style="color:var(--alerta-texto)">${esc(x.error)}</span>` : `@${esc(x.usuario)} · PIN <b style="color:var(--oro);letter-spacing:.1em">${esc(x.pin)}</b>${wa[x.user_id] ? "" : " · sin número"}`}</div></div>
+        ${x.error ? "" : `<a class="btn btn-chico" target="_blank" rel="noopener" data-enviado="${x.user_id}" href="${linkWhats(mensajeAcceso(x.nombre, x.usuario, x.pin), wa[x.user_id])}">Enviar</a>`}
+      </div>`).join("")}</div>
+    <div class="pila" style="gap:8px;margin-top:8px">
+      <button class="btn btn-sec btn-bloque" id="ra-copiar">${icono("file", 18)}Copiar todos los accesos</button>
+      <button class="btn btn-bloque" id="ra-listo">Listo</button>
+    </div>`;
+  caja.querySelectorAll("[data-enviado]").forEach((a) => a.addEventListener("click", () => { a.textContent = "Enviado ✓"; a.classList.add("btn-sec"); a.closest(".fila-aviso").classList.add("enviado"); }));
+  caja.querySelector("#ra-copiar").onclick = () => copiar(res.filter((x) => !x.error).map((x) => `${x.nombre}: usuario ${x.usuario} · PIN ${x.pin}`).join("\n"));
+  caja.querySelector("#ra-listo").onclick = async () => {
+    if (await confirmar("¿Ya los enviaste?", "Al cerrar, los PIN ya no se vuelven a mostrar.", "Sí, cerrar")) capaRes.cerrar(true);
+  };
+  await r2;
+}
+
 function mostrarAcceso(nombre, usuario, pin, whatsapp) {
   const msg = mensajeAcceso(nombre, usuario, pin);
   const p = modal(`
@@ -377,20 +449,24 @@ async function importarDelGestor() {
   const vistos = new Set();
   const filas = gestor.filter((g) => { const k = norm(g.nombre); if (vistos.has(k)) return false; vistos.add(k); return true; })
     .map((g) => ({ ...g, existente: yaEsta(g) }));
-  const nuevos = filas.filter((f) => f.activo && !f.existente);
+  const puedeEntrar = (f) => f.activo || !!f.entra;
+  const nuevos = filas.filter((f) => puedeEntrar(f) && !f.existente);
   const bajas = filas.filter((f) => !f.activo && f.existente?.activo);
   let verBajas = false;
 
   const pintar = () => {
-    const visibles = filas.filter((f) => verBajas || f.activo);
+    const visibles = filas.filter((f) => verBajas || puedeEntrar(f));
+    const fechaC = (d) => (d ? new Date(d + "T12:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" }) : "");
     caja.innerHTML = `
-      <p class="modal-texto">${nuevos.length ? `${nuevos.length} empleado(s) activos del Gestor todavía no tienen cuenta.` : "Todo tu equipo activo ya tiene cuenta en la Academia."}</p>
+      <p class="modal-texto">${nuevos.length ? `${nuevos.length} empleado(s) del Gestor todavía no tienen cuenta.` : "Todo tu equipo activo ya tiene cuenta en la Academia."}</p>
+      <p class="texto-tenue" style="margin:0;font-size:12.5px">${icono("refresh", 13)} El Gestor subió su lista a la nube por última vez <b>${gestor.actualizado ? haceCuanto(gestor.actualizado) : "(sin fecha)"}</b>. Se toma en cuenta la semana del ${fechaC(gestor.semana)}. ¿Falta alguien o sale alguien que ya se fue? Abre el Gestor en el equipo donde hiciste el cambio y revisa que diga <b>"Al día ✓"</b> (o toca <b>"Subir este dispositivo"</b>).</p>
       <label class="check"><input type="checkbox" id="ig-bajas" ${verBajas ? "checked" : ""}><span>Mostrar también a los dados de baja</span></label>
       <div class="tabla-caja" style="max-height:46vh;overflow:auto"><table class="tabla" style="min-width:560px">
         <thead><tr><th style="width:36px"><input type="checkbox" id="ig-todos" aria-label="Seleccionar todos" checked></th><th>Nombre</th><th>Área</th><th>Sede · turno</th><th>WhatsApp</th></tr></thead>
-        <tbody>${visibles.map((f) => `<tr class="${f.activo ? "" : "inactivo"}">
-          <td>${f.existente ? icono("check", 18, 'style="color:var(--verde)"') : `<input type="checkbox" class="ig-sel" value="${esc(f.gestor_id)}" ${f.activo ? "checked" : ""} aria-label="Importar a ${esc(f.nombre)}">`}</td>
-          <td><b>${esc(f.nombre)}</b>${f.existente ? `<div class="texto-tenue" style="font-size:12px">Ya tiene cuenta: @${esc(f.existente.usuario)}</div>` : ""}${f.activo ? "" : ' <span class="pildora">Baja</span>'}</td>
+        <tbody>${visibles.map((f) => `<tr class="${puedeEntrar(f) ? "" : "inactivo"}">
+          <td>${f.existente ? icono("check", 18, 'style="color:var(--verde)"') : `<input type="checkbox" class="ig-sel" value="${esc(f.gestor_id)}" ${puedeEntrar(f) ? "checked" : ""} aria-label="Importar a ${esc(f.nombre)}">`}</td>
+          <td><b>${esc(f.nombre)}</b>${f.existente ? `<div class="texto-tenue" style="font-size:12px">Ya tiene cuenta: @${esc(f.existente.usuario)}</div>` : ""}
+            ${f.entra ? ` <span class="pildora pildora-ok">Entra el ${fechaC(f.entra)}</span>` : f.activo ? (f.sale ? ` <span class="pildora">Sale el ${fechaC(f.sale)}</span>` : "") : ` <span class="pildora">Baja${f.salio ? " desde el " + fechaC(f.salio) : ""}</span>`}</td>
           <td>${esc(nombreArea(f.area))}</td><td>${esc(f.sede)}${f.turno ? " · " + esc(f.turno) : ""}</td>
           <td>${f.whatsapp ? "Sí" : '<span class="texto-tenue">—</span>'}</td></tr>`).join("")}</tbody>
       </table></div>

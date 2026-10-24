@@ -612,3 +612,6 @@ button.avatar-grande { border: 0; padding: 0; background: transparent; cursor: p
 @keyframes av-mano-izq { from { transform: rotate(6deg); } to { transform: rotate(-22deg); } }
 @keyframes av-salta { 0% { transform: translateY(0); } 35% { transform: translateY(-14px) rotate(-3deg); } 65% { transform: translateY(0) rotate(2deg); } 80% { transform: translateY(-4px); } 100% { transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .av-anim .av-personaje, .av-anim .av-ojos, .av-anim .av-vapor, .av-saluda .baja, .av-saluda .av-brazo-arriba, .av-saluda .av-antebrazo, .av-salta .av-personaje { animation: none !important; } }
+
+/* ---------- Disfraces (v1.12.0) ---------- */
+.av-saluda .av-brazo-arriba.abierto .av-antebrazo { transform-origin: 180px 150px; }
