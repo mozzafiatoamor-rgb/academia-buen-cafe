@@ -131,7 +131,8 @@ function semilla() {
       { user_id: luis, puntos: 180, motivo: "bono", ref: "demo", creado_en: ahora() },
     ],
     premios: [
-      { id: "p-1", nombre: "Bebida de la casa", descripcion: "Una bebida a tu elección", costo: 300, activo: true },
+      { id: "p-1", nombre: "Bebida de la casa", descripcion: "Una bebida a tu elección", costo: 300, activo: true, destacado: true },
+      { id: "p-5", nombre: "Postre doble", descripcion: "Solo por temporada", costo: 150, activo: true, disponible_hasta: (() => { const d = new Date(); d.setDate(d.getDate() + 6); return d.toISOString().slice(0, 10); })() },
       { id: "p-2", nombre: "Comida gratis en turno", descripcion: "Un platillo del menú", costo: 500, activo: true },
       { id: "p-3", nombre: "Día libre extra", descripcion: "A coordinar con Gustavo", costo: 2000, activo: true },
       { id: "p-4", nombre: "Bono en nómina", descripcion: "Monto definido por admin", costo: 3000, activo: true },
@@ -335,6 +336,8 @@ export function crearDemo() {
     // ---------- Avatar ----------
     async miAvatar() { const u = exigir(); return u.avatar ? deshacer(u.avatar) : null; },
     async guardarAvatar(avatar) { const u = exigir(); u.avatar = avatar; guardar(); },
+    async miMeta() { const u = exigir(); return u.meta_premio || null; },
+    async fijarMeta(id) { const u = exigir(); u.meta_premio = id || null; guardar(); },
     async avatares() { return Object.fromEntries(db.usuarios.filter((u) => u.avatar && u.activo).map((u) => [u.user_id, u.avatar])); },
 
     // ---------- Audiolibros y catálogo ----------
@@ -434,6 +437,7 @@ export function crearDemo() {
       const disp = ganados(u.user_id) - gastados(u.user_id);
       if (disp < p.costo) throw new Error(`Te faltan ${p.costo - disp} puntos`);
       db.canjes.push({ id: uid(), user_id: u.user_id, premio_id: p.id, costo: p.costo, estado: "pendiente", creado_en: ahora() });
+      if (u.meta_premio === p.id) u.meta_premio = null;
       guardar(); return { disponibles: disp - p.costo };
     },
     async niveles() { return [...db.niveles].sort((a, b) => a.orden - b.orden); },

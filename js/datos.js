@@ -131,6 +131,15 @@ function crearNube() {
       } catch (_) { return null; }
     },
     guardarAvatar: (avatar) => rpc("academia_guardar_avatar", { p_avatar: avatar }),
+    async miMeta() {
+      try {
+        const { data } = await sb.auth.getSession();
+        const uid = data?.session?.user?.id; if (!uid) return null;
+        const r = await sb.from("academia_perfiles").select("meta_premio").eq("user_id", uid).maybeSingle();
+        return r.error ? null : r.data?.meta_premio || null;
+      } catch (_) { return null; }
+    },
+    fijarMeta: (premioId) => rpc("academia_fijar_meta", { p_premio: premioId || null }),
     async avatares() {
       try { return (await rpc("academia_avatares")) || {}; }
       catch (_) { return {}; }

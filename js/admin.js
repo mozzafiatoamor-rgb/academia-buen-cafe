@@ -1170,8 +1170,10 @@ async function pintarPremios(main) {
       <section class="panel" style="flex:1 1 420px">
         <h2>Catálogo</h2>
         ${premios.map((p) => `
-          <div class="tarjeta fila-entre" style="padding:12px 14px;${p.activo ? "" : "opacity:.55"}">
-            <div><b>${esc(p.nombre)}</b><div class="texto-tenue" style="font-size:12px">${num(p.costo)} pts${p.descripcion ? " · " + esc(p.descripcion) : ""}${p.activo ? "" : " · oculto"}</div></div>
+          <div class="tarjeta fila-entre" style="padding:10px 12px;gap:10px;${p.activo ? "" : "opacity:.55"}">
+            <button class="premio-mini" data-foto="${p.id}" title="${p.imagen_url ? "Cambiar foto" : "Subir foto"}">${p.imagen_url ? `<img src="${esc(p.imagen_url)}" alt="">` : icono("plus", 18)}</button>
+            <div style="flex:1;min-width:0"><b>${esc(p.nombre)}</b>${p.destacado ? ` <span class="pildora pildora-oro" style="font-size:10px">Destacado</span>` : ""}
+              <div class="texto-tenue" style="font-size:12px">${num(p.costo)} pts${p.descripcion ? " · " + esc(p.descripcion) : ""}${p.disponible_hasta ? ` · hasta ${fechaCorta(p.disponible_hasta)}${p.disponible_hasta < hoyISO() ? " (vencido)" : ""}` : ""}${p.activo ? "" : " · oculto"}</div></div>
             <div class="fila" style="gap:0"><button class="mini-btn" aria-label="Editar" data-editar="${p.id}">${icono("edit", 18)}</button>
             <button class="mini-btn" aria-label="${p.activo ? "Ocultar" : "Mostrar"}" data-activo="${p.id}">${icono(p.activo ? "x" : "eye", 18)}</button></div>
           </div>`).join("") || `<p class="texto-tenue">Sin premios.</p>`}
@@ -1192,12 +1194,25 @@ async function pintarPremios(main) {
       { nombre: "nombre", etiqueta: "Premio", valor: p.nombre, requerido: true, placeholder: "Día libre extra" },
       { nombre: "costo", etiqueta: "Costo en puntos", tipo: "numero", valor: p.costo, requerido: true },
       { nombre: "descripcion", etiqueta: "Detalle (opcional)", valor: p.descripcion },
+      { nombre: "destacado", etiqueta: "Destacarlo (sale arriba, más grande)", tipo: "check", valor: !!p.destacado },
+      { nombre: "disponible_hasta", etiqueta: "Disponible hasta (opcional, para premios por tiempo limitado)", tipo: "fecha", valor: p.disponible_hasta || "" },
     ]);
     if (!v) return;
     if (!(v.costo > 0)) return aviso("El costo debe ser mayor a 0", "error");
-    try { await datos.guardarPremio({ id: p.id, ...v }); aviso("Guardado", "ok"); recargar(); } catch (e) { aviso(e.message, "error"); }
+    try { await datos.guardarPremio({ id: p.id, ...v, destacado: !!v.destacado, disponible_hasta: v.disponible_hasta || null }); aviso(p.id ? "Guardado" : "Premio creado. Tócale el cuadrito para agregarle foto.", "ok"); recargar(); }
+    catch (e) { aviso(/destacado|disponible_hasta|imagen_url/i.test(e.message) ? "Falta correr el paso 9 de SQL en Supabase" : e.message, "error"); }
   };
   main.querySelector("#nuevo").onclick = () => editar();
+  main.querySelectorAll("[data-foto]").forEach((b) => (b.onclick = async () => {
+    const p = premios.find((x) => x.id === b.dataset.foto);
+    if (p.imagen_url) {
+      const op = await modal(`<h2 class="modal-titulo">Foto de "${esc(p.nombre)}"</h2><img src="${esc(p.imagen_url)}" alt="" style="width:100%;border-radius:14px">
+        <div class="fila-botones"><button class="btn btn-sec" data-cerrar="quitar">Quitar</button><button class="btn" data-cerrar="cambiar">Cambiar foto</button></div>`);
+      if (op === "quitar") { if (await quitarPortada("premio", p.id)) recargar(); return; }
+      if (op !== "cambiar") return;
+    }
+    if (await cambiarPortada("premio", p.id)) recargar();
+  }));
   main.querySelectorAll("[data-editar]").forEach((b) => (b.onclick = () => editar(premios.find((p) => p.id === b.dataset.editar))));
   main.querySelectorAll("[data-activo]").forEach((b) => (b.onclick = async () => {
     const p = premios.find((x) => x.id === b.dataset.activo);

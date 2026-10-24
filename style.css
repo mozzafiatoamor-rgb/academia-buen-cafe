@@ -615,3 +615,34 @@ button.avatar-grande { border: 0; padding: 0; background: transparent; cursor: p
 
 /* ---------- Disfraces (v1.12.0) ---------- */
 .av-saluda .av-brazo-arriba.abierto .av-antebrazo { transform-origin: 180px 150px; }
+
+/* ---------- Premios que motivan (v1.13.0) ---------- */
+.premio-foto { width: 100%; aspect-ratio: 4 / 3; background: var(--tarjeta-2); overflow: hidden; display: grid; place-items: center; }
+.premio-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.premio-sin-foto { color: var(--oro); background: radial-gradient(circle at 50% 40%, rgba(227, 182, 107, .18), transparent 65%), var(--tarjeta-2); }
+.premio-foto.chica { width: 64px; height: 64px; aspect-ratio: auto; border-radius: 12px; flex: none; }
+.premio-foto.chica svg { width: 26px; height: 26px; }
+.premio-foto.grande { width: 200px; border-radius: 18px; box-shadow: 0 14px 30px rgba(0, 0, 0, .4); }
+.rejilla-premios { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 158px), 1fr)); gap: 12px; }
+.carrusel-premios { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; margin: 0 -4px; padding-left: 4px; scrollbar-width: none; }
+.carrusel-premios::-webkit-scrollbar { display: none; }
+.carrusel-premios .premio-tarjeta { flex: 0 0 min(78%, 300px); scroll-snap-align: start; }
+.premio-tarjeta { position: relative; border-radius: 18px; overflow: hidden; background: var(--tarjeta); border: 1px solid var(--linea-suave); display: flex; flex-direction: column; }
+.premio-tarjeta.grande { border-color: rgba(227, 182, 107, .45); box-shadow: 0 10px 28px rgba(0, 0, 0, .35); }
+.premio-tarjeta.es-meta { border-color: var(--oro); box-shadow: 0 0 0 2px rgba(227, 182, 107, .35); }
+.premio-meta-btn { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; border-radius: 50%; border: 0; display: grid; place-items: center; background: rgba(20, 15, 13, .75); color: var(--crema-2); backdrop-filter: blur(6px); cursor: pointer; }
+.premio-meta-btn.activa { background: var(--oro); color: #2B1A14; }
+.forma-ganar { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 12px; border-radius: 14px; border: 1px solid var(--linea-suave); background: var(--tarjeta); color: var(--crema); font: inherit; cursor: pointer; }
+.forma-ganar b { display: block; font-size: 14px; }
+.forma-ganar small { display: block; color: var(--tenue); font-size: 12px; }
+.forma-ic { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: rgba(201, 130, 75, .18); color: var(--cobre); flex: none; }
+.forma-pts { color: var(--oro); font-size: 15px; white-space: nowrap; }
+.meta-tarjeta, .meta-vacia { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border: 1px solid rgba(227, 182, 107, .35); color: var(--crema); font: inherit; text-align: left; cursor: pointer; }
+.meta-tarjeta.lista { border-color: var(--oro); box-shadow: 0 0 0 2px rgba(227, 182, 107, .3); animation: meta-brillo 2.4s ease-in-out infinite; }
+@keyframes meta-brillo { 50% { box-shadow: 0 0 0 5px rgba(227, 182, 107, .12); } }
+.meta-vacia { border-style: dashed; color: var(--crema-2); }
+.meta-vacia svg:first-child { color: var(--oro); flex: none; }
+.meta-vacia span { flex: 1; } .meta-vacia b { display: block; } .meta-vacia small { color: var(--tenue); }
+.premio-mini { width: 52px; height: 52px; border-radius: 12px; border: 1px dashed var(--linea); background: var(--tarjeta-2); color: var(--arena); display: grid; place-items: center; overflow: hidden; flex: none; padding: 0; cursor: pointer; }
+.premio-mini img { width: 100%; height: 100%; object-fit: cover; }
+@media (prefers-reduced-motion: reduce) { .meta-tarjeta.lista { animation: none; } }

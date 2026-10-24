@@ -11,6 +11,7 @@ import { fijarCfgPuntos, valorCurso, puntosLeccion } from "./puntos.js";
 import { pintarAudiolibro, pintarBiblioteca, tarjetaAudio, esNuevoAudio } from "./audio.js";
 import { avatarOIniciales, avatarSVG, avatarCuerpoSVG } from "./avatar.js";
 import { pintarEditorAvatar, invitarAvatar } from "./avatar-editor.js";
+import { pintarPremiosEmpleado, tarjetaMeta, revisarMeta } from "./premios.js";
 
 const app = document.getElementById("app");
 const LOGO = "img/logo.png";
@@ -63,7 +64,7 @@ async function enrutar() {
       case "avatar": return await pintarEditorAvatar(ctxAudio());
       case "insignias": return await pintarInsignias();
       case "ranking": return await pintarRanking();
-      case "premios": return await pintarPremios();
+      case "premios": return await pintarPremiosEmpleado(ctxAudio());
       default: return await pintarInicio();
     }
   } catch (e) {
@@ -181,6 +182,7 @@ async function revisarNivelYRacha() {
     momento({ icono: "user", titulo: "¡Nuevas piezas para tu avatar!", texto: "Entra a tu perfil → Editar mi avatar para estrenarlas.", tono: "oro", duracion: 4200 });
   }
   estado.perfil = { ...antes, ...nuevo };
+  if (estado.metaPremio) await revisarMeta(nuevo.usuario, estado.metaPremio, nuevo.puntos_disponibles, ir);
 }
 
 // ---------------------------------------------------------------------
@@ -326,8 +328,11 @@ async function salir() {
 async function pintarInicio() {
   cargando();
   vaciarCola().catch(() => {});
-  const [r, cursos, audiosTodos, miAv] = await Promise.all([datos.resumen(), datos.misCursos(), datos.misAudiolibros().catch(() => []), datos.miAvatar().catch(() => null)]);
+  const [r, cursos, audiosTodos, miAv, metaId, catPremios] = await Promise.all([datos.resumen(), datos.misCursos(), datos.misAudiolibros().catch(() => []),
+    datos.miAvatar().catch(() => null), datos.miMeta().catch(() => null), datos.premios().catch(() => ({ premios: [] }))]);
   estado.miAvatar = miAv;
+  const metaPremio = (catPremios.premios || []).find((p) => p.id === metaId) || null;
+  estado.metaPremio = metaPremio;
   const audios = audiosTodos.filter((x) => x.asignado);
   estado.perfil = r;
   const avancePct = r.siguiente_min ? Math.round(((r.puntos_ganados - r.nivel_min) / (r.siguiente_min - r.nivel_min)) * 100) : 100;
@@ -364,6 +369,8 @@ async function pintarInicio() {
         <span>${r.siguiente_nivel ? `${num(r.siguiente_min - r.puntos_ganados)} para ${esc(r.siguiente_nivel)}` : "Nivel máximo"}</span>
       </div>
     </section>
+
+    ${(catPremios.premios || []).length ? tarjetaMeta(metaPremio, r.puntos_disponibles) : ""}
 
     ${enCurso ? `
     <section class="pila">
@@ -430,6 +437,7 @@ async function pintarInicio() {
   if (vista) await novedadAudiolibros(r);
   await anunciarNuevos(r, cursos, audios);
   await invitarAvatar(ctxAudio(), r);
+  await revisarMeta(r.usuario, metaPremio, r.puntos_disponibles, ir);
   if (r.insignias_sin_ver?.length) celebrar(r.insignias_sin_ver);
 }
 
@@ -1064,45 +1072,6 @@ async function pintarRanking(periodo = "semana") {
       </div>` : `<div class="vacio"><strong>Nadie ha sumado puntos ${periodo === "semana" ? "esta semana" : periodo === "mes" ? "este mes" : "todavía"}</strong>Termina una lección y sé el primero.</div>`}
   </main>`, "ranking");
   app.querySelectorAll("[data-p]").forEach((b) => (b.onclick = () => pintarRanking(b.dataset.p)));
-}
-
-// ---------------------------------------------------------------------
-//  PREMIOS
-// ---------------------------------------------------------------------
-async function pintarPremios() {
-  cargando();
-  const [{ premios, canjes }, r] = await Promise.all([datos.premios(), datos.resumen()]);
-  const disp = r.puntos_disponibles;
-  const nombrePremio = (id) => premios.find((p) => p.id === id)?.nombre || "Premio";
-  conNav(`
-  <main class="vista">
-    <h1 class="titulo-pagina">Premios</h1>
-    <section class="saldo"><div><div style="font-size:12px;font-weight:700;letter-spacing:1px">PUNTOS DISPONIBLES</div><b>${num(disp)}</b></div>${icono("gift", 40)}</section>
-    <section class="pila">
-      <div class="etiqueta">Catálogo</div>
-      ${premios.length ? premios.map((p) => {
-        const alcanza = disp >= p.costo;
-        const pendiente = canjes.some((c) => c.premio_id === p.id && c.estado === "pendiente");
-        return `<div class="tarjeta-borde fila-entre">
-          <div><b style="font-size:15px">${esc(p.nombre)}</b><div class="texto-tenue">${num(p.costo)} pts${p.descripcion ? " · " + esc(p.descripcion) : ""}</div></div>
-          ${pendiente ? `<span class="pildora pildora-ok">Solicitado</span>`
-            : alcanza ? `<button class="btn btn-chico" data-canjear="${p.id}">Canjear</button>`
-            : `<span class="pildora">Te faltan ${num(p.costo - disp)}</span>`}
-        </div>`;
-      }).join("") : `<div class="vacio">Pronto habrá premios para canjear.</div>`}
-    </section>
-    ${canjes.length ? `<section class="pila"><div class="etiqueta">Mis canjes</div>
-      ${canjes.slice(0, 10).map((c) => `<div class="fila-entre tarjeta" style="padding:12px 14px"><div><b style="font-size:14px">${esc(nombrePremio(c.premio_id))}</b><div class="texto-tenue" style="font-size:12px">${num(c.costo)} pts · ${haceCuanto(c.creado_en)}</div></div>
-        <span class="pildora ${c.estado === "aprobado" ? "pildora-ok" : c.estado === "rechazado" ? "pildora-alerta" : ""}">${c.estado === "pendiente" ? "En revisión" : c.estado === "aprobado" ? "Aprobado" : "Rechazado"}</span></div>`).join("")}
-    </section>` : ""}
-    <p class="texto-tenue">Al canjear, Gustavo recibe tu solicitud y la aprueba desde su panel. Si la rechaza, tus puntos regresan.</p>
-  </main>`, "premios");
-  app.querySelectorAll("[data-canjear]").forEach((b) => (b.onclick = async () => {
-    const p = premios.find((x) => x.id === b.dataset.canjear);
-    if (!(await confirmar("¿Canjear premio?", `${p.nombre} por ${num(p.costo)} puntos.`, "Canjear"))) return;
-    try { await datos.solicitarCanje(p.id); aviso("Solicitud enviada", "ok"); pintarPremios(); }
-    catch (e) { aviso(e.message, "error"); }
-  }));
 }
 
 // ---------------------------------------------------------------------

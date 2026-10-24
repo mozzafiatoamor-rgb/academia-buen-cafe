@@ -5,7 +5,8 @@
 import { datos } from "./datos.js";
 import { aviso } from "./ui.js";
 
-const MEDIDAS = { curso: [1280, 720], audio: [800, 800] };
+const MEDIDAS = { curso: [1280, 720], audio: [800, 800], premio: [900, 675] };
+const CARPETA = { curso: "cursos", audio: "audiolibros", premio: "premios" };
 
 function elegirImagen() {
   return new Promise((ok) => {
@@ -49,13 +50,14 @@ export async function cambiarPortada(tipo, id) {
   const archivo = await elegirImagen();
   if (!archivo) return null;
   if (!/^image\//.test(archivo.type) && !/\.(jpe?g|png|webp|heic|gif)$/i.test(archivo.name)) { aviso("Elige una imagen (JPG, PNG o WebP)", "error"); return null; }
-  aviso("Subiendo portada…");
+  aviso(tipo === "premio" ? "Subiendo foto…" : "Subiendo portada…");
   try {
     const { blob, ext } = await prepararImagen(archivo, MEDIDAS[tipo] || MEDIDAS.audio);
-    const url = await datos.subirPortada(blob, `${tipo === "curso" ? "cursos" : "audiolibros"}/${id}.${ext}`);
+    const url = await datos.subirPortada(blob, `${CARPETA[tipo] || "otros"}/${id}.${ext}`);
     if (tipo === "curso") await datos.guardarCurso({ id, portada_url: url });
+    else if (tipo === "premio") await datos.guardarPremio({ id, imagen_url: url });
     else await datos.guardarAudiolibro({ id, portada_url: url });
-    aviso("Portada lista", "ok");
+    aviso(tipo === "premio" ? "Foto lista" : "Portada lista", "ok");
     return url;
   } catch (e) {
     console.error(e);
@@ -67,6 +69,7 @@ export async function cambiarPortada(tipo, id) {
 export async function quitarPortada(tipo, id) {
   try {
     if (tipo === "curso") await datos.guardarCurso({ id, portada_url: null });
+    else if (tipo === "premio") await datos.guardarPremio({ id, imagen_url: null });
     else await datos.guardarAudiolibro({ id, portada_url: null });
     aviso("Portada quitada", "ok");
     return true;
