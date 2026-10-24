@@ -9,7 +9,7 @@ import { pintarConfiguracion } from "./configuracion.js";
 import { valorCurso, valorAudio } from "./puntos.js";
 import { pintarAudiolibrosAdmin, pintarEditorAudio } from "./admin-audio.js";
 import { cambiarPortada, quitarPortada } from "./portadas.js";
-import { avatarOIniciales } from "./avatar.js";
+import { avatarOIniciales, avatarCuerpoSVG } from "./avatar.js";
 
 const LOGO = "img/logo.png";
 let ctx; // { ir, salir }
@@ -103,7 +103,7 @@ function estadoEmpleado(e) {
 //  RESUMEN
 // ---------------------------------------------------------------------
 async function pintarResumen(main) {
-  const [equipo, cursos, { canjes, premios }] = await Promise.all([datos.adminAvance(), datos.adminCursos(), datos.adminPremios()]);
+  const [equipo, cursos, { canjes, premios }, avs] = await Promise.all([datos.adminAvance(), datos.adminCursos(), datos.adminPremios(), datos.avatares()]);
   canjes.forEach((c) => (c.premio_nombre = premios.find((p) => p.id === c.premio_id)?.nombre || "Premio"));
   const activos = equipo.filter((e) => e.activo);
   const conCursos = activos.filter((e) => e.lecciones_asignadas);
@@ -149,12 +149,13 @@ async function pintarResumen(main) {
     main.querySelector("#tabla-avance").innerHTML = filas.length ? `
       <table class="tabla"><thead><tr><th>Empleado</th><th>Área</th><th style="width:32%">Avance</th><th>Puntos</th><th>Estado</th></tr></thead><tbody>
       ${filas.map((e) => { const [txt, cls] = estadoEmpleado(e); return `<tr>
-        <td><b>${esc(e.nombre)}</b><div class="texto-tenue" style="font-size:12px">${esc(e.sede || "")}${e.turno ? " · " + esc(e.turno) : ""} · ${haceCuanto(e.ultima_actividad)}</div></td>
+        <td><span class="fila" style="gap:10px;align-items:center"><button class="avatar-boton" data-ver-av="${e.user_id}" aria-label="Ver avatar de ${esc(e.nombre)}">${avatarOIniciales(avs[e.user_id], e.nombre, 36)}</button><span><b>${esc(e.nombre)}</b><div class="texto-tenue" style="font-size:12px">${esc(e.sede || "")}${e.turno ? " · " + esc(e.turno) : ""} · ${haceCuanto(e.ultima_actividad)}</div></span></span></td>
         <td>${esc(nombreArea(e.area))}</td>
         <td><div class="fila"><div class="barra fina" style="flex:1"><i style="width:${pct(e)}%;${e.cursos_atrasados ? "background:var(--alerta)" : ""}"></i></div><b style="font-size:12px;color:var(--oro);min-width:36px;text-align:right">${pct(e)}%</b></div></td>
         <td>${num(e.puntos)}</td>
         <td><span class="pildora ${cls}">${txt}</span></td></tr>`; }).join("")}
       </tbody></table>` : `<div class="vacio"><strong>Sin empleados todavía</strong><a href="#/admin/empleados">Da de alta a tu equipo</a></div>`;
+    conectarVerAvatar(main.querySelector("#tabla-avance"), equipo, avs);
   };
   pintarTabla();
   main.querySelector("#filtros").onclick = (e) => {
@@ -235,6 +236,7 @@ async function pintarEmpleados(main) {
       <h1 class="titulo-pagina">Empleados</h1>
       <div class="fila" style="flex-wrap:wrap">
         <a class="btn btn-whats" target="_blank" rel="noopener" href="${linkWhats(mensajeLinkApp(), null)}">${icono("share", 18)}Compartir link de la app</a>
+        <button class="btn btn-sec" id="galeria">${icono("user", 18)}Avatares del equipo</button>
         <button class="btn btn-sec" id="reenviar">${icono("key", 18)}Reenviar accesos</button>
         <button class="btn" id="gestor">${icono("refresh", 18)}Importar del Gestor</button>
         <button class="btn btn-sec" id="lote">${icono("users", 18)}Alta en lote</button>
@@ -244,7 +246,7 @@ async function pintarEmpleados(main) {
     <section class="panel">
       ${equipo.length ? `<div class="tabla-caja"><table class="tabla"><thead><tr><th>Nombre</th><th>Usuario</th><th>Área</th><th>Sede · turno</th><th>Avance</th><th>Dispositivos</th><th></th></tr></thead><tbody>
       ${equipo.map((e) => `<tr class="${e.activo ? "" : "inactivo"}">
-        <td><span class="fila" style="gap:8px">${avatarOIniciales(avs[e.user_id], e.nombre, 30)}<b>${esc(e.nombre)}</b></span>${e.activo ? "" : ' <span class="pildora">Inactivo</span>'}</td>
+        <td><span class="fila" style="gap:8px"><button class="avatar-boton" data-ver-av="${e.user_id}" aria-label="Ver avatar de ${esc(e.nombre)}">${avatarOIniciales(avs[e.user_id], e.nombre, 34)}</button><b>${esc(e.nombre)}</b></span>${e.activo ? "" : ' <span class="pildora">Inactivo</span>'}</td>
         <td>@${esc(e.usuario)}</td><td>${esc(nombreArea(e.area))}</td>
         <td>${esc(e.sede || "—")}${e.turno ? " · " + esc(e.turno) : ""}</td>
         <td>${pct(e)}% · ${num(e.puntos)} pts</td>
@@ -288,6 +290,8 @@ async function pintarEmpleados(main) {
     });
   }).catch(() => main.querySelectorAll("[data-disp]").forEach((b) => (b.textContent = "—")));
   main.querySelector("#reenviar").onclick = () => reenviarAccesos(equipo.filter((e) => e.activo), avs);
+  main.querySelector("#galeria").onclick = () => galeriaAvatares(equipo.filter((e) => e.activo), avs);
+  conectarVerAvatar(main, equipo, avs);
   main.querySelectorAll("[data-pin]").forEach((b) => (b.onclick = async () => {
     const e = porId(b.dataset.pin);
     if (!(await confirmar("¿Reenviar acceso?", `Por seguridad los PIN no se guardan, así que se genera uno nuevo para ${e.nombre}. El anterior deja de servir y, si tenía la sesión abierta, tendrá que entrar con el nuevo.`, "Generar y enviar"))) return;
@@ -345,6 +349,47 @@ async function copiar(texto) {
 }
 
 const linkWhats = (msg, numero) => `https://wa.me/${numero ? String(numero).replace(/\D/g, "") : ""}?text=${encodeURIComponent(msg)}`;
+
+// Ver el avatar de un empleado en grande (cuerpo completo, saluda al abrir).
+function verAvatar(e, avatar) {
+  modal(`
+    <div class="pila" style="align-items:center;text-align:center;gap:10px">
+      ${avatar ? `<button class="avatar-cuerpo-modal" id="av-admin">${avatarCuerpoSVG(avatar, 260, { animado: true })}</button>`
+        : `<div class="vacio" style="width:100%"><strong>${esc(e.nombre)} aún no crea su avatar</strong>Le sale la invitación al entrar a la app, y también puede hacerlo desde su perfil.</div>`}
+      <h2 class="modal-titulo">${esc(e.nombre)}</h2>
+      <span class="texto-tenue">${esc(nombreArea(e.area))}${e.sede ? " · " + esc(e.sede) : ""} · ${num(e.puntos || 0)} pts</span>
+      <button class="btn btn-bloque" data-cerrar>Cerrar</button>
+    </div>`);
+  const svg = modal.actual?.querySelector("#av-admin svg");
+  if (svg) {
+    setTimeout(() => svg.classList.add("av-saluda"), 300);
+    modal.actual.querySelector("#av-admin").onclick = () => { svg.classList.remove("av-saluda"); void svg.getBoundingClientRect(); svg.classList.add("av-saluda"); };
+  }
+}
+function conectarVerAvatar(raiz, equipo, avs) {
+  raiz.querySelectorAll("[data-ver-av]").forEach((b) => (b.onclick = (ev) => {
+    ev.stopPropagation();
+    const e = equipo.find((x) => x.user_id === b.dataset.verAv);
+    if (e) verAvatar(e, avs[e.user_id]);
+  }));
+}
+
+// Galería con los avatares de todo el equipo.
+function galeriaAvatares(equipo, avs) {
+  const con = equipo.filter((e) => avs[e.user_id]).sort((a, b) => (b.puntos || 0) - (a.puntos || 0));
+  const sin = equipo.filter((e) => !avs[e.user_id]);
+  modal(`
+    <div class="fila-entre"><h2 class="modal-titulo">Avatares del equipo</h2><button class="btn-icono" data-cerrar aria-label="Cerrar">${icono("x")}</button></div>
+    <p class="texto-tenue" style="margin:0">${con.length} de ${equipo.length} ya crearon su avatar. Toca uno para verlo saludar.</p>
+    <div class="galeria-avatares">${con.map((e) => `
+      <button class="galeria-item" data-g="${e.user_id}">${avatarCuerpoSVG(avs[e.user_id], 170, { animado: true })}
+        <b>${esc(e.nombre)}</b><small>${num(e.puntos || 0)} pts</small></button>`).join("") || `<div class="vacio" style="grid-column:1/-1">Todavía nadie crea su avatar.</div>`}</div>
+    ${sin.length ? `<div class="pila" style="gap:6px"><span class="etiqueta">Les falta crearlo</span>
+      <div class="fila" style="flex-wrap:wrap;gap:6px">${sin.map((e) => `<span class="pildora">${esc(e.nombre)}</span>`).join("")}</div></div>` : ""}`, { clase: "modal-ancho" });
+  modal.actual.querySelectorAll("[data-g]").forEach((b) => (b.onclick = () => {
+    const svg = b.querySelector("svg"); svg.classList.remove("av-saluda"); void svg.getBoundingClientRect(); svg.classList.add("av-saluda");
+  }));
+}
 
 // Reenviar acceso a varios: elige a quién, genera PIN nuevo a cada uno y deja listo el WhatsApp.
 async function reenviarAccesos(equipo, avs = {}) {
