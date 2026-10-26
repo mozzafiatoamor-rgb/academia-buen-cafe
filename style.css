@@ -734,3 +734,5 @@ button.avatar-grande { border: 0; padding: 0; background: transparent; cursor: p
 .sin-respaldo { color: #f0a35e; font-weight: 700; }
 .globo-cuenta { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 6px; border-radius: 99px; background: var(--oro); color: #1B1411; font-size: 11.5px; font-weight: 800; }
 .vista-libreta .barra-sup { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.tour-mock { padding: 14px; border-radius: 16px; background: var(--fondo, #1B1411); border: 1px solid var(--linea); box-shadow: inset 0 0 0 1px rgba(227, 182, 107, .08); }
+.vista-libreta .barra-sup .btn { flex: none; }

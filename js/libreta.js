@@ -327,6 +327,7 @@ export async function pintarLibreta(ctx) {
     <div class="barra-sup">
       <button class="btn-icono" id="volver" aria-label="Volver">${icono("back")}</button>
       <span class="texto-tenue" style="flex:1"></span>
+      <button class="btn btn-sec btn-chico" id="como">${icono("bulb", 16)}¿Cómo funciona?</button>
       <button class="btn btn-chico" id="nueva">${icono("plus", 16)}Apunte</button>
     </div>
     <section class="libreta-cabeza">
@@ -459,9 +460,11 @@ export async function pintarLibreta(ctx) {
   };
   app.querySelector("#volver").onclick = () => ctx.ir("/inicio");
   app.querySelector("#nueva").onclick = async () => { if (await editarNota({ usuario })) recargar(); };
+  app.querySelector("#como").onclick = () => presentarLibreta(usuario, { final: "¡Entendido!" });
   app.querySelector("#reintentar")?.addEventListener("click", async () => { await procesarColaLibreta(usuario); recargar(); });
   app.querySelector("#respaldo").onclick = () => descargarRespaldo({ notas, ideas, titulosCurso, perfil: ctx.estado.perfil });
   pintar();
+  if (!vioPresentacionLibreta(usuario)) presentarLibreta(usuario, { final: "¡Empezar!" });
 }
 
 // ---------------------------------------------------------------------
@@ -563,4 +566,81 @@ export async function revisarIdeas(usuario) {
         texto: i.respuesta || `"${(i.texto || "").slice(0, 70)}"`, tono: i.estado === "probando" ? "oro" : "cobre", duracion: 5200 });
     }
   }
+}
+
+// ---------------------------------------------------------------------
+//  Presentación de "Mi libreta" (una vez, y cuando quieran desde la libreta)
+// ---------------------------------------------------------------------
+const llaveTour = (u) => `academia-tour-libreta-${u}`;
+export function vioPresentacionLibreta(usuario) { try { return !!localStorage.getItem(llaveTour(usuario)); } catch (_) { return true; } }
+
+export function presentarLibreta(usuario, { final = "Abrir mi libreta" } = {}) {
+  try { localStorage.setItem(llaveTour(usuario), "1"); } catch (_) { /* nada */ }
+  const mock = (html) => `<div class="tour-mock" aria-hidden="true">${html}</div>`;
+  const pasos = [
+    {
+      ic: "libreta", titulo: "Nuevo: Mi libreta",
+      cuerpo: `<p class="modal-texto" style="line-height:1.55">Estos cursos son para <b>mejorar nuestro menú y probar cosas nuevas</b> en Mozzafiato. Ahora tienes una libreta dentro de la app para guardar todo lo que aprendas… y mandarle tus mejores ideas a Gustavo.</p>
+        ${mock(`<div class="fila" style="gap:12px"><span class="medalla medalla-oro chica" style="flex:none">${icono("libreta", 22)}</span><span><b style="display:block">Mi libreta</b><span class="texto-tenue" style="font-size:12.5px">En Inicio y en tu perfil</span></span></div>`)}`,
+    },
+    {
+      ic: "play", titulo: "Anota en el minuto exacto",
+      cuerpo: `<p class="modal-texto" style="line-height:1.55">Mientras ves una lección toca <b>Anotar</b>. El video se pausa y tu apunte guarda el minuto. Después tocas el minuto y el video <b>salta justo ahí</b>.</p>
+        ${mock(`<div class="fila-entre"><b>${icono("libreta", 16, 'style="vertical-align:-3px;color:var(--oro)"')} Mis apuntes</b><span class="btn btn-chico" style="pointer-events:none">${icono("plus", 14)}Anotar</span></div>
+          <div class="apunte-mini" style="margin-top:10px"><span class="chip-tiempo">${icono("play", 12)}2:35</span><span style="font-size:13px">Aceite de oliva antes de hornear, no después.</span></div>`)}`,
+    },
+    {
+      ic: "mic", titulo: "Escribe, habla o toma foto",
+      cuerpo: `<p class="modal-texto" style="line-height:1.55">¿Sin tiempo de escribir? Graba una <b>nota de voz</b> de hasta 1 minuto. ¿Practicaste un emplatado o un arte latte? Tómale <b>foto</b> y guárdala con tu apunte.</p>
+        ${mock(`<div class="ln-grabando"><i class="punto-rojo"></i><b>0:12</b><span class="texto-tenue">/ 1:00</span><span class="btn btn-chico" style="margin-left:auto;pointer-events:none">${icono("check", 14)}Listo</span></div>
+          <div class="fila" style="gap:8px;margin-top:10px"><span class="btn btn-sec btn-chico" style="pointer-events:none">${icono("mic", 14)}Nota de voz</span><span class="btn btn-sec btn-chico" style="pointer-events:none">${icono("camara", 14)}Foto</span></div>`)}`,
+    },
+    {
+      ic: "bulb", titulo: "Propón tus ideas a Gustavo",
+      cuerpo: `<p class="modal-texto" style="line-height:1.55">¿Algo que podríamos agregar al menú o hacer mejor? En tu apunte toca <b>Proponer a Gustavo</b>. Le llega con tu texto, tu voz y tu foto, y tú ves en qué va:</p>
+        ${mock(`<div class="pila" style="gap:8px;align-items:flex-start">
+          <span class="estado-idea">${icono("send", 13)}Enviada a Gustavo</span>
+          <span class="estado-idea probando">${icono("flame", 13)}¡La vamos a probar!</span>
+          <span class="estado-idea implementada">${icono("trophy", 13)}¡Implementada! · +50 pts</span></div>`)}
+        <p class="texto-tenue" style="margin:0;font-size:13px">Si tu idea se implementa en Mozzafiato, <b style="color:var(--oro)">ganas puntos de bono</b>.</p>`,
+    },
+    {
+      ic: "clock", titulo: "Sin señal, no pasa nada",
+      cuerpo: `<p class="modal-texto" style="line-height:1.55">Si se va el internet, tu apunte se queda guardado en tu celular y <b>se sube solo</b> cuando vuelve la señal.</p>
+        ${mock(`<div class="apunte-mini pendiente"><span class="chip-tiempo">${icono("play", 12)}0:48</span><span style="font-size:13px">Temperatura del horno: 230 °C <span class="apunte-iconos"><em>sin subir</em></span></span></div>`)}`,
+    },
+    {
+      ic: "descargar", titulo: "Tu libreta es tuya",
+      cuerpo: `<p class="modal-texto" style="line-height:1.55">En Mi libreta toca <b>Descargar mi respaldo</b> y te llevas todo en un archivo .zip: apuntes, notas de voz y fotos, para verlos aunque no tengas internet.</p>
+        ${mock(`<span class="btn btn-sec btn-bloque" style="pointer-events:none">${icono("descargar", 18)}Descargar mi respaldo</span>`)}
+        <p class="texto-tenue" style="margin:0;font-size:13px">${icono("bulb", 14)} Descárgalo cuando termines un curso: después de un tiempo Gustavo puede limpiar los archivos de la nube para liberar espacio.</p>`,
+    },
+  ];
+  return new Promise((resolver) => {
+    let i = 0;
+    modal(`<div id="tl"></div>`, { cerrable: false, clase: "modal-ancho" }).then((v) => resolver(v));
+    const capa = modal.actual;
+    const pintar = () => {
+      const p = pasos[i], ultimo = i === pasos.length - 1;
+      capa.querySelector("#tl").innerHTML = `
+        <div class="pila" style="gap:16px">
+          <div class="fila-entre">
+            <div class="fila" style="gap:6px" aria-label="Paso ${i + 1} de ${pasos.length}">${pasos.map((_, k) => `<i style="display:block;height:6px;border-radius:3px;width:${k === i ? 22 : 6}px;background:${k <= i ? "var(--oro)" : "var(--linea)"};transition:width .3s"></i>`).join("")}</div>
+            ${ultimo ? "" : `<button class="btn-texto" id="tl-saltar">Saltar</button>`}
+          </div>
+          <div class="medalla medalla-oro" style="width:64px;height:64px;align-self:center">${icono(p.ic, 30)}</div>
+          <h2 class="modal-titulo" style="text-align:center">${p.titulo}</h2>
+          ${p.cuerpo}
+          <div class="fila-botones">
+            ${i > 0 ? `<button class="btn btn-sec" id="tl-atras">${icono("back", 18)}Atrás</button>` : ""}
+            <button class="btn" id="tl-sig">${ultimo ? `${icono("libreta", 18)}${final}` : `Siguiente ${icono("next", 18)}`}</button>
+          </div>
+        </div>`;
+      capa.querySelector("#tl-sig").onclick = () => { if (ultimo) capa.cerrar("libreta"); else { i++; pintar(); } };
+      capa.querySelector("#tl-atras")?.addEventListener("click", () => { i--; pintar(); });
+      capa.querySelector("#tl-saltar")?.addEventListener("click", () => capa.cerrar("saltar"));
+      capa.querySelector(".modal").scrollTop = 0;
+    };
+    pintar();
+  });
 }

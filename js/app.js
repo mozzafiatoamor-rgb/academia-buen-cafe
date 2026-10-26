@@ -12,7 +12,7 @@ import { pintarAudiolibro, pintarBiblioteca, tarjetaAudio, esNuevoAudio } from "
 import { avatarOIniciales, avatarSVG, avatarCuerpoSVG } from "./avatar.js";
 import { pintarEditorAvatar, invitarAvatar } from "./avatar-editor.js";
 import { pintarPremiosEmpleado, tarjetaMeta, revisarMeta } from "./premios.js";
-import { pintarLibreta, montarLibretaLeccion, iniciarColaLibreta, revisarIdeas } from "./libreta.js";
+import { pintarLibreta, montarLibretaLeccion, iniciarColaLibreta, revisarIdeas, presentarLibreta, vioPresentacionLibreta } from "./libreta.js";
 
 const app = document.getElementById("app");
 const LOGO = "img/logo.png";
@@ -444,35 +444,17 @@ async function pintarInicio() {
   try { vista = localStorage.getItem(llaveBienvenida) === "1"; } catch (_) { /* sin almacenamiento */ }
   if (!vista) {
     await mostrarBienvenida(r);
-    try { localStorage.setItem(llaveBienvenida, "1"); localStorage.setItem(`academia-novedad-audio-${r.usuario}`, "1"); localStorage.setItem(`academia-novedad-libreta-${r.usuario}`, "1"); } catch (_) { /* nada */ }
+    try { localStorage.setItem(llaveBienvenida, "1"); localStorage.setItem(`academia-novedad-audio-${r.usuario}`, "1"); } catch (_) { /* nada */ }
   }
-  if (vista) { await novedadAudiolibros(r); if ((await novedadApuntes(r)) === "libreta") return ir("/libreta"); }
+  if (vista) {
+    await novedadAudiolibros(r);
+    if (!vioPresentacionLibreta(r.usuario) && (await presentarLibreta(r.usuario)) === "libreta") return ir("/libreta");
+  }
   await anunciarNuevos(r, cursos, audios);
   await invitarAvatar(ctxAudio(), r);
   await revisarMeta(r.usuario, metaPremio, r.puntos_disponibles, ir);
   await revisarIdeas(r.usuario);
   if (r.insignias_sin_ver?.length) celebrar(r.insignias_sin_ver);
-}
-
-// Aviso único para quien ya conocía la Academia: tomar apuntes.
-async function novedadApuntes(r) {
-  const llave = `academia-novedad-libreta-${r.usuario}`;
-  try { if (localStorage.getItem(llave)) return; localStorage.setItem(llave, "1"); } catch (_) { return; }
-  const fila = (ic, txt) => `<div class="fila" style="gap:12px;align-items:flex-start"><span style="flex:none;width:22px;color:var(--oro);display:flex;justify-content:center">${icono(ic, 20)}</span><span style="font-size:14px">${txt}</span></div>`;
-  return modal(`
-    <div class="anuncio-nuevo">
-      <div class="anuncio-icono">${icono("libreta", 34)}</div>
-      <div class="etiqueta" style="text-align:center;color:var(--oro)">Un recordatorio importante</div>
-      <h2 class="modal-titulo" style="text-align:center">Toma apuntes: tus ideas cuentan</h2>
-      <p class="texto-tenue" style="text-align:center;margin:0">La idea de estos cursos es que al final <b style="color:var(--crema)">mejoremos nuestro menú e implementemos cosas nuevas</b> en Mozzafiato. Y eso empieza con lo que tú anotes.</p>
-      <div class="pila" style="gap:10px">
-        ${fila("libreta", "Nuevo: <b>Mi libreta</b>. En cada lección toca <b>Anotar</b> y se guarda el minuto exacto del video.")}
-        ${fila("mic", "Escribe, graba una nota de voz o toma una foto.")}
-        ${fila("bulb", "Toca <b>Proponer a Gustavo</b> en tus mejores ideas. Si se implementan, ganas puntos.")}
-      </div>
-      <button class="btn btn-bloque" data-cerrar="libreta">${icono("libreta", 18)}Abrir mi libreta</button>
-      <button class="btn-texto" data-cerrar style="align-self:center">Después</button>
-    </div>`);
 }
 
 // Aviso único para quien ya conocía la Academia: llegaron los audiolibros.
