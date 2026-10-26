@@ -91,14 +91,17 @@ const FRASES_LECCION = [
   "Tu esfuerzo se nota. Sigue así.",
   "Buenas manos, buen café. Eso eres tú.",
   "Poco a poco se llena la taza.",
+  "¿Ya anotaste lo más importante? Esa idea puede llegar a nuestro menú.",
+  "Anota la idea que más te gustó: puede ser lo próximo que probemos en Mozzafiato.",
+  "Lección lista. Escribe en tu libreta una cosa que podríamos mejorar.",
 ];
 export const fraseLeccion = () => FRASES_LECCION[Math.floor(Math.random() * FRASES_LECCION.length)];
 
 // Mensaje para los hitos de avance dentro de un curso.
 export function hitoCurso(pctAntes, pctDespues, curso) {
   if (pctAntes < 25 && pctDespues >= 25 && pctDespues < 50) return { icono: "flame", titulo: "¡Buen arranque!", texto: `Ya llevas una cuarta parte de ${curso}.` };
-  if (pctAntes < 50 && pctDespues >= 50 && pctDespues < 75) return { icono: "star", titulo: "¡Vas a la mitad!", texto: `La mitad de ${curso} ya es tuya. Lo que sigue se pone mejor.` };
-  if (pctAntes < 75 && pctDespues >= 75 && pctDespues < 100) return { icono: "target", titulo: "¡Recta final!", texto: "Solo te falta un cuarto. Ya casi lo tienes." };
+  if (pctAntes < 50 && pctDespues >= 50 && pctDespues < 75) return { icono: "star", titulo: "¡Vas a la mitad!", texto: `La mitad de ${curso} ya es tuya. ¿Cómo van tus apuntes?` };
+  if (pctAntes < 75 && pctDespues >= 75 && pctDespues < 100) return { icono: "target", titulo: "¡Recta final!", texto: "Solo te falta un cuarto. Repasa tus apuntes: al final queremos tus ideas." };
   return null;
 }
 
