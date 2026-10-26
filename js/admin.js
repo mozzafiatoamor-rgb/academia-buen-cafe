@@ -11,6 +11,7 @@ import { pintarAudiolibrosAdmin, pintarEditorAudio } from "./admin-audio.js";
 import { cambiarPortada, quitarPortada } from "./portadas.js";
 import { avatarOIniciales, avatarCuerpoSVG } from "./avatar.js";
 import { estadoSubtitulos, subtitulosLeccion, subtitulosCapitulo } from "./subtitulos.js";
+import { pintarIdeasAdmin, contarIdeasNuevas } from "./admin-ideas.js";
 
 const LOGO = "img/logo.png";
 let ctx; // { ir, salir }
@@ -18,7 +19,7 @@ let ctx; // { ir, salir }
 export async function vistaAdmin(app, partes, contexto) {
   ctx = contexto;
   const [seccion = "", id, pestana] = partes;
-  const menu = [["cursos", "book", "Cursos"], ["audiolibros", "audifonos", "Audiolibros"], ["empleados", "users", "Empleados"], ["resumen", "chart", "Resumen"], ["premios", "gift", "Premios y canjes"], ["insignias", "medal", "Insignias"], ["configuracion", "ajustes", "Configuración"]];
+  const menu = [["cursos", "book", "Cursos"], ["audiolibros", "audifonos", "Audiolibros"], ["empleados", "users", "Empleados"], ["ideas", "bulb", "Ideas"], ["resumen", "chart", "Resumen"], ["premios", "gift", "Premios y canjes"], ["insignias", "medal", "Insignias"], ["configuracion", "ajustes", "Configuración"]];
   const activa = seccion === "curso" || !seccion ? "cursos" : seccion === "audio" ? "audiolibros" : seccion;
   app.className = "";
   app.innerHTML = `
@@ -42,12 +43,17 @@ export async function vistaAdmin(app, partes, contexto) {
     </div>
   </div>`;
   fijarMenuMovil(app);
+  contarIdeasNuevas().then((n) => {
+    const a = app.querySelector('.admin-menu a[href="#/admin/ideas"]');
+    if (a && n) a.insertAdjacentHTML("beforeend", `<span class="globo-cuenta">${n}</span>`);
+  });
   app.querySelector("#salir").onclick = ctx.salir;
   app.querySelector("#salir-movil").onclick = ctx.salir;
   const main = app.querySelector("#admin-main");
   try {
     if (seccion === "empleados") return await pintarEmpleados(main);
     if (seccion === "resumen") return await pintarResumen(main);
+    if (seccion === "ideas") return await pintarIdeasAdmin(main, id || "ideas");
     if (seccion === "audiolibros") return await pintarAudiolibrosAdmin(main, ctx);
     if (seccion === "audio") return await pintarEditorAudio(main, id, pestana, ctx);
     if (seccion === "curso") return await pintarEditorCurso(main, id, pestana);

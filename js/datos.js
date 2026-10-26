@@ -373,6 +373,70 @@ function crearNube() {
     audioRuta: (ruta) => funcion("academia-audio", { accion: "url_ruta", ruta }),
     diagnosticoAudio: () => funcion("academia-audio", { accion: "diagnostico" }),
     probarAudio: (ruta) => funcion("academia-audio", { accion: "probar", ruta }),
+    // ---------- Mi libreta (notas, voz, fotos) e ideas ----------
+    async _miId() {
+      if (this._uid) return this._uid;
+      const { data } = await sb.auth.getSession();
+      if (!data?.session) throw new ErrorAcademia("Tu sesión expiró. Vuelve a entrar.");
+      return (this._uid = data.session.user.id);
+    },
+    misNotas: () => q(sb.from("academia_notas").select("*").order("creado_en", { ascending: false })),
+    async guardarNota(n) {
+      const fila = { id: n.id, curso_id: n.curso_id || null, leccion_id: n.leccion_id || null, segundo: n.segundo ?? null, referencia: n.referencia || null,
+        texto: n.texto || "", audio_path: n.audio_path || null, audio_seg: n.audio_seg ?? null, foto_path: n.foto_path || null,
+        actualizado_en: new Date().toISOString() };
+      if (n.creado_en) fila.creado_en = n.creado_en;
+      return q(sb.from("academia_notas").upsert(fila).select().single());
+    },
+    async borrarNota(nota) {
+      // Los archivos se quedan si una idea que propusiste todavía los usa.
+      const ideas = await q(sb.from("academia_ideas").select("audio_path, foto_path"));
+      const usados = new Set(ideas.flatMap((i) => [i.audio_path, i.foto_path]).filter(Boolean));
+      const rutas = [nota.audio_path, nota.foto_path].filter((r) => r && !usados.has(r));
+      await q(sb.from("academia_notas").delete().eq("id", nota.id));
+      if (rutas.length) await sb.storage.from("academia-libreta").remove(rutas);
+    },
+    async quitarArchivoNota(ruta) {
+      const ideas = await q(sb.from("academia_ideas").select("audio_path, foto_path"));
+      if (!ideas.some((i) => i.audio_path === ruta || i.foto_path === ruta)) await sb.storage.from("academia-libreta").remove([ruta]);
+    },
+    async subirArchivoNota(blob, nombre) {
+      const ruta = `${await this._miId()}/${nombre}`;
+      const tipo = (blob.type || "").split(";")[0] || undefined;
+      const r = await sb.storage.from("academia-libreta").upload(ruta, blob, { contentType: tipo, upsert: true });
+      if (r.error) throw new ErrorAcademia(r.error.message, esDeRed(r.error));
+      return ruta;
+    },
+    async urlsArchivosNota(rutas) {
+      const lista = [...new Set(rutas.filter(Boolean))];
+      if (!lista.length) return {};
+      const r = await sb.storage.from("academia-libreta").createSignedUrls(lista, 3600);
+      if (r.error) throw new ErrorAcademia(r.error.message, esDeRed(r.error));
+      return Object.fromEntries((r.data || []).filter((x) => x.signedUrl).map((x) => [x.path, x.signedUrl]));
+    },
+    async bajarArchivoNota(ruta) {
+      const r = await sb.storage.from("academia-libreta").download(ruta);
+      if (r.error) throw new ErrorAcademia(r.error.message, esDeRed(r.error));
+      return r.data;
+    },
+    misIdeas: () => q(sb.from("academia_ideas").select("*").order("creado_en", { ascending: false })),
+    proponerIdea: (notaId) => rpc("academia_proponer_idea", { p_nota: notaId }),
+    retirarIdea: (id) => q(sb.from("academia_ideas").delete().eq("id", id)),
+    marcarRespaldo: () => rpc("academia_marcar_respaldo"),
+    // Admin
+    adminIdeas: () => q(sb.from("academia_ideas").select("*").order("creado_en", { ascending: false })),
+    responderIdea: (id, estado, respuesta, puntos) => rpc("academia_responder_idea", { p_id: id, p_estado: estado, p_respuesta: respuesta || "", p_puntos: puntos || 0 }),
+    libretasResumen: () => rpc("academia_libretas_resumen"),
+    async borrarLibreta(userId, { soloTerminados = false, borrarTexto = false } = {}) {
+      const rutas = (await rpc("academia_libreta_archivos", { p_user: userId, p_solo_terminados: soloTerminados })) || [];
+      for (let i = 0; i < rutas.length; i += 100) {
+        const r = await sb.storage.from("academia-libreta").remove(rutas.slice(i, i + 100));
+        if (r.error) throw new ErrorAcademia(r.error.message, esDeRed(r.error));
+      }
+      const res = await rpc("academia_libreta_limpiar", { p_user: userId, p_rutas: rutas, p_borrar_texto: borrarTexto, p_solo_terminados: soloTerminados });
+      return { archivos: rutas.length, notas: res?.notas_borradas || 0 };
+    },
+
     async subirPortada(blob, ruta) {
       const r = await sb.storage.from("academia-portadas").upload(ruta, blob, { contentType: blob.type, upsert: true, cacheControl: "31536000" });
       if (r.error) throw new ErrorAcademia(r.error.message);

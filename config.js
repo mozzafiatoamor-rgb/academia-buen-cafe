@@ -9,5 +9,5 @@ window.ACADEMIA_CONFIG = {
   SUPABASE_URL: "https://ujmecfdsbqtwxusqqiqi.supabase.co",
   SUPABASE_KEY: "sb_publishable_XY_anhqYY9rhgZau67wkcw_WkMx_PRA", // publishable: es pública por diseño
   DOMINIO_USUARIOS: "academia.mozzafiato.app", // debe coincidir con la función academia-admin
-  VERSION: "1.15.0",
+  VERSION: "1.16.0",
 };

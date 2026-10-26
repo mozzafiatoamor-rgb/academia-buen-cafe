@@ -662,6 +662,93 @@ export function crearDemo() {
       await espera(); exigirAdmin();
       return { carpeta, items: (AUDIOS_BUNNY[carpeta] || []).map((x) => ({ ...x, ruta: (carpeta ? carpeta + "/" : "") + x.nombre })) };
     },
+    // ---------- Mi libreta e ideas (demo: todo en este navegador) ----------
+    async misNotas() { await espera(); const u = exigir(); return deshacer((db.notas || []).filter((n) => n.user_id === u.user_id).sort((a, b) => b.creado_en.localeCompare(a.creado_en))); },
+    async guardarNota(n) {
+      await espera(); const u = exigir(); db.notas = db.notas || [];
+      const i = db.notas.findIndex((x) => x.id === n.id);
+      const fila = { creado_en: ahora(), ...(i >= 0 ? db.notas[i] : {}), ...n, id: n.id || uid(), user_id: u.user_id, actualizado_en: ahora() };
+      if (i >= 0) db.notas[i] = fila; else db.notas.push(fila);
+      guardar(); return deshacer(fila);
+    },
+    async borrarNota(nota) {
+      await espera(); const u = exigir();
+      const usados = new Set((db.ideas || []).filter((i) => i.user_id === u.user_id).flatMap((i) => [i.audio_path, i.foto_path]));
+      for (const r of [nota.audio_path, nota.foto_path]) if (r && !usados.has(r) && db.archivos_libreta) delete db.archivos_libreta[r];
+      db.notas = (db.notas || []).filter((x) => !(x.id === nota.id && x.user_id === u.user_id)); guardar();
+    },
+    async quitarArchivoNota(ruta) {
+      const u = exigir();
+      if (!(db.ideas || []).some((i) => i.user_id === u.user_id && (i.audio_path === ruta || i.foto_path === ruta)) && db.archivos_libreta) { delete db.archivos_libreta[ruta]; guardar(); }
+    },
+    async subirArchivoNota(blob, nombre) {
+      await espera(); const u = exigir();
+      const datosUrl = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(blob); });
+      const ruta = `${u.user_id}/${nombre}`;
+      db.archivos_libreta = { ...(db.archivos_libreta || {}), [ruta]: datosUrl }; guardar();
+      return ruta;
+    },
+    async urlsArchivosNota(rutas) { return Object.fromEntries(rutas.filter((r) => r && db.archivos_libreta?.[r]).map((r) => [r, db.archivos_libreta[r]])); },
+    async bajarArchivoNota(ruta) { const d = db.archivos_libreta?.[ruta]; if (!d) throw new Error("Archivo no encontrado"); return (await fetch(d)).blob(); },
+    async misIdeas() { await espera(); const u = exigir(); return deshacer((db.ideas || []).filter((i) => i.user_id === u.user_id).sort((a, b) => b.creado_en.localeCompare(a.creado_en))); },
+    async proponerIdea(notaId) {
+      await espera(); const u = exigir(); db.ideas = db.ideas || [];
+      const n = (db.notas || []).find((x) => x.id === notaId && x.user_id === u.user_id);
+      if (!n) throw new Error("Nota no encontrada");
+      if (!n.texto?.trim() && !n.audio_path && !n.foto_path) throw new Error("La nota está vacía");
+      const copia = { texto: n.texto, audio_path: n.audio_path, audio_seg: n.audio_seg, foto_path: n.foto_path, curso_id: n.curso_id, leccion_id: n.leccion_id, segundo: n.segundo, referencia: n.referencia };
+      const ya = db.ideas.find((i) => i.nota_id === n.id);
+      if (ya) { if (ya.estado !== "nueva") throw new Error("Esa idea ya la está revisando Gustavo"); Object.assign(ya, copia, { actualizado_en: ahora() }); guardar(); return { id: ya.id }; }
+      const idea = { id: uid(), user_id: u.user_id, nota_id: n.id, ...copia, estado: "nueva", respuesta: null, puntos: 0, creado_en: ahora(), actualizado_en: ahora() };
+      db.ideas.push(idea); guardar(); return { id: idea.id };
+    },
+    async retirarIdea(id) { const u = exigir(); db.ideas = (db.ideas || []).filter((i) => !(i.id === id && i.user_id === u.user_id && i.estado === "nueva")); guardar(); },
+    async marcarRespaldo() { const u = exigir(); u.libreta_respaldo_en = ahora(); guardar(); return u.libreta_respaldo_en; },
+    async adminIdeas() { await espera(); exigirAdmin(); return deshacer((db.ideas || []).sort((a, b) => b.creado_en.localeCompare(a.creado_en))); },
+    async responderIdea(id, estado, respuesta, puntos) {
+      await espera(); exigirAdmin();
+      const i = (db.ideas || []).find((x) => x.id === id); if (!i) throw new Error("Idea no encontrada");
+      let dados = 0;
+      if (estado === "implementada" && puntos > 0 && !db.puntos.some((p) => p.user_id === i.user_id && p.motivo === "idea" && p.ref === id)) {
+        dados = Math.min(puntos, 1000); darPuntos(i.user_id, dados, "idea", id);
+      }
+      Object.assign(i, { estado, respuesta: (respuesta || "").trim() || null, puntos: (i.puntos || 0) + dados, actualizado_en: ahora() });
+      guardar(); return { puntos_dados: dados };
+    },
+    async libretasResumen() {
+      await espera(); exigirAdmin();
+      const peso = (uidU) => Object.entries(db.archivos_libreta || {}).filter(([r]) => r.startsWith(uidU + "/"));
+      return db.usuarios.filter((u) => u.rol !== "admin" && ((db.notas || []).some((n) => n.user_id === u.user_id) || peso(u.user_id).length)).map((u) => {
+        const notas = (db.notas || []).filter((n) => n.user_id === u.user_id);
+        return { user_id: u.user_id, nombre: u.nombre, activo: u.activo, notas: notas.length,
+          ultima_nota: notas.map((n) => n.actualizado_en).sort().pop() || null,
+          ideas: (db.ideas || []).filter((i) => i.user_id === u.user_id).length,
+          archivos: peso(u.user_id).length, bytes: peso(u.user_id).reduce((a, [, d]) => a + Math.round(d.length * 0.75), 0),
+          respaldo_en: u.libreta_respaldo_en || null };
+      });
+    },
+    async borrarLibreta(userId, { soloTerminados = false, borrarTexto = false } = {}) {
+      await espera(); exigirAdmin();
+      const abiertas = new Set((db.ideas || []).filter((i) => i.user_id === userId && ["nueva", "probando"].includes(i.estado)).flatMap((i) => [i.audio_path, i.foto_path]));
+      const terminado = (c) => !soloTerminados || (c && db.puntos.some((p) => p.user_id === userId && p.motivo === "curso" && p.ref === c));
+      const rutas = new Set();
+      for (const n of (db.notas || []).filter((n) => n.user_id === userId && terminado(n.curso_id))) for (const r of [n.audio_path, n.foto_path]) if (r && !abiertas.has(r)) rutas.add(r);
+      for (const i of (db.ideas || []).filter((i) => i.user_id === userId && ["implementada", "descartada"].includes(i.estado) && terminado(i.curso_id))) for (const r of [i.audio_path, i.foto_path]) if (r && !abiertas.has(r)) rutas.add(r);
+      for (const r of rutas) delete db.archivos_libreta?.[r];
+      for (const x of [...(db.notas || []), ...(db.ideas || [])]) {
+        if (x.user_id !== userId) continue;
+        if (rutas.has(x.audio_path)) { x.audio_path = null; x.audio_seg = null; }
+        if (rutas.has(x.foto_path)) x.foto_path = null;
+      }
+      let borradas = 0;
+      if (borrarTexto) {
+        const antes = (db.notas || []).length;
+        db.notas = (db.notas || []).filter((n) => !(n.user_id === userId && !n.audio_path && !n.foto_path && terminado(n.curso_id)
+          && !(db.ideas || []).some((i) => i.nota_id === n.id && ["nueva", "probando"].includes(i.estado))));
+        borradas = antes - db.notas.length;
+      }
+      guardar(); return { archivos: rutas.size, notas: borradas };
+    },
     async subirPortada(blob) {
       exigirAdmin();
       return new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(blob); });

@@ -12,6 +12,7 @@ import { pintarAudiolibro, pintarBiblioteca, tarjetaAudio, esNuevoAudio } from "
 import { avatarOIniciales, avatarSVG, avatarCuerpoSVG } from "./avatar.js";
 import { pintarEditorAvatar, invitarAvatar } from "./avatar-editor.js";
 import { pintarPremiosEmpleado, tarjetaMeta, revisarMeta } from "./premios.js";
+import { pintarLibreta, montarLibretaLeccion, iniciarColaLibreta, revisarIdeas } from "./libreta.js";
 
 const app = document.getElementById("app");
 const LOGO = "img/logo.png";
@@ -65,6 +66,7 @@ async function enrutar() {
       case "insignias": return await pintarInsignias();
       case "ranking": return await pintarRanking();
       case "premios": return await pintarPremiosEmpleado(ctxAudio());
+      case "libreta": return await pintarLibreta(ctxAudio());
       default: return await pintarInicio();
     }
   } catch (e) {
@@ -146,13 +148,6 @@ export async function celebrar(insignias, puntos) {
   else if (puntos) aviso(`+${num(puntos)} pts`, "ok");
 }
 
-// Abre WhatsApp con un mensaje listo para mandar ideas del curso a Gustavo.
-function mandarIdeas(titulo) {
-  const nombre = String(estado.perfil?.nombre || "").split(" ")[0];
-  const txt = `Hola Gustavo, soy ${nombre || "del equipo"}. Terminé el curso "${titulo}" en la Academia del Buen Café. Mis ideas para Mozzafiato:\n\n1. \n2. \n3. `;
-  window.open(`https://wa.me/?text=${encodeURIComponent(txt)}`, "_blank", "noopener");
-}
-
 // Celebra cada avance: lección, hito del curso, curso terminado, insignias, racha y nivel.
 async function celebrarAvance({ puntos, insignias, cursoTerminado, pctAntes, pctDespues, curso, cursoId }) {
   if (cursoTerminado) {
@@ -165,12 +160,12 @@ async function celebrarAvance({ puntos, insignias, cursoTerminado, pctAntes, pct
         <p class="modal-texto">Lo terminaste de principio a fin. Eso habla de tu compromiso con el equipo y con cada cliente.</p>
         ${puntos ? `<b style="color:var(--oro);font-size:18px">+${num(puntos)} pts</b>` : ""}
         <div class="tip-apuntes" style="text-align:left">${icono("libreta", 18)}<span>Repasa tus apuntes: ¿qué podríamos <b>agregar al menú o mejorar</b> en Mozzafiato con lo que aprendiste?</span></div>
-        <button class="btn btn-sec btn-bloque" data-cerrar="ideas">${icono("send", 18)}Mandar mis ideas a Gustavo</button>
+        <button class="btn btn-sec btn-bloque" data-cerrar="ideas">${icono("bulb", 18)}Proponer mis ideas a Gustavo</button>
         ${curso.certificado ? `<button class="btn btn-bloque" data-cerrar="cert">${icono("medal", 18)}Ver mi certificado</button>` : ""}
         <button class="btn ${curso.certificado ? "btn-sec" : ""} btn-bloque" data-cerrar>Seguir</button>
       </div>`, { clase: "desbloqueo" });
     if (r === "cert") { try { sessionStorage.setItem("academia-abrir-cert", cursoId); } catch (_) { /* nada */ } ir(`/curso/${cursoId}`); }
-    if (r === "ideas") mandarIdeas(curso.titulo);
+    if (r === "ideas") ir("/libreta");
   } else {
     const hito = hitoCurso(pctAntes, pctDespues, curso.titulo);
     if (hito) { confeti({ cantidad: 90 }); momento({ ...hito, puntos, tono: "oro" }); }
@@ -338,6 +333,7 @@ async function salir() {
 async function pintarInicio() {
   cargando();
   vaciarCola().catch(() => {});
+  iniciarColaLibreta(() => estado.perfil?.usuario);
   const [r, cursos, audiosTodos, miAv, metaId, catPremios] = await Promise.all([datos.resumen(), datos.misCursos(), datos.misAudiolibros().catch(() => []),
     datos.miAvatar().catch(() => null), datos.miMeta().catch(() => null), datos.premios().catch(() => ({ premios: [] }))]);
   estado.miAvatar = miAv;
@@ -381,6 +377,12 @@ async function pintarInicio() {
     </section>
 
     ${(catPremios.premios || []).length ? tarjetaMeta(metaPremio, r.puntos_disponibles) : ""}
+
+    <button class="tarjeta-borde fila tarjeta-libreta" data-ir="/libreta">
+      <span class="medalla medalla-oro chica" style="flex:none">${icono("libreta", 22)}</span>
+      <span style="flex:1;min-width:0"><b style="display:block;font-size:15px">Mi libreta</b><span class="texto-tenue" style="font-size:12.5px">Tus apuntes, notas de voz e ideas para mejorar Mozzafiato.</span></span>
+      ${icono("next", 18)}
+    </button>
 
     ${enCurso ? `
     <section class="pila">
@@ -442,32 +444,34 @@ async function pintarInicio() {
   try { vista = localStorage.getItem(llaveBienvenida) === "1"; } catch (_) { /* sin almacenamiento */ }
   if (!vista) {
     await mostrarBienvenida(r);
-    try { localStorage.setItem(llaveBienvenida, "1"); localStorage.setItem(`academia-novedad-audio-${r.usuario}`, "1"); localStorage.setItem(`academia-novedad-apuntes-${r.usuario}`, "1"); } catch (_) { /* nada */ }
+    try { localStorage.setItem(llaveBienvenida, "1"); localStorage.setItem(`academia-novedad-audio-${r.usuario}`, "1"); localStorage.setItem(`academia-novedad-libreta-${r.usuario}`, "1"); } catch (_) { /* nada */ }
   }
-  if (vista) { await novedadAudiolibros(r); await novedadApuntes(r); }
+  if (vista) { await novedadAudiolibros(r); if ((await novedadApuntes(r)) === "libreta") return ir("/libreta"); }
   await anunciarNuevos(r, cursos, audios);
   await invitarAvatar(ctxAudio(), r);
   await revisarMeta(r.usuario, metaPremio, r.puntos_disponibles, ir);
+  await revisarIdeas(r.usuario);
   if (r.insignias_sin_ver?.length) celebrar(r.insignias_sin_ver);
 }
 
 // Aviso único para quien ya conocía la Academia: tomar apuntes.
 async function novedadApuntes(r) {
-  const llave = `academia-novedad-apuntes-${r.usuario}`;
+  const llave = `academia-novedad-libreta-${r.usuario}`;
   try { if (localStorage.getItem(llave)) return; localStorage.setItem(llave, "1"); } catch (_) { return; }
   const fila = (ic, txt) => `<div class="fila" style="gap:12px;align-items:flex-start"><span style="flex:none;width:22px;color:var(--oro);display:flex;justify-content:center">${icono(ic, 20)}</span><span style="font-size:14px">${txt}</span></div>`;
-  await modal(`
+  return modal(`
     <div class="anuncio-nuevo">
       <div class="anuncio-icono">${icono("libreta", 34)}</div>
       <div class="etiqueta" style="text-align:center;color:var(--oro)">Un recordatorio importante</div>
       <h2 class="modal-titulo" style="text-align:center">Toma apuntes: tus ideas cuentan</h2>
       <p class="texto-tenue" style="text-align:center;margin:0">La idea de estos cursos es que al final <b style="color:var(--crema)">mejoremos nuestro menú e implementemos cosas nuevas</b> en Mozzafiato. Y eso empieza con lo que tú anotes.</p>
       <div class="pila" style="gap:10px">
-        ${fila("libreta", "Ten a la mano una libreta o las notas de tu celular.")}
-        ${fila("bulb", "Anota recetas, técnicas e ideas para mejorar el servicio.")}
-        ${fila("send", "Al terminar un curso, manda tus ideas a Gustavo.")}
+        ${fila("libreta", "Nuevo: <b>Mi libreta</b>. En cada lección toca <b>Anotar</b> y se guarda el minuto exacto del video.")}
+        ${fila("mic", "Escribe, graba una nota de voz o toma una foto.")}
+        ${fila("bulb", "Toca <b>Proponer a Gustavo</b> en tus mejores ideas. Si se implementan, ganas puntos.")}
       </div>
-      <button class="btn btn-bloque" data-cerrar>${icono("check", 18)}¡Entendido!</button>
+      <button class="btn btn-bloque" data-cerrar="libreta">${icono("libreta", 18)}Abrir mi libreta</button>
+      <button class="btn-texto" data-cerrar style="align-self:center">Después</button>
     </div>`);
 }
 
@@ -562,10 +566,11 @@ function abrirPerfil(r) {
     </div>
     ${pendientesCola() ? `<p class="texto-tenue">${pendientesCola()} avance(s) esperando señal para enviarse.</p>` : ""}
     <button class="btn btn-bloque" data-cerrar="avatar">${icono("user", 18)}${estado.miAvatar ? "Editar mi avatar" : "Crear mi avatar"}</button>
+    <button class="btn btn-sec btn-bloque" data-cerrar="libreta">${icono("libreta", 18)}Mi libreta</button>
     <button class="btn btn-sec btn-bloque" data-cerrar="bienvenida">${icono("book", 18)}Cómo funciona la Academia</button>
     <button class="btn btn-peligro btn-bloque" data-cerrar="salir">${icono("logout", 18)}Cerrar sesión</button>
     <button class="btn btn-sec btn-bloque" data-cerrar>Cerrar</button>
-  `).then((v) => { if (v === "salir") salir(); if (v === "bienvenida") mostrarBienvenida(r); if (v === "avatar") ir("/avatar"); });
+  `).then((v) => { if (v === "salir") salir(); if (v === "bienvenida") mostrarBienvenida(r); if (v === "avatar") ir("/avatar"); if (v === "libreta") ir("/libreta"); });
   const cuerpo = modal.actual?.querySelector("#perfil-cuerpo svg");
   if (cuerpo) {
     setTimeout(() => cuerpo.classList.add("av-saluda"), 350);
@@ -621,10 +626,10 @@ function mostrarBienvenida(r) {
       icono: "libreta", titulo: "Toma apuntes: tus ideas cuentan",
       cuerpo: `<p class="modal-texto" style="line-height:1.55">Estos cursos no son solo para aprender: la idea es que, al terminar, <b>mejoremos nuestro menú e implementemos cosas nuevas</b> en Mozzafiato. Y eso empieza con lo que tú anotes.</p>
         <div class="pila" style="gap:14px">
-        ${punto("libreta", "Ten a la mano una libreta", "O las notas de tu celular. Pausa el video cuando algo te llame la atención.")}
+        ${punto("libreta", "Usa tu libreta en la app", "En cada lección toca Anotar: se guarda el minuto exacto del video. Escribe, graba una nota de voz o toma una foto.")}
         ${punto("bulb", "Anota ideas, no solo datos", "Una receta que podríamos probar, una técnica, algo que haríamos mejor en el servicio.")}
         ${punto("marcador", "En los audiolibros, usa marcadores", "Guárdalos con una nota para volver a esa idea después.")}
-        ${punto("send", "Compártelas al terminar", "Cuando acabes un curso, manda tus ideas a Gustavo. Las mejores se prueban en Mozzafiato.")}
+        ${punto("send", "Propónselas a Gustavo", "Desde tu libreta toca “Proponer a Gustavo”. Las mejores se prueban en Mozzafiato y, si se implementan, ganas puntos.")}
       </div>`,
     },
     {
@@ -719,8 +724,8 @@ async function pintarCurso(id) {
       ${siguiente ? `<button class="btn" data-ir="${B}/leccion/${id}/${siguiente.id}">${icono("play", 18)}${listas ? "Continuar" : "Empezar curso"}</button>` : ""}
     </header>
     ${terminado
-      ? `<div class="tip-apuntes">${icono("libreta", 18)}<span style="flex:1">¿Ya compartiste tus ideas de este curso? Lo que anotaste puede mejorar nuestro menú.</span><button class="btn btn-chico btn-sec" id="mandar-ideas">${icono("send", 16)}Mandar</button></div>`
-      : `<div class="tip-apuntes">${icono("libreta", 18)}<span><b>Ten tu libreta a la mano.</b> Este curso es para mejorar nuestro menú y probar cosas nuevas: anota recetas, técnicas e ideas mientras avanzas.</span></div>`}
+      ? `<div class="tip-apuntes">${icono("libreta", 18)}<span style="flex:1">¿Ya le propusiste tus ideas de este curso a Gustavo? Lo que anotaste puede mejorar nuestro menú.</span>${vp ? "" : `<button class="btn btn-chico btn-sec" id="mandar-ideas">${icono("bulb", 16)}Mi libreta</button>`}</div>`
+      : `<div class="tip-apuntes">${icono("libreta", 18)}<span style="flex:1"><b>Toma apuntes.</b> Este curso es para mejorar nuestro menú y probar cosas nuevas: en cada lección toca <b>Anotar</b> y guarda recetas, técnicas e ideas.</span>${vp ? "" : `<button class="btn btn-chico btn-sec" id="mandar-ideas">${icono("libreta", 16)}Mi libreta</button>`}</div>`}
 
     ${terminado ? `<div class="tarjeta fila" style="border:1px solid var(--verde)">${icono("trophy", 28)}<div><b>¡Curso completado!</b><div class="texto-tenue">Buen trabajo. Tus puntos ya están en tu cuenta.</div></div></div>` : ""}
     ${d.curso.certificado && (terminado || vp) ? `<button class="tarjeta-borde fila" id="ver-cert" style="border-color:var(--oro);gap:14px;display:flex;align-items:center">
@@ -760,7 +765,7 @@ async function pintarCurso(id) {
   </main>`);
 
   app.querySelector("#volver").onclick = () => ir(vp ? `/admin/curso/${id}` : "/inicio");
-  app.querySelector("#mandar-ideas")?.addEventListener("click", () => mandarIdeas(d.curso.titulo));
+  app.querySelector("#mandar-ideas")?.addEventListener("click", () => ir("/libreta"));
   app.querySelector("#ver-cert")?.addEventListener("click", () => {
     const fechas = [...d.progreso.filter((p) => p.completado && orden.some((l) => l.id === p.leccion_id)).map((p) => p.completado_en),
       ...d.intentos.filter((t) => t.aprobado).map((t) => t.creado_en)].filter(Boolean).sort();
@@ -851,7 +856,7 @@ async function pintarLeccion(cursoId, leccionId) {
       <h1 class="titulo-pagina" style="font-size:30px">${esc(leccion.titulo)}</h1>
       <span class="texto-tenue">${cap ? esc(cap.titulo) : ""}${leccion.duracion_seg ? " · " + duracion(leccion.duracion_seg) : ""}</span>
     </div>
-    <div class="tip-apuntes">${icono("libreta", 18)}<span>${TIPS_APUNTES[idx % TIPS_APUNTES.length]}</span></div>
+    ${vp ? `<div class="tip-apuntes">${icono("libreta", 18)}<span>${TIPS_APUNTES[idx % TIPS_APUNTES.length]}</span></div>` : `<section id="libreta-leccion"></section>`}
     <div class="tarjeta fila" id="estado-leccion">${estadoLeccionHTML(completado)}</div>
     <div class="fila-botones" style="justify-content:stretch">
       ${idx > 0 ? `<button class="btn btn-sec" data-ir="${B}/leccion/${cursoId}/${orden[idx - 1].id}">${icono("back", 18)}Anterior</button>` : ""}
@@ -870,6 +875,18 @@ async function pintarLeccion(cursoId, leccionId) {
 
   // ---- Seguimiento de avance ----
   let ultimoSeg = v.segundo_inicio || 0, ultimaDur = leccion.duracion_seg || 0, ultimoEnvio = 0, enviando = false, ultimoEnviado = -1;
+  // Mi libreta: apuntes ligados al minuto del video
+  const ctlVideo = { tiempo: () => ultimoSeg, saltar: () => {}, pausar: () => {} };
+  let saltarA = null;
+  try {
+    const sj = JSON.parse(sessionStorage.getItem("academia-saltar") || "null");
+    if (sj && sj.leccion === leccionId) saltarA = Number(sj.seg) || 0;
+    sessionStorage.removeItem("academia-saltar");
+  } catch (_) { /* nada */ }
+  if (!vp) montarLibretaLeccion(app.querySelector("#libreta-leccion"), {
+    curso: d.curso, leccion, video: ctlVideo, usuario: estado.perfil?.usuario, ir,
+    tip: TIPS_APUNTES[idx % TIPS_APUNTES.length].replace(/<\/?b>/g, ""),
+  });
   const reportar = async (forzar = false) => {
     if (vp || enviando) return;
     if (!forzar && Date.now() - ultimoEnvio < 10000) return;
@@ -913,6 +930,9 @@ async function pintarLeccion(cursoId, leccionId) {
     };
     const vig = crearVigilante({ pausar: parar, reanudar: arrancar, min: 40, max: 70, activo: !vp });
     pausarVideo = parar;
+    ctlVideo.pausar = parar;
+    ctlVideo.saltar = (s) => { mover(s); reportar(true); };
+    if (saltarA != null) mover(saltarA);
     play.onclick = () => (timer ? parar() : arrancar());
     barra.oninput = () => mover(Number(barra.value));
     barra.onchange = () => reportar(true);
@@ -925,10 +945,13 @@ async function pintarLeccion(cursoId, leccionId) {
   let player = null;
   const vig = crearVigilante({ pausar: () => player?.pause(), reanudar: () => player?.play(), min: 240, max: 420, activo: !vp });
   pausarVideo = () => player?.pause();
+  ctlVideo.pausar = () => player?.pause();
+  ctlVideo.saltar = (s) => { try { player?.setCurrentTime(s); player?.play(); } catch (_) { /* nada */ } };
   try {
     player = new window.playerjs.Player(iframe);
     player.on("ready", () => {
-      if (v.segundo_inicio > 5) player.setCurrentTime(v.segundo_inicio);
+      if (saltarA != null) player.setCurrentTime(saltarA);
+      else if (v.segundo_inicio > 5) player.setCurrentTime(v.segundo_inicio);
       let previo = null;
       player.on("timeupdate", (t) => {
         if (previo !== null) { const d = t.seconds - previo; if (d > 0 && d < 5) vig.avanzar(d); }

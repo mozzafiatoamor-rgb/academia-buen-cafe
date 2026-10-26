@@ -685,3 +685,52 @@ button.avatar-grande { border: 0; padding: 0; background: transparent; cursor: p
 .tip-apuntes > svg { flex: none; color: var(--oro); }
 .tip-apuntes b { color: var(--crema); }
 .tip-apuntes .btn { flex: none; }
+
+/* ---------- Mi libreta e ideas (v1.16.0) ---------- */
+.tarjeta-libreta { display: flex; align-items: center; gap: 14px; border-color: rgba(227, 182, 107, .45); }
+.libreta-leccion { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: rgba(227, 182, 107, .07); border: 1px dashed rgba(227, 182, 107, .45); }
+.apunte-mini { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 12px; background: var(--tarjeta); }
+.apunte-mini.pendiente { opacity: .75; }
+.apunte-mini-texto { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; color: var(--crema); font: inherit; font-size: 13.5px; line-height: 1.4; padding: 2px 0; cursor: pointer; white-space: pre-wrap; word-break: break-word; }
+.apunte-iconos { display: inline-flex; gap: 4px; margin-left: 6px; color: var(--oro); vertical-align: -2px; }
+.apunte-iconos em { font-style: normal; font-size: 11px; font-weight: 700; }
+.chip-tiempo { display: inline-flex; align-items: center; gap: 3px; flex: none; height: 26px; padding: 0 9px; border-radius: 99px; border: 1px solid var(--oro); background: transparent; color: var(--oro); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; font-variant-numeric: tabular-nums; }
+.chip-tiempo:hover { background: rgba(227, 182, 107, .12); }
+.ln-texto { width: 100%; min-height: 110px; resize: vertical; border-radius: 14px; border: 1px solid var(--linea); background: var(--tarjeta-2, var(--tarjeta)); color: var(--crema); font: inherit; font-size: 15px; line-height: 1.45; padding: 12px; }
+.ln-texto:focus { outline: 2px solid var(--oro); outline-offset: 1px; }
+.ln-adjuntos { display: flex; flex-direction: column; gap: 8px; }
+.ln-adjunto:empty { display: none; }
+.ln-archivo { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border-radius: 12px; background: var(--tarjeta); color: var(--oro); }
+.ln-archivo audio { flex: 1; min-width: 0; height: 38px; }
+.ln-archivo img { flex: 1; min-width: 0; max-height: 180px; object-fit: contain; border-radius: 10px; }
+.ln-grabando { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; background: rgba(224, 90, 70, .12); border: 1px solid rgba(224, 90, 70, .5); }
+.ln-grabando b { font-variant-numeric: tabular-nums; font-size: 17px; }
+.ln-grabando .btn { margin-left: auto; }
+.punto-rojo { width: 12px; height: 12px; border-radius: 50%; background: #e05a46; animation: latido 1s ease-in-out infinite; }
+@keyframes latido { 50% { opacity: .3; transform: scale(.8); } }
+.ln-idea span { display: inline-flex; align-items: center; gap: 6px; }
+.libreta-cabeza { display: flex; align-items: center; gap: 14px; }
+.libreta-grupo { font-size: 16px; margin: 4px 0 0; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.nota-tarjeta { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; background: var(--tarjeta); border: 1px solid var(--linea); }
+.nota-tarjeta.pendiente { border-style: dashed; border-color: var(--oro); }
+.nota-tarjeta audio { width: 100%; height: 40px; }
+.nota-texto { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 14.5px; line-height: 1.5; }
+.nota-foto { border: 0; padding: 0; background: transparent; cursor: zoom-in; align-self: flex-start; }
+.nota-foto img { max-width: 100%; max-height: 220px; border-radius: 12px; display: block; }
+.estado-idea { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 99px; font-size: 12px; font-weight: 800; background: rgba(227, 182, 107, .12); color: var(--oro); }
+.estado-idea.probando { background: rgba(227, 140, 70, .18); color: #f0a35e; }
+.estado-idea.implementada { background: rgba(110, 170, 110, .2); color: #8fd18f; }
+.estado-idea.descartada { background: var(--linea); color: var(--arena); }
+.nota-tarjeta.idea.implementada { border-color: rgba(110, 170, 110, .55); }
+.respuesta-gustavo { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: rgba(227, 182, 107, .08); border-left: 3px solid var(--oro); font-size: 13.5px; line-height: 1.45; }
+.respuesta-gustavo > svg { flex: none; color: var(--oro); margin-top: 2px; }
+.buscador { width: 100%; height: 44px; border-radius: 12px; border: 1px solid var(--linea); background: var(--tarjeta); color: var(--crema); font: inherit; padding: 0 14px; }
+/* Admin */
+.idea-admin { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: var(--tarjeta); border: 1px solid var(--linea); }
+.idea-admin.nueva { border-color: rgba(227, 182, 107, .6); }
+.idea-quien { display: flex; align-items: center; gap: 10px; }
+.uso-barra { height: 10px; border-radius: 99px; background: var(--linea); overflow: hidden; }
+.uso-barra i { display: block; height: 100%; background: var(--oro); border-radius: 99px; }
+.sin-respaldo { color: #f0a35e; font-weight: 700; }
+.globo-cuenta { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 6px; border-radius: 99px; background: var(--oro); color: #1B1411; font-size: 11.5px; font-weight: 800; }
+.vista-libreta .barra-sup { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
