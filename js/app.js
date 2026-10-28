@@ -11,7 +11,7 @@ import { fijarCfgPuntos, valorCurso, puntosLeccion } from "./puntos.js";
 import { pintarAudiolibro, pintarBiblioteca, tarjetaAudio, esNuevoAudio } from "./audio.js";
 import { avatarOIniciales, avatarSVG, avatarCuerpoSVG } from "./avatar.js";
 import { pintarEditorAvatar, invitarAvatar } from "./avatar-editor.js";
-import { pintarPremiosEmpleado, tarjetaMeta, revisarMeta } from "./premios.js";
+import { pintarPremiosEmpleado, tarjetaMeta, revisarMeta, revisarCanjes } from "./premios.js";
 import { pintarLibreta, montarLibretaLeccion, iniciarColaLibreta, revisarIdeas, presentarLibreta, vioPresentacionLibreta,
   propuestasPendientes, tarjetaPropuestas, conectarPropuestas, recordarPropuesta, escribirPropuesta } from "./libreta.js";
 
@@ -457,6 +457,7 @@ async function pintarInicio() {
   await anunciarNuevos(r, cursos, audios);
   await invitarAvatar(ctxAudio(), r);
   await revisarMeta(r.usuario, metaPremio, r.puntos_disponibles, ir);
+  await revisarCanjes(r.usuario, catPremios.canjes || [], catPremios.premios || []);
   await revisarIdeas(r.usuario);
   if (await recordarPropuesta(pendProp, r.usuario)) return pintarInicio();
   if (r.insignias_sin_ver?.length) celebrar(r.insignias_sin_ver);

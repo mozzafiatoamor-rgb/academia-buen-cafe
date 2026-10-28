@@ -303,3 +303,83 @@ export async function pintarFicha(main, userId) {
   conectarHist();
   main.querySelectorAll("[data-diploma]").forEach((b) => (b.onclick = () => verDiploma(p, f.cursos.find((c) => c.id === b.dataset.diploma))));
 }
+
+// ---------------------------------------------------------------------
+//  Avisos para el admin: qué tiene pendiente por dar o revisar
+// ---------------------------------------------------------------------
+const diasDesde = (iso) => (iso ? (Date.now() - new Date(iso + "T12:00:00").getTime()) / 864e5 : Infinity);
+
+export async function pendientesAdmin() {
+  const [rec, pr, ideas] = await Promise.all([
+    datos.adminReconocer().then((x) => ({ gente: x })).catch((e) => ({ error: e })),
+    datos.adminPremios().catch(() => ({ premios: [], canjes: [] })),
+    datos.adminIdeas().catch(() => []),
+  ]);
+  const r = { canjes: (pr.canjes || []).filter((c) => c.estado === "pendiente").length, premios: 0, diplomas: 0, propuestas: 0,
+    ideas: ideas.filter((i) => i.estado === "nueva").length, faltaSql: !!rec.error };
+  if (rec.gente) {
+    const vig = premiosVigentes(pr.premios || []);
+    const avisados = leer(LLAVE_PREMIOS), entregados = leer(LLAVE_DIPLOMAS), recordados = leer(LLAVE_PROPUESTAS);
+    r.premios = rec.gente.filter((g) => vig.some((p) => p.costo <= g.disponibles) && diasDesde(avisados[g.user_id]) > 7).length;
+    r.diplomas = rec.gente.reduce((a, g) => a + g.diplomas.filter((d) => !entregados[`${g.user_id}|${d.curso_id}`]).length, 0);
+    r.propuestas = rec.gente.filter((g) => (g.sin_propuesta || []).length && diasDesde(recordados[g.user_id]) > 3).length;
+  }
+  r.resumen = r.premios + r.diplomas + r.propuestas;
+  r.total = r.canjes + r.resumen + r.ideas;
+  return r;
+}
+
+function lineas(p) {
+  return [
+    [p.canjes, "canjes por aprobar", "canje por aprobar", "gift", "#/admin/resumen", "canjes"],
+    [p.premios, "personas a las que ya les alcanza un premio", "persona a la que ya le alcanza un premio", "star", "#/admin/resumen", "reconocer"],
+    [p.diplomas, "diplomas por entregar", "diploma por entregar", "medal", "#/admin/resumen", "reconocer"],
+    [p.propuestas, "personas sin su propuesta", "persona sin su propuesta", "bulb", "#/admin/resumen", "reconocer"],
+    [p.ideas, "ideas nuevas", "idea nueva", "send", "#/admin/ideas", ""],
+  ].filter(([n]) => n > 0);
+}
+
+// Franja "Pendientes de hoy" arriba del Resumen.
+export function franjaPendientes(caja, p) {
+  if (!caja) return;
+  const ls = lineas(p);
+  if (!ls.length && !p.faltaSql) { caja.innerHTML = `<div class="pendientes-hoy listo">${icono("check", 18)}<span>Estás al día: no tienes canjes, premios, diplomas ni ideas pendientes.</span></div>`; return; }
+  caja.innerHTML = `
+    <div class="pendientes-hoy">
+      <b>${icono("bell", 18, 'style="vertical-align:-3px"')} Pendientes de hoy</b>
+      <div class="fila" style="gap:8px;flex-wrap:wrap">${ls.map(([n, pl, sg, ic, href, ancla]) => `<a class="chip-pendiente" href="${href}" data-ancla="${ancla}">${icono(ic, 15)}<b>${n}</b> ${n === 1 ? sg : pl}</a>`).join("")}</div>
+      ${p.faltaSql ? `<small class="texto-tenue">${icono("bulb", 13)} Para ver premios por ofrecer y diplomas por entregar, corre en Supabase los pasos 11 y 13 de SQL.</small>` : ""}
+    </div>`;
+  caja.querySelectorAll("[data-ancla]").forEach((a) => (a.onclick = (e) => {
+    const destino = a.dataset.ancla && document.getElementById(a.dataset.ancla);
+    if (destino && location.hash.startsWith("#/admin/resumen")) { e.preventDefault(); destino.scrollIntoView({ behavior: "smooth", block: "start" }); destino.classList.add("resaltar"); setTimeout(() => destino.classList.remove("resaltar"), 1600); }
+  }));
+}
+
+// Ventana de avisos al entrar al panel (una vez por sesión del navegador).
+export async function avisoAlEntrar(p, ir) {
+  try { if (sessionStorage.getItem("academia-admin-avisos")) return; sessionStorage.setItem("academia-admin-avisos", "1"); } catch (_) { return; }
+  const ls = lineas(p);
+  if (!ls.length) return;
+  const v = await modal(`
+    <div class="pila" style="gap:14px">
+      <div class="medalla medalla-oro" style="width:64px;height:64px;align-self:center">${icono("bell", 30)}</div>
+      <h2 class="modal-titulo" style="text-align:center">Tienes pendientes</h2>
+      <div class="pila" style="gap:8px">${ls.map(([n, pl, sg, ic, href]) => `<button class="aviso-admin-fila" data-cerrar="${href}">${icono(ic, 18)}<span style="flex:1;text-align:left"><b>${n}</b> ${n === 1 ? sg : pl}</span>${icono("next", 16)}</button>`).join("")}</div>
+      <button class="btn btn-sec btn-bloque" data-cerrar>Después</button>
+    </div>`);
+  if (typeof v === "string" && v.startsWith("#/")) ir(v.slice(1));
+}
+
+// Globitos en el menú del panel.
+export function globosMenu(app, p) {
+  const poner = (ruta, n) => {
+    const a = app.querySelector(`.admin-menu a[href="#/admin/${ruta}"]`);
+    if (!a) return;
+    a.querySelector(".globo-cuenta")?.remove();
+    if (n) a.insertAdjacentHTML("beforeend", `<span class="globo-cuenta">${n}</span>`);
+  };
+  poner("resumen", p.resumen + p.canjes);
+  poner("premios", p.canjes);
+  poner("ideas", p.ideas);
+}

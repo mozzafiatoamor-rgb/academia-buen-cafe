@@ -12,7 +12,7 @@ import { cambiarPortada, quitarPortada } from "./portadas.js";
 import { avatarOIniciales, avatarCuerpoSVG } from "./avatar.js";
 import { estadoSubtitulos, subtitulosLeccion, subtitulosCapitulo } from "./subtitulos.js";
 import { pintarIdeasAdmin, contarIdeasNuevas } from "./admin-ideas.js";
-import { montarRanking, montarReconocer, pintarFicha } from "./admin-equipo.js";
+import { montarRanking, montarReconocer, pintarFicha, pendientesAdmin, franjaPendientes, avisoAlEntrar, globosMenu } from "./admin-equipo.js";
 
 const LOGO = "img/logo.png";
 let ctx; // { ir, salir }
@@ -44,10 +44,10 @@ export async function vistaAdmin(app, partes, contexto) {
     </div>
   </div>`;
   fijarMenuMovil(app);
-  contarIdeasNuevas().then((n) => {
-    const a = app.querySelector('.admin-menu a[href="#/admin/ideas"]');
-    if (a && n) a.insertAdjacentHTML("beforeend", `<span class="globo-cuenta">${n}</span>`);
-  });
+  pendientesAdmin().then((p) => {
+    globosMenu(app, p);
+    avisoAlEntrar(p, ctx.ir);
+  }).catch(() => {});
   app.querySelector("#salir").onclick = ctx.salir;
   app.querySelector("#salir-movil").onclick = ctx.salir;
   const main = app.querySelector("#admin-main");
@@ -131,6 +131,7 @@ async function pintarResumen(main) {
         <a class="btn" href="#/admin/cursos">${icono("plus", 18)}Curso</a>
       </div>
     </div>
+    <div id="pendientes-hoy"></div>
     <div class="metricas">
       <div class="metrica"><small>Empleados activos</small><b>${activos.length}</b><span>con acceso a la Academia</span></div>
       <div class="metrica"><small>Cursos publicados</small><b>${cursos.filter((c) => c.publicado).length}</b><span>${cursos.reduce((a, c) => a + c.lecciones, 0)} lecciones en total</span></div>
@@ -148,7 +149,7 @@ async function pintarResumen(main) {
         <section class="panel" id="ranking"></section>
         <section class="panel pila" id="reconocer" style="gap:10px"></section>
         <section class="panel" id="alertas-cuentas" hidden></section>
-        <section class="panel">
+        <section class="panel" id="canjes-panel">
           <h2>Canjes por aprobar</h2>
           <div id="canjes" class="pila">${listaCanjesHTML(pendientes)}</div>
         </section>
@@ -176,6 +177,7 @@ async function pintarResumen(main) {
     pintarTabla();
   };
   conectarCanjes(main);
+  pendientesAdmin().then((p) => franjaPendientes(main.querySelector("#pendientes-hoy"), p)).catch(() => {});
   montarRanking(main.querySelector("#ranking"), avs);
   montarReconocer(main.querySelector("#reconocer"), avs);
   pintarAlertasCuentas(main.querySelector("#alertas-cuentas"));

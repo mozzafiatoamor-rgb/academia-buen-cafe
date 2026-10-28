@@ -124,8 +124,10 @@ export async function pintarPremiosEmpleado(ctx) {
 
   ctx.conNav(`
   <main class="vista">
-    <h1 class="titulo-pagina">Premios</h1>
-    <section class="saldo"><div><div style="font-size:12px;font-weight:700;letter-spacing:1px">PUNTOS DISPONIBLES</div><b>${num(disp)}</b></div>${icono("gift", 40)}</section>
+    <div class="fila-entre" style="gap:10px"><h1 class="titulo-pagina">Premios</h1>
+      <button class="btn btn-sec btn-chico" id="como-puntos">${icono("bulb", 16)}¿Cómo funcionan mis puntos?</button></div>
+    <section class="saldo"><div><div style="font-size:12px;font-weight:700;letter-spacing:1px">PUNTOS DISPONIBLES</div><b>${num(disp)}</b>
+      <small style="display:block;font-weight:700;opacity:.8;margin-top:4px">${num(r.puntos_ganados)} ganados en total${r.puntos_ganados > disp ? ` · ${num(r.puntos_ganados - disp)} ya canjeados o apartados` : ""}</small></div>${icono("gift", 40)}</section>
     ${meta ? tarjetaMeta(meta, disp) : `<p class="texto-tenue" style="margin:0">${icono("target", 14)} Toca la diana de un premio para hacerlo <b>tu meta</b>: lo verás en Inicio con tu avance.</p>`}
     ${destacados.length ? `<section class="pila"><div class="etiqueta">Destacados</div><div class="carrusel-premios">${destacados.map((p) => tarjeta(p, true)).join("")}</div></section>` : ""}
     ${formasHTML(formas)}
@@ -137,11 +139,22 @@ export async function pintarPremiosEmpleado(ctx) {
       ${canjes.slice(0, 10).map((c) => `<div class="fila-entre tarjeta" style="padding:12px 14px"><div><b style="font-size:14px">${esc(nombrePremio(c.premio_id))}</b><div class="texto-tenue" style="font-size:12px">${num(c.costo)} pts · ${haceCuanto(c.creado_en)}</div></div>
         <span class="pildora ${c.estado === "aprobado" ? "pildora-ok" : c.estado === "rechazado" ? "pildora-alerta" : ""}">${c.estado === "pendiente" ? "En revisión" : c.estado === "aprobado" ? "Aprobado" : "Rechazado"}</span></div>`).join("")}
     </section>` : ""}
-    <p class="texto-tenue">Al canjear, Gustavo recibe tu solicitud y la aprueba desde su panel. Si la rechaza, tus puntos regresan.</p>
+    <section class="tarjeta pila" style="gap:10px">
+      <b>${icono("gift", 18, 'style="vertical-align:-3px;color:var(--oro)"')} ¿Cómo reclamo mi premio?</b>
+      <ol class="pasos-canje">
+        <li>Cuando te alcancen los puntos, toca <b>Canjear</b> en el premio.</li>
+        <li>Tus puntos se apartan y Gustavo recibe tu solicitud (<b>En revisión</b>).</li>
+        <li>Cuando la aprueba, te avisamos aquí en la app: <b>pasa con Gustavo</b> a recoger tu premio.</li>
+        <li>Si no se puede, la rechaza y <b>tus puntos regresan</b> completos.</li>
+      </ol>
+      <small class="texto-tenue">Canjear no te baja de nivel ni del ranking: esos cuentan todos los puntos que has ganado.</small>
+    </section>
   </main>`, "premios");
 
   const app = ctx.app;
   app.querySelectorAll("[data-ir]").forEach((b) => (b.onclick = () => ctx.ir(b.dataset.ir)));
+  app.querySelector("#como-puntos").onclick = () => presentarPuntos(r);
+  if (!vioPresentacionPuntos(r.usuario)) presentarPuntos(r);
   app.querySelectorAll("[data-meta]").forEach((b) => (b.onclick = async () => {
     const id = b.dataset.meta, quitar = meta?.id === id;
     try {
@@ -153,7 +166,111 @@ export async function pintarPremiosEmpleado(ctx) {
   app.querySelectorAll("[data-canjear]").forEach((b) => (b.onclick = async () => {
     const p = premios.find((x) => x.id === b.dataset.canjear);
     if (!(await confirmar("¿Canjear premio?", `${p.nombre} por ${num(p.costo)} puntos.`, "Canjear"))) return;
-    try { await datos.solicitarCanje(p.id); confeti({ cantidad: 120 }); aviso("¡Solicitud enviada!", "ok"); pintarPremiosEmpleado(ctx); }
+    try {
+      await datos.solicitarCanje(p.id); confeti({ cantidad: 120 });
+      await modal(`
+        <div class="pila desbloqueo" style="align-items:center;text-align:center;gap:12px">
+          <div class="medalla medalla-oro">${icono("gift", 40)}</div>
+          <h2 class="modal-titulo">¡Solicitud enviada!</h2>
+          <p class="modal-texto">Apartamos <b>${num(p.costo)} puntos</b> para <b>${esc(p.nombre)}</b>. Gustavo la va a revisar y te avisaremos aquí en la app cuando esté aprobada para que pases a recogerlo.</p>
+          <small class="texto-tenue">Si no se puede, tus puntos regresan completos.</small>
+          <button class="btn btn-bloque" data-cerrar>¡Entendido!</button>
+        </div>`, { clase: "desbloqueo" });
+      pintarPremiosEmpleado(ctx);
+    }
     catch (e) { aviso(e.message, "error"); }
   }));
+}
+
+// ---------------------------------------------------------------------
+//  "¿Cómo funcionan mis puntos?" (se ve una vez y cuando quieran)
+// ---------------------------------------------------------------------
+const llavePuntos = (u) => `academia-tour-puntos-${u}`;
+export function vioPresentacionPuntos(u) { try { return !!localStorage.getItem(llavePuntos(u)); } catch (_) { return true; } }
+
+export function presentarPuntos(r) {
+  try { localStorage.setItem(llavePuntos(r.usuario), "1"); } catch (_) { /* nada */ }
+  const ganados = r.puntos_ganados || 690, ejemplo = Math.min(300, ganados) || 300;
+  const mock = (html) => `<div class="tour-mock" aria-hidden="true">${html}</div>`;
+  const pasos = [
+    { ic: "star", titulo: "Tus puntos tienen dos números",
+      cuerpo: `${mock(`<div class="fila" style="gap:10px">
+          <div class="pila" style="gap:2px;flex:1;padding:10px;border-radius:12px;background:var(--tarjeta)"><small class="texto-tenue">Ganados</small><b style="font-size:22px;color:var(--oro)">${num(r.puntos_ganados)}</b><small class="texto-tenue">nunca bajan</small></div>
+          <div class="pila" style="gap:2px;flex:1;padding:10px;border-radius:12px;background:var(--tarjeta)"><small class="texto-tenue">Disponibles</small><b style="font-size:22px">${num(r.puntos_disponibles)}</b><small class="texto-tenue">para canjear</small></div></div>`)}
+        <p class="modal-texto" style="line-height:1.55"><b>Ganados</b> son todos los puntos que has juntado: con ellos subes de <b>nivel</b> y compites en el <b>ranking</b>. <b>Disponibles</b> son los que puedes gastar en premios.</p>` },
+    { ic: "gift", titulo: "Canjear no te quita tu nivel",
+      cuerpo: `${mock(`<div class="pila" style="gap:6px;font-size:14px">
+          <div class="fila-entre"><span>Ganados</span><b style="color:var(--oro)">${num(ganados)} → ${num(ganados)}</b></div>
+          <div class="fila-entre"><span>Canjeas un premio de</span><b>−${num(ejemplo)}</b></div>
+          <div class="fila-entre"><span>Disponibles</span><b>${num(ganados)} → ${num(ganados - ejemplo)}</b></div></div>`)}
+        <p class="modal-texto" style="line-height:1.55">Al canjear solo bajan tus <b>disponibles</b>. Tu nivel, tu lugar en el ranking y tus insignias <b>se quedan igual</b>.</p>` },
+    { ic: "check", titulo: "Cómo reclamar tu premio",
+      cuerpo: `<ol class="pasos-canje" style="font-size:14.5px">
+          <li>En <b>Premios</b>, toca <b>Canjear</b> en el que te alcance.</li>
+          <li>Tus puntos se apartan y queda <span class="pildora" style="padding:1px 8px">En revisión</span>.</li>
+          <li>Gustavo lo aprueba y te avisamos aquí: <span class="pildora pildora-ok" style="padding:1px 8px">Aprobado</span> → <b>pasa con él a recogerlo</b>.</li>
+          <li>Si no se puede, lo rechaza y <b>tus puntos regresan completos</b>.</li></ol>` },
+    { ic: "target", titulo: "Elige tu meta",
+      cuerpo: `<p class="modal-texto" style="line-height:1.55">Toca la <b>diana</b> 🎯 de un premio para hacerlo tu meta. En Inicio verás cuánto te falta, y te avisamos en cuanto te alcance.</p>
+        <p class="texto-tenue" style="margin:0;font-size:13px">¿Cómo juntar más? Termina lecciones y cursos, saca quiz perfecto, escucha audiolibros, mantén tu racha y propón ideas para Mozzafiato.</p>` },
+  ];
+  return new Promise((resolver) => {
+    let i = 0;
+    modal(`<div id="tp"></div>`, { cerrable: false, clase: "modal-ancho" }).then(resolver);
+    const capa = modal.actual;
+    const pintar = () => {
+      const p = pasos[i], ultimo = i === pasos.length - 1;
+      capa.querySelector("#tp").innerHTML = `
+        <div class="pila" style="gap:16px">
+          <div class="fila-entre">
+            <div class="fila" style="gap:6px">${pasos.map((_, k) => `<i style="display:block;height:6px;border-radius:3px;width:${k === i ? 22 : 6}px;background:${k <= i ? "var(--oro)" : "var(--linea)"};transition:width .3s"></i>`).join("")}</div>
+            ${ultimo ? "" : `<button class="btn-texto" id="tp-saltar">Saltar</button>`}
+          </div>
+          <div class="medalla medalla-oro" style="width:64px;height:64px;align-self:center">${icono(p.ic, 30)}</div>
+          <h2 class="modal-titulo" style="text-align:center">${p.titulo}</h2>
+          ${p.cuerpo}
+          <div class="fila-botones">
+            ${i > 0 ? `<button class="btn btn-sec" id="tp-atras">${icono("back", 18)}Atrás</button>` : ""}
+            <button class="btn" id="tp-sig">${ultimo ? "¡Entendido!" : `Siguiente ${icono("next", 18)}`}</button>
+          </div>
+        </div>`;
+      capa.querySelector("#tp-sig").onclick = () => { if (ultimo) capa.cerrar(true); else { i++; pintar(); } };
+      capa.querySelector("#tp-atras")?.addEventListener("click", () => { i--; pintar(); });
+      capa.querySelector("#tp-saltar")?.addEventListener("click", () => capa.cerrar(true));
+      capa.querySelector(".modal").scrollTop = 0;
+    };
+    pintar();
+  });
+}
+
+// Aviso en Inicio cuando Gustavo aprueba o rechaza un canje.
+export async function revisarCanjes(usuario, canjes = [], premios = []) {
+  const llave = `academia-canjes-vistos-${usuario}`;
+  let vistos = null;
+  try { vistos = JSON.parse(localStorage.getItem(llave) || "null"); } catch (_) { /* nada */ }
+  const ahora = Object.fromEntries(canjes.map((c) => [c.id, c.estado]));
+  try { localStorage.setItem(llave, JSON.stringify(ahora)); } catch (_) { return; }
+  if (!vistos) return;
+  const nombre = (id) => premios.find((p) => p.id === id)?.nombre || "tu premio";
+  for (const c of canjes.filter((x) => x.estado !== "pendiente" && vistos[x.id] && vistos[x.id] !== x.estado)) {
+    if (c.estado === "aprobado") {
+      confeti({ cantidad: 160, duracion: 2600 });
+      await modal(`
+        <div class="pila desbloqueo" style="align-items:center;text-align:center;gap:12px">
+          <div class="etiqueta" style="color:var(--oro)">¡Canje aprobado!</div>
+          <div class="destellos"><div class="medalla medalla-oro">${icono("gift", 48)}</div></div>
+          <h2 class="modal-titulo">${esc(nombre(c.premio_id))}</h2>
+          <p class="modal-texto">Gustavo aprobó tu canje. <b>Pasa con él a recogerlo.</b> ¡Te lo ganaste!</p>
+          <button class="btn btn-bloque" data-cerrar>¡Genial!</button>
+        </div>`, { clase: "desbloqueo" });
+    } else if (c.estado === "rechazado") {
+      await modal(`
+        <div class="pila" style="align-items:center;text-align:center;gap:12px">
+          <div class="medalla medalla-cobre" style="width:64px;height:64px">${icono("gift", 30)}</div>
+          <h2 class="modal-titulo">Tu canje no se pudo hacer</h2>
+          <p class="modal-texto">${esc(nombre(c.premio_id))}${c.nota ? ` · ${esc(c.nota)}` : ""}. <b>Tus ${num(c.costo)} puntos ya regresaron</b> a tus disponibles.</p>
+          <button class="btn btn-bloque" data-cerrar>Entendido</button>
+        </div>`);
+    }
+  }
 }
