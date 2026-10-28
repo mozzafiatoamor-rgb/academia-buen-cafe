@@ -561,6 +561,8 @@ export function crearDemo() {
       return db.usuarios.filter((u) => u.rol === "empleado" && u.activo).map((u) => ({
         user_id: u.user_id, nombre: u.nombre, usuario: u.usuario, area: u.area, sede: u.sede, meta_premio: u.meta_premio || null,
         disponibles: ganados(u.user_id) - gastados(u.user_id),
+        sin_propuesta: db.cursos.filter((c) => terminado(u.user_id, c.id) && !(db.ideas || []).some((i) => i.user_id === u.user_id && i.curso_id === c.id))
+          .map((c) => ({ curso_id: c.id, titulo: c.titulo, terminado_en: leccionesDe(c.id).map((l) => prog(u.user_id, l.id)?.completado_en).filter(Boolean).sort().pop() || null })),
         diplomas: db.cursos.filter((c) => c.certificado && terminado(u.user_id, c.id)).map((c) => {
           const ls = leccionesDe(c.id);
           const fin = [...ls.map((l) => prog(u.user_id, l.id)?.completado_en), ...db.intentos.filter((i) => i.user_id === u.user_id && i.curso_id === c.id && i.aprobado).map((i) => i.creado_en)].filter(Boolean).sort().pop();

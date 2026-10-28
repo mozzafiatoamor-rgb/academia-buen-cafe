@@ -127,7 +127,8 @@ async function reducirFoto(archivo) {
 // ---------------------------------------------------------------------
 // contexto: { curso_id, leccion_id, segundo, referencia }
 // urls: { ruta: url } para mostrar el audio/foto que ya tiene la nota
-export function editarNota({ nota = null, contexto = {}, urls = {}, idea = null, usuario }) {
+// propuesta = true: propuesta por escrito al terminar un curso (se manda a Gustavo).
+export function editarNota({ nota = null, contexto = {}, urls = {}, idea = null, usuario, propuesta = false }) {
   return new Promise((resolver) => {
     const n = nota || { id: nuevoId(), ...contexto, texto: "" };
     const ideaCerrada = idea && idea.estado !== "nueva";
@@ -138,17 +139,19 @@ export function editarNota({ nota = null, contexto = {}, urls = {}, idea = null,
     let grabadora = null, flujo = null, trozos = [], inicio = 0, reloj1 = null;
 
     modal(`
-      <h2 class="modal-titulo">${icono("libreta", 22, 'style="vertical-align:-4px;color:var(--oro)"')} ${nota ? "Editar apunte" : "Nuevo apunte"}</h2>
+      <h2 class="modal-titulo">${icono(propuesta ? "bulb" : "libreta", 22, 'style="vertical-align:-4px;color:var(--oro)"')} ${propuesta ? "Mi propuesta para Mozzafiato" : nota ? "Editar apunte" : "Nuevo apunte"}</h2>
       ${n.referencia || n.segundo != null ? `<p class="texto-tenue" style="margin:-6px 0 0;font-size:13px">${esc(n.referencia || "")}${n.segundo != null ? ` · <b style="color:var(--oro)">minuto ${reloj(n.segundo)}</b>` : ""}</p>` : ""}
-      <textarea id="ln-texto" class="ln-texto" rows="5" maxlength="4000" placeholder="¿Qué te llamó la atención? ¿Qué podríamos probar o mejorar en Mozzafiato?">${esc(n.texto || "")}</textarea>
+      ${propuesta ? `<div class="tip-apuntes" style="font-size:13px">${icono("libreta", 18)}<span>Repasa tus apuntes y escribe <b>qué podríamos implementar</b> con lo que aprendiste: un platillo o bebida nueva, una mejora en la receta, en la presentación o en el servicio. <b>Explica cómo lo harías.</b></span></div>` : ""}
+      <textarea id="ln-texto" class="ln-texto" rows="${propuesta ? 7 : 5}" maxlength="4000" placeholder="${propuesta ? "Propongo… porque… Lo haríamos así: …" : "¿Qué te llamó la atención? ¿Qué podríamos probar o mejorar en Mozzafiato?"}">${esc(n.texto || "")}</textarea>
       <div class="ln-adjuntos">
         <div id="ln-voz" class="ln-adjunto"></div>
         <div id="ln-foto" class="ln-adjunto"></div>
       </div>
-      ${ideaCerrada ? `<p class="texto-tenue" style="margin:0;font-size:12.5px">${icono("bulb", 14)} Esta idea ya la está revisando Gustavo: los cambios quedan solo en tu libreta.</p>`
+      ${propuesta ? `<p class="texto-tenue" style="margin:0;font-size:12.5px">${icono("send", 14)} Se le envía a Gustavo como idea. Si se implementa, ganas puntos de bono. Puedes agregar una nota de voz o foto, pero la propuesta va por escrito.</p>`
+        : ideaCerrada ? `<p class="texto-tenue" style="margin:0;font-size:12.5px">${icono("bulb", 14)} Esta idea ya la está revisando Gustavo: los cambios quedan solo en tu libreta.</p>`
         : `<label class="check ln-idea"><input type="checkbox" id="ln-idea" ${idea ? "checked" : ""}><span>${icono("bulb", 16)} ${idea ? "Actualizar mi idea para Gustavo" : "Proponerla a Gustavo como idea"}</span></label>`}
       <p class="error-form" hidden></p>
-      <div class="fila-botones"><button class="btn btn-sec" data-cerrar>Cancelar</button><button class="btn" id="ln-guardar">${icono("check", 18)}Guardar</button></div>`);
+      <div class="fila-botones"><button class="btn btn-sec" data-cerrar>Cancelar</button><button class="btn" id="ln-guardar">${icono(propuesta ? "send" : "check", 18)}${propuesta ? "Enviar propuesta" : "Guardar"}</button></div>`);
     const capa = modal.actual;
     const $ = (s) => capa.querySelector(s);
     const error = $(".error-form");
@@ -224,8 +227,9 @@ export function editarNota({ nota = null, contexto = {}, urls = {}, idea = null,
     $("#ln-guardar").onclick = async (ev) => {
       if (grabadora?.state === "recording") { grabadora.stop(); await new Promise((r) => setTimeout(r, 300)); }
       const texto = $("#ln-texto").value.trim();
+      if (propuesta && texto.length < 30) { error.textContent = "Escribe tu propuesta con un poco más de detalle: qué propones y cómo lo harías."; error.hidden = false; return; }
       if (!texto && !voz && !foto) { error.textContent = "Escribe algo, graba una nota de voz o agrega una foto."; error.hidden = false; return; }
-      const proponer = !!$("#ln-idea")?.checked;
+      const proponer = propuesta || !!$("#ln-idea")?.checked;
       const item = {
         id: n.id, usuario, creado: Date.now(), proponer,
         nota: { id: n.id, curso_id: n.curso_id || null, leccion_id: n.leccion_id || null, segundo: n.segundo ?? null, referencia: n.referencia || null,
@@ -239,6 +243,7 @@ export function editarNota({ nota = null, contexto = {}, urls = {}, idea = null,
         const r = await guardarConCola(item);
         apagar(); capa.cerrar(true);
         if (r.pendiente) aviso("Sin señal: el apunte quedó guardado en tu celular y se sube solo al volver el internet.");
+        else if (propuesta) { confeti({ cantidad: 120, duracion: 2200 }); aviso("¡Propuesta enviada a Gustavo! 💡", "ok"); }
         else aviso(proponer ? "Apunte guardado y enviado a Gustavo 💡" : "Apunte guardado ✓", "ok");
         resolver(r.nota || { ...item.nota, pendiente: true });
       } catch (e) {
@@ -643,4 +648,63 @@ export function presentarLibreta(usuario, { final = "Abrir mi libreta" } = {}) {
     };
     pintar();
   });
+}
+
+// ---------------------------------------------------------------------
+//  Propuestas por escrito al terminar un curso
+// ---------------------------------------------------------------------
+// Cursos terminados para los que todavía no ha enviado ninguna idea.
+export function propuestasPendientes(cursos, ideas) {
+  if (!Array.isArray(ideas)) return [];
+  const con = new Set(ideas.map((i) => i.curso_id).filter(Boolean));
+  return cursos.filter((c) => c.terminado && !con.has(c.id));
+}
+
+export function escribirPropuesta(curso, usuario) {
+  return editarNota({ contexto: { curso_id: curso.id, referencia: `Propuesta · ${curso.titulo}` }, usuario, propuesta: true });
+}
+
+export function tarjetaPropuestas(pend) {
+  if (!pend.length) return "";
+  return `
+    <section class="tarjeta-propuesta">
+      <div class="fila" style="gap:12px;align-items:flex-start">
+        <span class="medalla medalla-oro chica" style="flex:none">${icono("bulb", 22)}</span>
+        <div style="flex:1;min-width:0">
+          <b style="display:block;font-size:15px">${pend.length === 1 ? "Te falta tu propuesta" : `Te faltan ${pend.length} propuestas`}</b>
+          <span class="texto-tenue" style="font-size:13px">Ya terminaste ${pend.length === 1 ? `<b style="color:var(--crema)">${esc(pend[0].titulo)}</b>` : `${pend.length} cursos`}. Escribe qué podríamos implementar en Mozzafiato con lo que aprendiste.</span>
+        </div>
+      </div>
+      <div class="fila" style="gap:8px;flex-wrap:wrap">${pend.slice(0, 3).map((c) => `<button class="btn btn-chico" data-propuesta="${esc(c.id)}">${icono("edit", 15)}${pend.length === 1 ? "Escribir mi propuesta" : esc(c.titulo)}</button>`).join("")}</div>
+    </section>`;
+}
+
+export function conectarPropuestas(raiz, pend, usuario, alEnviar) {
+  raiz.querySelectorAll("[data-propuesta]").forEach((b) => (b.onclick = async () => {
+    const c = pend.find((x) => x.id === b.dataset.propuesta);
+    if (c && (await escribirPropuesta(c, usuario))) alEnviar?.();
+  }));
+}
+
+// Recordatorio en ventana: como máximo una vez cada 3 días por curso.
+export async function recordarPropuesta(pend, usuario) {
+  if (!pend.length) return false;
+  const llave = `academia-recordar-propuesta-${usuario}`;
+  let vistos = {};
+  try { vistos = JSON.parse(localStorage.getItem(llave) || "{}"); } catch (_) { /* nada */ }
+  const c = pend.find((x) => !vistos[x.id] || Date.now() - vistos[x.id] > 3 * 864e5);
+  if (!c) return false;
+  vistos[c.id] = Date.now();
+  try { localStorage.setItem(llave, JSON.stringify(vistos)); } catch (_) { return false; }
+  const v = await modal(`
+    <div class="anuncio-nuevo">
+      <div class="anuncio-icono">${icono("bulb", 34)}</div>
+      <div class="etiqueta" style="text-align:center;color:var(--oro)">Terminaste un curso</div>
+      <h2 class="modal-titulo" style="text-align:center">¿Qué implementarías en Mozzafiato?</h2>
+      <p class="texto-tenue" style="text-align:center;margin:0">Ya terminaste <b style="color:var(--crema)">${esc(c.titulo)}</b>. La idea de cada curso es mejorar nuestro menú y el servicio: repasa tus apuntes y <b style="color:var(--crema)">escribe tu propuesta</b>. Si se implementa, ganas puntos de bono.</p>
+      <button class="btn btn-bloque" data-cerrar="escribir">${icono("edit", 18)}Escribir mi propuesta</button>
+      <button class="btn-texto" data-cerrar style="align-self:center">Más tarde</button>
+    </div>`);
+  if (v === "escribir") return !!(await escribirPropuesta(c, usuario));
+  return false;
 }

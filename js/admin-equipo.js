@@ -28,7 +28,7 @@ const urlApp = () => `${location.origin}${location.pathname}`;
 const fechaLarga = (iso) => new Date(iso || Date.now()).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
 const leer = (k) => { try { return JSON.parse(localStorage.getItem(k) || "{}"); } catch (_) { return {}; } };
 const escribir = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { /* nada */ } };
-const LLAVE_DIPLOMAS = "academia-admin-diplomas-entregados", LLAVE_PREMIOS = "academia-admin-premios-avisados";
+const LLAVE_DIPLOMAS = "academia-admin-diplomas-entregados", LLAVE_PREMIOS = "academia-admin-premios-avisados", LLAVE_PROPUESTAS = "academia-admin-propuestas-recordadas";
 
 // Números de WhatsApp desde el Gestor (si está conectado).
 async function numerosWhats() {
@@ -81,7 +81,8 @@ export async function montarReconocer(caja, avs = {}) {
   const vigentes = premiosVigentes(premios).sort((a, b) => a.costo - b.costo);
   let verEntregados = false;
   const pintar = () => {
-    const avisados = leer(LLAVE_PREMIOS), entregados = leer(LLAVE_DIPLOMAS);
+    const avisados = leer(LLAVE_PREMIOS), entregados = leer(LLAVE_DIPLOMAS), recordados = leer(LLAVE_PROPUESTAS);
+    const faltan = gente.filter((g) => Array.isArray(g.sin_propuesta) && g.sin_propuesta.length);
     const alcanzan = gente.map((g) => {
       const ok = vigentes.filter((p) => p.costo <= g.disponibles);
       const meta = premios.find((p) => p.id === g.meta_premio);
@@ -107,6 +108,19 @@ export async function montarReconocer(caja, avs = {}) {
           <a class="btn btn-chico btn-sec" target="_blank" rel="noopener" data-avisar="${g.user_id}" href="${linkWhats(mensajePremio(g), numeros[g.user_id])}">${icono("send", 15)}Avisar</a>
         </div>`;
       }).join("") : `<p class="texto-tenue" style="margin:0;font-size:13px">A nadie le alcanza todavía${vigentes.length ? ` (el premio más barato cuesta ${num(vigentes[0].costo)} pts)` : " — no hay premios activos"}.</p>`}
+      ${gente.some((g) => Array.isArray(g.sin_propuesta)) ? `<div class="etiqueta" style="margin-top:8px">Les falta su propuesta · ${faltan.length}</div>
+      ${faltan.length ? faltan.map((g) => {
+        const rec = recordados[g.user_id];
+        return `
+        <div class="rec-fila">
+          <a href="#/admin/empleado/${g.user_id}" class="avatar-boton">${avatarOIniciales(avs[g.user_id], g.nombre, 34)}</a>
+          <span style="flex:1;min-width:0">
+            <a href="#/admin/empleado/${g.user_id}" class="rec-nombre">${esc(g.nombre)}</a>
+            <small class="texto-tenue" style="display:block">Terminó ${g.sin_propuesta.map((c) => esc(c.titulo)).join(", ")} y no ha enviado su propuesta${rec ? ` · <span class="ok-aviso">recordado ${rec === hoyISO() ? "hoy" : fechaCorta(rec)}</span>` : ""}</small>
+          </span>
+          <a class="btn btn-chico btn-sec" target="_blank" rel="noopener" data-recordar="${g.user_id}" href="${linkWhats(mensajePropuesta(g), numeros[g.user_id])}">${icono("send", 15)}Recordar</a>
+        </div>`;
+      }).join("") : `<p class="texto-tenue" style="margin:0;font-size:13px">Todos los que terminaron un curso ya enviaron su propuesta. 👏</p>`}` : ""}
       <div class="fila-entre" style="margin-top:8px"><div class="etiqueta">Diplomas listos · ${pendientes.length}</div>
         ${diplomas.length > pendientes.length ? `<button class="btn-texto" id="rec-ver" style="min-height:28px">${verEntregados ? "Ocultar entregados" : `Ver entregados (${diplomas.length - pendientes.length})`}</button>` : ""}</div>
       ${lista.length ? lista.map((d) => `
@@ -120,6 +134,7 @@ export async function montarReconocer(caja, avs = {}) {
           <button class="mini-btn" data-entregado="${d.clave}" title="${entregados[d.clave] ? "Marcar como no entregado" : "Marcar como entregado"}" aria-label="Entregado">${icono(entregados[d.clave] ? "x" : "check", 18)}</button>
         </div>`).join("") : `<p class="texto-tenue" style="margin:0;font-size:13px">${diplomas.length ? "Todos los diplomas ya están entregados. 🎉" : "Todavía nadie termina un curso con diploma."}</p>`}`;
     caja.querySelectorAll("[data-avisar]").forEach((a) => (a.onclick = () => { const m = leer(LLAVE_PREMIOS); m[a.dataset.avisar] = hoyISO(); escribir(LLAVE_PREMIOS, m); setTimeout(pintar, 300); }));
+    caja.querySelectorAll("[data-recordar]").forEach((a) => (a.onclick = () => { const m = leer(LLAVE_PROPUESTAS); m[a.dataset.recordar] = hoyISO(); escribir(LLAVE_PROPUESTAS, m); setTimeout(pintar, 300); }));
     caja.querySelector("#rec-ver")?.addEventListener("click", () => { verEntregados = !verEntregados; pintar(); });
     caja.querySelectorAll("[data-diploma]").forEach((b) => (b.onclick = () => { const d = diplomas.find((x) => x.clave === b.dataset.diploma); verDiploma(d.g, d); }));
     caja.querySelectorAll("[data-entregado]").forEach((b) => (b.onclick = () => {
@@ -137,6 +152,14 @@ function mensajePremio(g) {
   return `¡Felicidades ${nombre}! 🎉 Ya juntaste *${num(g.disponibles)} puntos* en la Academia del Buen Café.\n\n`
     + (g.metaLista ? `¡Ya te alcanza para tu meta: *${g.meta.nombre}*! 🎯\n\n` : "")
     + `Te alcanza para:\n${lista}\n\nEntra a la app → Premios para canjearlo 🎁\n${urlApp()}`;
+}
+
+function mensajePropuesta(g) {
+  const nombre = String(g.nombre || "").split(" ")[0];
+  const cursos = g.sin_propuesta.map((c) => `«${c.titulo}»`).join(", ");
+  return `¡Hola ${nombre}! 👋 Felicidades por terminar ${cursos} en la Academia del Buen Café. 🎉\n\n`
+    + `Me falta tu *propuesta por escrito*: con lo que aprendiste, ¿qué podríamos implementar o mejorar en Mozzafiato? (un platillo, una bebida, la presentación, el servicio…)\n\n`
+    + `Entra a la app y toca *Escribir mi propuesta* en Inicio. Si la implementamos, ganas puntos de bono 💡\n${urlApp()}`;
 }
 
 export function verDiploma(persona, curso) {
@@ -160,8 +183,11 @@ export function verDiploma(persona, curso) {
 export async function pintarFicha(main, userId) {
   let f, premios = [], avs = {}, numeros = {};
   try {
-    [f, { premios }, avs, numeros] = await Promise.all([datos.adminFicha(userId), datos.adminPremios().catch(() => ({ premios: [] })),
-      datos.avatares().catch(() => ({})), numerosWhats()]);
+    let ideasTodas;
+    [f, { premios }, avs, numeros, ideasTodas] = await Promise.all([datos.adminFicha(userId), datos.adminPremios().catch(() => ({ premios: [] })),
+      datos.avatares().catch(() => ({})), numerosWhats(), datos.adminIdeas().catch(() => [])]);
+    f.propuestasPorCurso = {};
+    for (const i of ideasTodas.filter((x) => x.user_id === userId && x.curso_id)) f.propuestasPorCurso[i.curso_id] = (f.propuestasPorCurso[i.curso_id] || 0) + 1;
   } catch (e) {
     main.innerHTML = `<a href="#/admin/resumen" class="btn-texto" style="display:inline-flex;align-items:center;gap:4px">${icono("back", 16)}Resumen</a>
       <div class="vacio"><strong>No se pudo cargar la ficha</strong>${esc(falta11(e))}</div>`;
@@ -187,7 +213,9 @@ export async function pintarFicha(main, userId) {
           : atrasado ? `<span class="pildora pildora-alerta">Atrasado</span>` : c.completadas ? `<span class="pildora">En curso</span>` : `<span class="pildora">Sin empezar</span>`}
       </div>
       <div class="fila"><div class="barra fina ${c.terminado ? "ok" : ""}" style="flex:1"><i style="width:${pct}%"></i></div><b style="font-size:12px;color:var(--oro);min-width:36px;text-align:right">${pct}%</b></div>
-      ${c.terminado && c.certificado ? `<button class="btn btn-chico btn-sec" data-diploma="${c.id}" style="align-self:flex-start">${icono("medal", 15)}Ver diploma</button>` : ""}
+      ${c.terminado ? `<div class="fila" style="gap:8px;flex-wrap:wrap">
+        ${f.propuestasPorCurso[c.id] ? `<span class="pildora pildora-verde">${icono("bulb", 13)}${f.propuestasPorCurso[c.id] === 1 ? "Propuesta enviada" : `${f.propuestasPorCurso[c.id]} propuestas`}</span>` : `<span class="pildora pildora-alerta">${icono("bulb", 13)}Falta su propuesta</span>`}
+        ${c.certificado ? `<button class="btn btn-chico btn-sec" data-diploma="${c.id}">${icono("medal", 15)}Ver diploma</button>` : ""}</div>` : ""}
     </div>`;
   };
   const audioHTML = (b) => {

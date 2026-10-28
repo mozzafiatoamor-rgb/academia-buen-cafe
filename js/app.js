@@ -12,7 +12,8 @@ import { pintarAudiolibro, pintarBiblioteca, tarjetaAudio, esNuevoAudio } from "
 import { avatarOIniciales, avatarSVG, avatarCuerpoSVG } from "./avatar.js";
 import { pintarEditorAvatar, invitarAvatar } from "./avatar-editor.js";
 import { pintarPremiosEmpleado, tarjetaMeta, revisarMeta } from "./premios.js";
-import { pintarLibreta, montarLibretaLeccion, iniciarColaLibreta, revisarIdeas, presentarLibreta, vioPresentacionLibreta } from "./libreta.js";
+import { pintarLibreta, montarLibretaLeccion, iniciarColaLibreta, revisarIdeas, presentarLibreta, vioPresentacionLibreta,
+  propuestasPendientes, tarjetaPropuestas, conectarPropuestas, recordarPropuesta, escribirPropuesta } from "./libreta.js";
 
 const app = document.getElementById("app");
 const LOGO = "img/logo.png";
@@ -160,12 +161,12 @@ async function celebrarAvance({ puntos, insignias, cursoTerminado, pctAntes, pct
         <p class="modal-texto">Lo terminaste de principio a fin. Eso habla de tu compromiso con el equipo y con cada cliente.</p>
         ${puntos ? `<b style="color:var(--oro);font-size:18px">+${num(puntos)} pts</b>` : ""}
         <div class="tip-apuntes" style="text-align:left">${icono("libreta", 18)}<span>Repasa tus apuntes: ¿qué podríamos <b>agregar al menú o mejorar</b> en Mozzafiato con lo que aprendiste?</span></div>
-        <button class="btn btn-sec btn-bloque" data-cerrar="ideas">${icono("bulb", 18)}Proponer mis ideas a Gustavo</button>
+        <button class="btn btn-sec btn-bloque" data-cerrar="ideas">${icono("edit", 18)}Escribir mi propuesta</button>
         ${curso.certificado ? `<button class="btn btn-bloque" data-cerrar="cert">${icono("medal", 18)}Ver mi certificado</button>` : ""}
         <button class="btn ${curso.certificado ? "btn-sec" : ""} btn-bloque" data-cerrar>Seguir</button>
       </div>`, { clase: "desbloqueo" });
     if (r === "cert") { try { sessionStorage.setItem("academia-abrir-cert", cursoId); } catch (_) { /* nada */ } ir(`/curso/${cursoId}`); }
-    if (r === "ideas") ir("/libreta");
+    if (r === "ideas" && (await escribirPropuesta({ id: cursoId, titulo: curso.titulo }, estado.perfil?.usuario)) && location.hash.includes(cursoId)) pintarCurso(cursoId);
   } else {
     const hito = hitoCurso(pctAntes, pctDespues, curso.titulo);
     if (hito) { confeti({ cantidad: 90 }); momento({ ...hito, puntos, tono: "oro" }); }
@@ -334,8 +335,9 @@ async function pintarInicio() {
   cargando();
   vaciarCola().catch(() => {});
   iniciarColaLibreta(() => estado.perfil?.usuario);
-  const [r, cursos, audiosTodos, miAv, metaId, catPremios] = await Promise.all([datos.resumen(), datos.misCursos(), datos.misAudiolibros().catch(() => []),
-    datos.miAvatar().catch(() => null), datos.miMeta().catch(() => null), datos.premios().catch(() => ({ premios: [] }))]);
+  const [r, cursos, audiosTodos, miAv, metaId, catPremios, misIdeasLista] = await Promise.all([datos.resumen(), datos.misCursos(), datos.misAudiolibros().catch(() => []),
+    datos.miAvatar().catch(() => null), datos.miMeta().catch(() => null), datos.premios().catch(() => ({ premios: [] })), datos.misIdeas().catch(() => null)]);
+  const pendProp = propuestasPendientes(cursos, misIdeasLista);
   estado.miAvatar = miAv;
   const metaPremio = (catPremios.premios || []).find((p) => p.id === metaId) || null;
   estado.metaPremio = metaPremio;
@@ -360,6 +362,7 @@ async function pintarInicio() {
       <button class="btn-icono boton-avatar ${miAv ? "con-avatar" : "avatar yo"}" id="perfil" aria-label="Mi perfil" style="width:52px;height:52px">${miAv ? avatarSVG(miAv, 52, "", { animado: true }) : esc(iniciales(r.nombre))}</button>
     </header>
     <p class="frase-inicio">${icono("coffee", 16)}<span>${esc(fraseInicio(r, cursos))}</span></p>
+    ${tarjetaPropuestas(pendProp)}
 
     <section class="tarjeta pila" style="gap:12px">
       <div class="fila-entre">
@@ -428,6 +431,7 @@ async function pintarInicio() {
   </main>`, "inicio");
 
   app.querySelectorAll("[data-ir]").forEach((b) => (b.onclick = () => ir(b.dataset.ir)));
+  conectarPropuestas(app, pendProp, r.usuario, () => pintarInicio());
   app.querySelector("#perfil").onclick = () => abrirPerfil(r);
   animarBarras(app);
   const filtro = app.querySelector("#filtro-cat");
@@ -454,6 +458,7 @@ async function pintarInicio() {
   await invitarAvatar(ctxAudio(), r);
   await revisarMeta(r.usuario, metaPremio, r.puntos_disponibles, ir);
   await revisarIdeas(r.usuario);
+  if (await recordarPropuesta(pendProp, r.usuario)) return pintarInicio();
   if (r.insignias_sin_ver?.length) celebrar(r.insignias_sin_ver);
 }
 
@@ -678,6 +683,7 @@ async function pintarCurso(id) {
   cargando();
   const B = base(), vp = !!estado.preview;
   const d = await datos.curso(id);
+  const ideasCurso = vp ? [] : ((await datos.misIdeas().catch(() => [])) || []).filter((i) => i.curso_id === id);
   const hechas = new Set(d.progreso.filter((p) => p.completado).map((p) => p.leccion_id));
   const caps = armarCapitulos(d.modulos, d.lecciones);
   const orden = caps.flatMap((c) => c.lecciones);
@@ -706,7 +712,9 @@ async function pintarCurso(id) {
       ${siguiente ? `<button class="btn" data-ir="${B}/leccion/${id}/${siguiente.id}">${icono("play", 18)}${listas ? "Continuar" : "Empezar curso"}</button>` : ""}
     </header>
     ${terminado
-      ? `<div class="tip-apuntes">${icono("libreta", 18)}<span style="flex:1">¿Ya le propusiste tus ideas de este curso a Gustavo? Lo que anotaste puede mejorar nuestro menú.</span>${vp ? "" : `<button class="btn btn-chico btn-sec" id="mandar-ideas">${icono("bulb", 16)}Mi libreta</button>`}</div>`
+      ? (ideasCurso.length
+        ? `<div class="tip-apuntes">${icono("check", 18)}<span style="flex:1"><b>Ya enviaste ${ideasCurso.length === 1 ? "tu propuesta" : `${ideasCurso.length} propuestas`}</b> de este curso. ¿Se te ocurre otra?</span>${vp ? "" : `<button class="btn btn-chico btn-sec" id="escribir-propuesta">${icono("edit", 16)}Otra propuesta</button>`}</div>`
+        : `<div class="tarjeta-propuesta"><div class="fila" style="gap:12px;align-items:flex-start">${icono("bulb", 22, 'style="color:var(--oro);flex:none"')}<span style="flex:1"><b style="display:block">Te falta tu propuesta</b><span class="texto-tenue" style="font-size:13px">Repasa tus apuntes y escribe qué podríamos implementar en Mozzafiato con lo que aprendiste en este curso.</span></span></div>${vp ? "" : `<button class="btn btn-chico" id="escribir-propuesta" style="align-self:flex-start">${icono("edit", 16)}Escribir mi propuesta</button>`}</div>`)
       : `<div class="tip-apuntes">${icono("libreta", 18)}<span style="flex:1"><b>Toma apuntes.</b> Este curso es para mejorar nuestro menú y probar cosas nuevas: en cada lección toca <b>Anotar</b> y guarda recetas, técnicas e ideas.</span>${vp ? "" : `<button class="btn btn-chico btn-sec" id="mandar-ideas">${icono("libreta", 16)}Mi libreta</button>`}</div>`}
 
     ${terminado ? `<div class="tarjeta fila" style="border:1px solid var(--verde)">${icono("trophy", 28)}<div><b>¡Curso completado!</b><div class="texto-tenue">Buen trabajo. Tus puntos ya están en tu cuenta.</div></div></div>` : ""}
@@ -748,6 +756,9 @@ async function pintarCurso(id) {
 
   app.querySelector("#volver").onclick = () => ir(vp ? `/admin/curso/${id}` : "/inicio");
   app.querySelector("#mandar-ideas")?.addEventListener("click", () => ir("/libreta"));
+  app.querySelector("#escribir-propuesta")?.addEventListener("click", async () => {
+    if (await escribirPropuesta({ id, titulo: d.curso.titulo }, estado.perfil?.usuario)) pintarCurso(id);
+  });
   app.querySelector("#ver-cert")?.addEventListener("click", () => {
     const fechas = [...d.progreso.filter((p) => p.completado && orden.some((l) => l.id === p.leccion_id)).map((p) => p.completado_en),
       ...d.intentos.filter((t) => t.aprobado).map((t) => t.creado_en)].filter(Boolean).sort();

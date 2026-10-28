@@ -762,3 +762,6 @@ button.avatar-grande { border: 0; padding: 0; background: transparent; cursor: p
 .rec-fila > span:not(.medalla) { flex: 1 1 150px !important; }
 .rec-fila .btn, .rec-fila .mini-btn { margin-left: auto; }
 .rec-fila .btn + .mini-btn { margin-left: 0; }
+
+/* ---------- Propuesta al terminar un curso (v1.18.0) ---------- */
+.tarjeta-propuesta { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 16px; background: linear-gradient(135deg, rgba(227, 182, 107, .16), rgba(227, 182, 107, .05)); border: 1px solid rgba(227, 182, 107, .55); }
