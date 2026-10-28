@@ -541,6 +541,21 @@ export function crearDemo() {
         ideas: (db.ideas || []).filter((i) => i.user_id === userId).reduce((o, i) => ({ ...o, [i.estado]: (o[i.estado] || 0) + 1 }), {}),
       });
     },
+    async ajustarInsignias(insignia, aplicar) {
+      await espera(); exigirAdmin();
+      const deIns = (ref, id) => ref === id || (ref.startsWith(id + "_") && /^\d{4}-\d{2}$/.test(ref.slice(id.length + 1)));
+      const grupos = {};
+      for (const p of db.puntos.filter((x) => x.motivo === "insignia")) {
+        const i = db.insignias.find((y) => (!insignia || y.id === insignia) && deIns(p.ref, y.id));
+        if (!i || p.puntos === i.puntos) continue;
+        const k = p.user_id + "|" + i.id, u = db.usuarios.find((x) => x.user_id === p.user_id);
+        grupos[k] = grupos[k] || { user_id: p.user_id, nombre: u?.nombre, insignia: i.id, nombre_insignia: i.nombre, veces: 0, antes: 0, ahora: 0, disponibles: ganados(p.user_id) - gastados(p.user_id) };
+        grupos[k].veces++; grupos[k].antes += p.puntos; grupos[k].ahora += i.puntos;
+        if (aplicar) { p.nota = `Valor actualizado (antes ${p.puntos})`; p.puntos = i.puntos; }
+      }
+      if (aplicar) guardar();
+      return Object.values(grupos);
+    },
     async adminReconocer() {
       await espera(); exigirAdmin();
       return db.usuarios.filter((u) => u.rol === "empleado" && u.activo).map((u) => ({

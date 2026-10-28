@@ -2,7 +2,7 @@
 //  CONFIGURACIÓN (admin): puntos, niveles e insignias
 // =====================================================================
 import { datos } from "./datos.js";
-import { icono, esc, num, duracion, aviso, formulario, confirmar, categorias, nombreCategoria, slug } from "./ui.js";
+import { icono, esc, num, duracion, aviso, modal, formulario, confirmar, categorias, nombreCategoria, slug } from "./ui.js";
 import { CFG_BASE, cfgPuntos, fijarCfgPuntos, valorCurso, valorAudio, puntosLeccion, nivelesSugeridos } from "./puntos.js";
 
 const ICONOS = [["cup", "Taza"], ["coffee", "Café"], ["flame", "Flama"], ["star", "Estrella"], ["trophy", "Trofeo"], ["medal", "Medalla"],
@@ -46,7 +46,7 @@ export async function pintarConfiguracion(main, pestana = "puntos") {
   main.innerHTML = `
     <div class="pila" style="gap:4px">
       <h1 class="titulo-pagina">Configuración</h1>
-      <p class="texto-tenue" style="margin:0">Cómo se ganan los puntos, los niveles y las insignias. Los cambios aplican de aquí en adelante; los puntos ya ganados no se tocan.</p>
+      <p class="texto-tenue" style="margin:0">Cómo se ganan los puntos, los niveles y las insignias. Los cambios aplican de aquí en adelante; los puntos ya ganados no se tocan (en insignias puedes aplicar el nuevo valor a quienes ya la tienen).</p>
     </div>
     <div class="pestanas" role="tablist" style="max-width:560px">
       ${[["puntos", "Puntos"], ["niveles", "Niveles"], ["insignias", "Insignias"]].map(([v, t]) =>
@@ -213,7 +213,8 @@ function seccionInsignias(caja, insignias, recargar) {
   const ordenadas = [...insignias].sort((a, b) => (b.activa - a.activa) || (a.orden || 0) - (b.orden || 0));
   caja.innerHTML = `
     <div class="fila-entre" style="flex-wrap:wrap"><h2>Insignias</h2>
-      <button class="btn btn-chico" id="in-nueva">${icono("plus", 16)}Nueva insignia</button></div>
+      <div class="fila" style="flex-wrap:wrap;gap:8px"><button class="btn btn-chico btn-sec" id="in-ajustar">${icono("refresh", 16)}Actualizar puntos ya ganados</button>
+      <button class="btn btn-chico" id="in-nueva">${icono("plus", 16)}Nueva insignia</button></div></div>
     <p class="texto-tenue" style="margin:0">Las automáticas se ganan solas al cumplir su meta. Las manuales las otorgas tú desde <b>Insignias → Otorgar reconocimiento</b>.</p>
     <div class="pila" style="gap:8px">
       ${ordenadas.map((i) => `
@@ -231,6 +232,7 @@ function seccionInsignias(caja, insignias, recargar) {
     try { await datos.guardarInsignia({ ...i, activa: !i.activa }); recargar(); } catch (e) { aviso(e.message, "error"); }
   }));
   caja.querySelectorAll("[data-editar]").forEach((b) => (b.onclick = async () => { if (await editarInsignia(porId(b.dataset.editar))) recargar(); }));
+  caja.querySelector("#in-ajustar").onclick = () => revisarPuntosInsignias(null);
   caja.querySelector("#in-nueva").onclick = async () => {
     const t = await formulario("Nueva insignia · ¿cómo se gana?", [
       { nombre: "tipo", etiqueta: "Se gana al…", tipo: "select", opciones: TIPOS.map(([v, txt]) => [v, txt]) },
@@ -270,6 +272,42 @@ async function editarInsignia(i, nueva = false) {
   const ins = { ...i, nombre: v.nombre, descripcion: v.descripcion || describirRegla(regla), puntos: Math.max(0, Math.round(v.puntos || 0)),
     icono: v.icono, nivel: v.nivel || null, secreta: !!v.secreta, regla };
   if (nueva) ins.id = slug(v.nombre).slice(0, 40) + "_" + Date.now().toString(36).slice(-4);
-  try { await datos.guardarInsignia(ins); aviso(nueva ? "Insignia creada" : "Insignia guardada", "ok"); return true; }
+  const puntosAntes = Number(i.puntos) || 0;
+  try { await datos.guardarInsignia(ins); aviso(nueva ? "Insignia creada" : "Insignia guardada", "ok"); }
   catch (e) { aviso(e.message, "error"); return false; }
+  if (!nueva && ins.puntos !== puntosAntes) await revisarPuntosInsignias(ins.id, true);
+  return true;
+}
+
+// Los puntos se guardan con el valor del día en que se ganó la insignia.
+// Aquí el admin ve a quién le cambiaría y decide si aplicar el valor de hoy.
+async function revisarPuntosInsignias(insignia, despuesDeEditar = false) {
+  let filas;
+  try { filas = await datos.ajustarInsignias(insignia, false); }
+  catch (e) {
+    aviso(/academia_admin_ajustar_insignias|Could not find the function|PGRST202/i.test(e.message) ? "Falta correr el paso 12 de SQL en Supabase para actualizar puntos ya ganados" : e.message, "error");
+    return;
+  }
+  if (!filas.length) { if (!despuesDeEditar) aviso("Todos los puntos de insignias ya están al día ✓", "ok"); return; }
+  const porPersona = {};
+  for (const f of filas) {
+    porPersona[f.user_id] = porPersona[f.user_id] || { nombre: f.nombre, disponibles: f.disponibles, dif: 0, filas: [] };
+    porPersona[f.user_id].dif += f.ahora - f.antes; porPersona[f.user_id].filas.push(f);
+  }
+  const gente = Object.values(porPersona).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const negativos = gente.filter((g) => g.disponibles + g.dif < 0);
+  const v = await modal(`
+    <h2 class="modal-titulo">${despuesDeEditar ? "¿Aplicar el nuevo valor a quienes ya la tienen?" : "Actualizar puntos ya ganados"}</h2>
+    <p class="texto-tenue" style="margin:0;font-size:13.5px">Los puntos se guardaron con el valor que tenía la insignia el día que la ganaron. Si aplicas el cambio, así quedarían:</p>
+    <div class="pila" style="gap:8px;max-height:48vh;overflow:auto">${gente.map((g) => `
+      <div class="tarjeta pila" style="gap:4px;padding:10px 12px">
+        <div class="fila-entre"><b>${esc(g.nombre)}</b><b style="color:${g.dif < 0 ? "var(--alerta)" : "var(--verde)"}">${g.dif > 0 ? "+" : ""}${num(g.dif)} pts</b></div>
+        ${g.filas.map((f) => `<small class="texto-tenue">${esc(f.nombre_insignia)}${f.veces > 1 ? ` ×${f.veces}` : ""}: ${num(f.antes)} → ${num(f.ahora)}</small>`).join("")}
+        ${g.disponibles + g.dif < 0 ? `<small style="color:var(--alerta)">Sus puntos disponibles quedarían en ${num(g.disponibles + g.dif)} (ya canjeó).</small>` : ""}
+      </div>`).join("")}</div>
+    ${negativos.length ? `<p class="texto-tenue" style="margin:0;font-size:12.5px">${icono("bulb", 14)} Bajar puntos puede dejar a alguien en negativo si ya los canjeó: no podrá canjear de nuevo hasta recuperarlos.</p>` : ""}
+    <div class="fila-botones"><button class="btn btn-sec" data-cerrar="no">Dejar como está</button><button class="btn" data-cerrar="si">${icono("check", 18)}Aplicar a ${gente.length} ${gente.length === 1 ? "persona" : "personas"}</button></div>`);
+  if (v !== "si") return;
+  try { await datos.ajustarInsignias(insignia, true); aviso(`Listo: puntos actualizados para ${gente.length} ${gente.length === 1 ? "persona" : "personas"}`, "ok"); }
+  catch (e) { aviso(e.message, "error"); }
 }
