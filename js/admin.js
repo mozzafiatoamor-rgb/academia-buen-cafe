@@ -12,6 +12,7 @@ import { cambiarPortada, quitarPortada } from "./portadas.js";
 import { avatarOIniciales, avatarCuerpoSVG } from "./avatar.js";
 import { estadoSubtitulos, subtitulosLeccion, subtitulosCapitulo } from "./subtitulos.js";
 import { pintarIdeasAdmin, contarIdeasNuevas } from "./admin-ideas.js";
+import { montarRanking, montarReconocer, pintarFicha } from "./admin-equipo.js";
 
 const LOGO = "img/logo.png";
 let ctx; // { ir, salir }
@@ -20,7 +21,7 @@ export async function vistaAdmin(app, partes, contexto) {
   ctx = contexto;
   const [seccion = "", id, pestana] = partes;
   const menu = [["cursos", "book", "Cursos"], ["audiolibros", "audifonos", "Audiolibros"], ["empleados", "users", "Empleados"], ["ideas", "bulb", "Ideas"], ["resumen", "chart", "Resumen"], ["premios", "gift", "Premios y canjes"], ["insignias", "medal", "Insignias"], ["configuracion", "ajustes", "Configuración"]];
-  const activa = seccion === "curso" || !seccion ? "cursos" : seccion === "audio" ? "audiolibros" : seccion;
+  const activa = seccion === "curso" || !seccion ? "cursos" : seccion === "audio" ? "audiolibros" : seccion === "empleado" ? "resumen" : seccion;
   app.className = "";
   app.innerHTML = `
   ${MODO === "demo" ? `<div class="banda-demo">MODO DEMO · datos de ejemplo</div>` : ""}
@@ -54,6 +55,7 @@ export async function vistaAdmin(app, partes, contexto) {
     if (seccion === "empleados") return await pintarEmpleados(main);
     if (seccion === "resumen") return await pintarResumen(main);
     if (seccion === "ideas") return await pintarIdeasAdmin(main, id || "ideas");
+    if (seccion === "empleado") return await pintarFicha(main, id);
     if (seccion === "audiolibros") return await pintarAudiolibrosAdmin(main, ctx);
     if (seccion === "audio") return await pintarEditorAudio(main, id, pestana, ctx);
     if (seccion === "curso") return await pintarEditorCurso(main, id, pestana);
@@ -143,6 +145,8 @@ async function pintarResumen(main) {
         <div class="tabla-caja" id="tabla-avance"></div>
       </section>
       <div class="pila" style="flex:1 1 300px;gap:20px">
+        <section class="panel" id="ranking"></section>
+        <section class="panel pila" id="reconocer" style="gap:10px"></section>
         <section class="panel" id="alertas-cuentas" hidden></section>
         <section class="panel">
           <h2>Canjes por aprobar</h2>
@@ -156,7 +160,7 @@ async function pintarResumen(main) {
     main.querySelector("#tabla-avance").innerHTML = filas.length ? `
       <table class="tabla"><thead><tr><th>Empleado</th><th>Área</th><th style="width:32%">Avance</th><th>Puntos</th><th>Estado</th></tr></thead><tbody>
       ${filas.map((e) => { const [txt, cls] = estadoEmpleado(e); return `<tr>
-        <td><span class="fila" style="gap:10px;align-items:center"><button class="avatar-boton" data-ver-av="${e.user_id}" aria-label="Ver avatar de ${esc(e.nombre)}">${avatarOIniciales(avs[e.user_id], e.nombre, 36)}</button><span><b>${esc(e.nombre)}</b><div class="texto-tenue" style="font-size:12px">${esc(e.sede || "")}${e.turno ? " · " + esc(e.turno) : ""} · ${haceCuanto(e.ultima_actividad)}</div></span></span></td>
+        <td><span class="fila" style="gap:10px;align-items:center"><button class="avatar-boton" data-ver-av="${e.user_id}" aria-label="Ver avatar de ${esc(e.nombre)}">${avatarOIniciales(avs[e.user_id], e.nombre, 36)}</button><span><a class="enlace-ficha" href="#/admin/empleado/${e.user_id}"><b>${esc(e.nombre)}</b></a><div class="texto-tenue" style="font-size:12px">${esc(e.sede || "")}${e.turno ? " · " + esc(e.turno) : ""} · ${haceCuanto(e.ultima_actividad)}</div></span></span></td>
         <td>${esc(nombreArea(e.area))}</td>
         <td><div class="fila"><div class="barra fina" style="flex:1"><i style="width:${pct(e)}%;${e.cursos_atrasados ? "background:var(--alerta)" : ""}"></i></div><b style="font-size:12px;color:var(--oro);min-width:36px;text-align:right">${pct(e)}%</b></div></td>
         <td>${num(e.puntos)}</td>
@@ -172,6 +176,8 @@ async function pintarResumen(main) {
     pintarTabla();
   };
   conectarCanjes(main);
+  montarRanking(main.querySelector("#ranking"), avs);
+  montarReconocer(main.querySelector("#reconocer"), avs);
   pintarAlertasCuentas(main.querySelector("#alertas-cuentas"));
 }
 
@@ -253,7 +259,7 @@ async function pintarEmpleados(main) {
     <section class="panel">
       ${equipo.length ? `<div class="tabla-caja"><table class="tabla"><thead><tr><th>Nombre</th><th>Usuario</th><th>Área</th><th>Sede · turno</th><th>Avance</th><th>Dispositivos</th><th></th></tr></thead><tbody>
       ${equipo.map((e) => `<tr class="${e.activo ? "" : "inactivo"}">
-        <td><span class="fila" style="gap:8px"><button class="avatar-boton" data-ver-av="${e.user_id}" aria-label="Ver avatar de ${esc(e.nombre)}">${avatarOIniciales(avs[e.user_id], e.nombre, 34)}</button><b>${esc(e.nombre)}</b></span>${e.activo ? "" : ' <span class="pildora">Inactivo</span>'}</td>
+        <td><span class="fila" style="gap:8px"><button class="avatar-boton" data-ver-av="${e.user_id}" aria-label="Ver avatar de ${esc(e.nombre)}">${avatarOIniciales(avs[e.user_id], e.nombre, 34)}</button><a class="enlace-ficha" href="#/admin/empleado/${e.user_id}"><b>${esc(e.nombre)}</b></a></span>${e.activo ? "" : ' <span class="pildora">Inactivo</span>'}</td>
         <td>@${esc(e.usuario)}</td><td>${esc(nombreArea(e.area))}</td>
         <td>${esc(e.sede || "—")}${e.turno ? " · " + esc(e.turno) : ""}</td>
         <td>${pct(e)}% · ${num(e.puntos)} pts</td>

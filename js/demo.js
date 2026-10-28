@@ -121,6 +121,8 @@ function semilla() {
     progreso: [
       { user_id: ana, leccion_id: "l-1", segundo_actual: 95, max_segundo: 95, completado: true, completado_en: new Date(Date.now() - 2 * 864e5).toISOString(), actualizado: ahora() },
       { user_id: ana, leccion_id: "l-2", segundo_actual: 50, max_segundo: 50, completado: false, completado_en: null, actualizado: ahora() },
+      { user_id: karla, leccion_id: "l-5", segundo_actual: 90, max_segundo: 90, completado: true, completado_en: new Date(Date.now() - 3 * 864e5).toISOString(), actualizado: new Date(Date.now() - 3 * 864e5).toISOString() },
+      { user_id: karla, leccion_id: "l-6", segundo_actual: 110, max_segundo: 110, completado: true, completado_en: new Date(Date.now() - 3 * 864e5 + 6e5).toISOString(), actualizado: new Date(Date.now() - 3 * 864e5 + 6e5).toISOString() },
     ],
     intentos: [],
     insignias_usuario: [{ user_id: ana, insignia_id: "primer_sorbo", otorgada_en: ahora(), vista: true }],
@@ -128,6 +130,9 @@ function semilla() {
       { user_id: ana, puntos: 10, motivo: "leccion", ref: "l-1", creado_en: ahora() },
       { user_id: ana, puntos: 10, motivo: "insignia", ref: "primer_sorbo", creado_en: ahora() },
       { user_id: karla, puntos: 640, motivo: "bono", ref: "demo", creado_en: ahora() },
+      { user_id: karla, puntos: 10, motivo: "leccion", ref: "l-5", creado_en: new Date(Date.now() - 3 * 864e5).toISOString() },
+      { user_id: karla, puntos: 10, motivo: "leccion", ref: "l-6", creado_en: new Date(Date.now() - 3 * 864e5 + 6e5).toISOString() },
+      { user_id: karla, puntos: 30, motivo: "curso", ref: "c-higiene", creado_en: new Date(Date.now() - 3 * 864e5 + 6e5).toISOString() },
       { user_id: luis, puntos: 180, motivo: "bono", ref: "demo", creado_en: ahora() },
     ],
     premios: [
@@ -492,6 +497,62 @@ export function crearDemo() {
           ultima_actividad: db.progreso.filter((p) => p.user_id === u.user_id).map((p) => p.actualizado).sort().pop() || null,
         };
       }).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    },
+    async adminFicha(userId) {
+      await espera(); exigirAdmin();
+      const u = db.usuarios.find((x) => x.user_id === userId); if (!u) throw new Error("Empleado no encontrado");
+      const titCurso = (id) => db.cursos.find((c) => c.id === id)?.titulo;
+      const titLibro = (id) => db.audiolibros.find((b) => b.id === id)?.titulo;
+      const detalle = (p) => ({
+        leccion: () => { const l = db.lecciones.find((x) => x.id === p.ref); return l ? `${l.titulo} · ${titCurso(l.curso_id)}` : null; },
+        curso: () => titCurso(p.ref), quiz_perfecto: () => titCurso(p.ref), a_tiempo: () => titCurso(p.ref),
+        insignia: () => db.insignias.find((i) => i.id === p.ref)?.nombre,
+        audio: () => { const [b, t] = String(p.ref).split(":"); return titLibro(b) ? `${titLibro(b)}${t === "fin" ? " · final" : t ? " · tramo " + t : ""}` : null; },
+        audiolibro: () => titLibro(p.ref), audio_a_tiempo: () => titLibro(p.ref),
+        idea: () => (db.ideas || []).find((i) => i.id === p.ref)?.texto?.slice(0, 90) || "Nota de voz / foto",
+      }[p.motivo]?.() || p.nota || p.ref || "");
+      const mios = db.puntos.filter((p) => p.user_id === userId);
+      const porMotivo = {};
+      mios.forEach((p) => { porMotivo[p.motivo] = porMotivo[p.motivo] || { motivo: p.motivo, puntos: 0, veces: 0 }; porMotivo[p.motivo].puntos += p.puntos; porMotivo[p.motivo].veces++; });
+      const fechaFin = (cid) => [...leccionesDe(cid).map((l) => prog(userId, l.id)?.completado_en), ...db.intentos.filter((i) => i.user_id === userId && i.curso_id === cid && i.aprobado).map((i) => i.creado_en)].filter(Boolean).sort().pop() || null;
+      const conProg = (cid) => leccionesDe(cid).some((l) => prog(userId, l.id));
+      const r = racha(userId), g = ganados(userId);
+      const nivel = [...db.niveles].sort((a, b) => b.puntos_min - a.puntos_min).find((n) => n.puntos_min <= g)?.nombre;
+      return deshacer({
+        perfil: { user_id: u.user_id, nombre: u.nombre, usuario: u.usuario, area: u.area, sede: u.sede, turno: u.turno, activo: u.activo, meta_premio: u.meta_premio || null },
+        ganados: g, disponibles: g - gastados(userId), nivel, racha_actual: r.actual, racha_maxima: r.maxima,
+        por_motivo: Object.values(porMotivo).sort((a, b) => b.puntos - a.puntos),
+        historial: [...mios].sort((a, b) => String(b.creado_en).localeCompare(String(a.creado_en))).map((p) => ({ puntos: p.puntos, motivo: p.motivo, creado_en: p.creado_en, detalle: detalle(p) })),
+        cursos: db.cursos.filter((c) => (c.publicado && asignado(u, c.id)) || conProg(c.id)).map((c) => {
+          const ls = leccionesDe(c.id), t = terminado(userId, c.id);
+          return { id: c.id, titulo: c.titulo, publicado: c.publicado, certificado: c.certificado, asignado: asignado(u, c.id), fecha_limite: limite(u, c.id),
+            lecciones: ls.length, completadas: ls.filter((l) => prog(userId, l.id)?.completado).length, duracion_seg: ls.reduce((a, l) => a + (l.duracion_seg || 0), 0),
+            terminado: t, terminado_en: t ? fechaFin(c.id) : null,
+            quiz_mejor: db.intentos.filter((i) => i.user_id === userId && i.curso_id === c.id).reduce((m, i) => Math.max(m, i.puntaje), 0) || null,
+            ultima_actividad: ls.map((l) => prog(userId, l.id)?.actualizado).filter(Boolean).sort().pop() || null };
+        }).sort((a, b) => Number(a.terminado) - Number(b.terminado) || a.titulo.localeCompare(b.titulo)),
+        audiolibros: db.audiolibros.map((b) => {
+          const ap = db.audio_progreso.find((p) => p.user_id === userId && p.audiolibro_id === b.id);
+          const as = db.audio_asignaciones.some((a) => a.audiolibro_id === b.id && (!a.area || a.area === u.area) && (!a.sede || a.sede === u.sede) && (!a.user_id || a.user_id === u.user_id));
+          return (b.publicado && as) || ap ? { id: b.id, titulo: b.titulo, duracion_seg: b.duracion_seg, asignado: as, escuchado: ap?.max_segundo || 0, completado: !!ap?.completado, completado_en: ap?.completado_en || null, ultima_actividad: ap?.actualizado || null } : null;
+        }).filter(Boolean),
+        insignias: db.insignias_usuario.filter((x) => x.user_id === userId).map((x) => { const i = db.insignias.find((y) => y.id === x.insignia_id) || {}; return { id: i.id, nombre: i.nombre, icono: i.icono, nivel: i.nivel, otorgada_en: x.otorgada_en }; }),
+        canjes: db.canjes.filter((k) => k.user_id === userId).map((k) => ({ premio: db.premios.find((p) => p.id === k.premio_id)?.nombre || "Premio", costo: k.costo, estado: k.estado, creado_en: k.creado_en })),
+        ideas: (db.ideas || []).filter((i) => i.user_id === userId).reduce((o, i) => ({ ...o, [i.estado]: (o[i.estado] || 0) + 1 }), {}),
+      });
+    },
+    async adminReconocer() {
+      await espera(); exigirAdmin();
+      return db.usuarios.filter((u) => u.rol === "empleado" && u.activo).map((u) => ({
+        user_id: u.user_id, nombre: u.nombre, usuario: u.usuario, area: u.area, sede: u.sede, meta_premio: u.meta_premio || null,
+        disponibles: ganados(u.user_id) - gastados(u.user_id),
+        diplomas: db.cursos.filter((c) => c.certificado && terminado(u.user_id, c.id)).map((c) => {
+          const ls = leccionesDe(c.id);
+          const fin = [...ls.map((l) => prog(u.user_id, l.id)?.completado_en), ...db.intentos.filter((i) => i.user_id === u.user_id && i.curso_id === c.id && i.aprobado).map((i) => i.creado_en)].filter(Boolean).sort().pop();
+          return { curso_id: c.id, titulo: c.titulo, terminado_en: fin || null, duracion_seg: ls.reduce((a, l) => a + (l.duracion_seg || 0), 0),
+            quiz_mejor: db.intentos.filter((i) => i.user_id === u.user_id && i.curso_id === c.id).reduce((m, i) => Math.max(m, i.puntaje), 0) || null };
+        }),
+      })).sort((a, b) => a.nombre.localeCompare(b.nombre));
     },
     async crearEmpleado(d) {
       await espera(); exigirAdmin();

@@ -144,7 +144,7 @@ export async function dibujarCertificado({ nombre, curso, fecha, segundos, punta
 
 export async function mostrarCertificado(datosCert) {
   const p = modal(`
-    <h2 class="modal-titulo">Tu certificado</h2>
+    <h2 class="modal-titulo">${esc(datosCert.titulo || "Tu certificado")}</h2>
     <div id="cert-prev" class="cargando" style="min-height:180px"><div class="taza-carga"></div></div>
     <div class="fila-botones">
       <button class="btn btn-sec" id="cert-desc" disabled>${icono("file", 18)}Descargar</button>
@@ -165,7 +165,7 @@ export async function mostrarCertificado(datosCert) {
     desc.onclick = () => { const a = document.createElement("a"); a.href = url; a.download = nombreArchivo; document.body.appendChild(a); a.click(); a.remove(); };
     const archivo = new File([blob], nombreArchivo, { type: "image/png" });
     if (navigator.canShare?.({ files: [archivo] })) {
-      comp.onclick = () => navigator.share({ files: [archivo], title: "Mi certificado · Academia del Buen Café" }).catch(() => {});
+      comp.onclick = () => navigator.share({ files: [archivo], title: datosCert.tituloCompartir || "Mi certificado · Academia del Buen Café", text: datosCert.textoCompartir || undefined }).catch(() => {});
     } else {
       comp.textContent = "Abrir en grande";
       comp.onclick = () => window.open(url, "_blank");

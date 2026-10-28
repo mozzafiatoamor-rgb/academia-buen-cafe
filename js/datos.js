@@ -275,6 +275,8 @@ function crearNube() {
 
     // ---------- Admin ----------
     adminAvance: () => rpc("academia_admin_avance"),
+    adminFicha: (userId) => rpc("academia_admin_ficha", { p_user: userId }),
+    adminReconocer: () => rpc("academia_admin_reconocer"),
     adminPerfiles: () => q(sb.from("academia_perfiles").select("user_id, nombre, usuario, gestor_id, activo, area, sede").eq("rol", "empleado")),
     otorgarInsignia: (userId, insignia) => rpc("academia_otorgar_insignia", { p_user: userId, p_insignia: insignia }),
     crearEmpleado: (d) => funcion("academia-admin", { accion: "crear_empleado", ...d }),
