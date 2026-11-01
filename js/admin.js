@@ -323,14 +323,21 @@ async function pintarEmpleados(main) {
   }));
   main.querySelectorAll("[data-editar]").forEach((b) => (b.onclick = async () => {
     const e = porId(b.dataset.editar);
+    const completos = await datos.nombresCompletos().catch(() => null);
     const d = await formulario(`Editar a ${e.nombre}`, [
-      { nombre: "nombre", etiqueta: "Nombre", valor: e.nombre, requerido: true },
+      { nombre: "nombre", etiqueta: "Nombre para mostrar", valor: e.nombre, requerido: true },
+      ...(completos ? [{ nombre: "nombre_completo", etiqueta: "Nombre completo (diplomas)", valor: completos[e.user_id] || "", placeholder: "Nombre y apellidos con acentos", ayuda: "El empleado también lo puede cambiar desde su perfil." }] : []),
       { nombre: "area", etiqueta: "Área", tipo: "select", opciones: AREAS, valor: e.area },
       { nombre: "sede", etiqueta: "Sede", tipo: "select", opciones: SEDES, valor: e.sede },
       { nombre: "turno", etiqueta: "Turno", tipo: "select", opciones: [["", "—"], ["AM", "AM"], ["PM", "PM"]], valor: e.turno || "" },
     ]);
     if (!d) return;
-    try { await datos.actualizarEmpleado(e.user_id, d); aviso("Guardado", "ok"); recargar(); } catch (err) { aviso(err.message, "error"); }
+    const { nombre_completo, ...cambios } = d;
+    try {
+      await datos.actualizarEmpleado(e.user_id, cambios);
+      if (completos && (nombre_completo || "") !== (completos[e.user_id] || "")) await datos.guardarNombres("", nombre_completo, e.user_id);
+      aviso("Guardado", "ok"); recargar();
+    } catch (err) { aviso(err.message, "error"); }
   }));
   main.querySelectorAll("[data-activo]").forEach((b) => (b.onclick = async () => {
     const e = porId(b.dataset.activo);

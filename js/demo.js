@@ -498,6 +498,18 @@ export function crearDemo() {
         };
       }).sort((a, b) => a.nombre.localeCompare(b.nombre));
     },
+    async misNombres() { const u = exigir(); return { nombre: u.nombre, nombre_completo: u.nombre_completo || null }; },
+    async guardarNombres(nombre, completo, userId) {
+      await espera(); const yoU = exigir();
+      const u = userId ? db.usuarios.find((x) => x.user_id === userId) : yoU;
+      if (userId && userId !== yoU.user_id) exigirAdmin();
+      const n = String(nombre || "").trim(), c = String(completo || "").trim();
+      if (n && (n.length < 2 || n.length > 40)) throw new Error("El nombre para mostrar debe tener entre 2 y 40 letras");
+      if (c.length > 120) throw new Error("El nombre completo es demasiado largo");
+      if (n) u.nombre = n;
+      u.nombre_completo = c || null; guardar();
+    },
+    async nombresCompletos() { exigirAdmin(); return Object.fromEntries(db.usuarios.filter((u) => u.nombre_completo).map((u) => [u.user_id, u.nombre_completo])); },
     async adminFicha(userId) {
       await espera(); exigirAdmin();
       const u = db.usuarios.find((x) => x.user_id === userId); if (!u) throw new Error("Empleado no encontrado");

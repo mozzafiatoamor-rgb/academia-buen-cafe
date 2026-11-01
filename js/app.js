@@ -2,7 +2,7 @@
 //  ACADEMIA DEL BUEN CAFÉ · App del empleado + enrutador
 // =====================================================================
 import { datos, MODO, enviarAvance, vaciarCola, pendientesCola } from "./datos.js";
-import { icono, esc, num, duracion, reloj, fechaCorta, hoyISO, haceCuanto, iniciales, saludo, aviso, modal, confirmar, marcaTitulo, nombreArea, nombreCategoria, fijarCategorias } from "./ui.js";
+import { icono, esc, num, duracion, reloj, fechaCorta, hoyISO, haceCuanto, iniciales, saludo, aviso, modal, confirmar, formulario, marcaTitulo, nombreArea, nombreCategoria, fijarCategorias } from "./ui.js";
 import { vistaAdmin } from "./admin.js";
 import { mostrarCertificado, folio } from "./certificado.js";
 import { abrirVisor } from "./visor.js";
@@ -541,6 +541,38 @@ function tarjetaCurso(c) {
 }
 const diasHasta = (iso) => Math.round((new Date(iso + "T12:00:00") - new Date(hoyISO() + "T12:00:00")) / 864e5);
 
+// Nombre para mostrar en la app y nombre completo para los diplomas.
+const falta14 = (e) => /academia_mis_nombres|academia_guardar_nombres|Could not find the function|PGRST202/i.test(e?.message || "");
+async function editarMisNombres() {
+  let actual;
+  try { actual = await datos.misNombres(); }
+  catch (e) { aviso(falta14(e) ? "Esta opción estará lista muy pronto (falta un paso en el sistema)." : e.message, "error"); return; }
+  const v = await formulario("Mis nombres", [
+    { nombre: "nombre", etiqueta: "Nombre para mostrar en la app", valor: actual?.nombre || estado.perfil.nombre, requerido: true, ayuda: "Así te ven tus compañeros en el ranking y en tu perfil. Ej. Ana P." },
+    { nombre: "nombre_completo", etiqueta: "Nombre completo para tus diplomas", valor: actual?.nombre_completo || "", placeholder: "Ej. Ana Patricia Pérez Chan", ayuda: "Escríbelo completo y con acentos, tal como quieres que aparezca en tus diplomas." },
+  ], "Guardar");
+  if (!v) return;
+  try {
+    await datos.guardarNombres(v.nombre, v.nombre_completo);
+    estado.perfil = { ...estado.perfil, nombre: v.nombre.trim() };
+    aviso("Nombres guardados ✓", "ok");
+    if (location.hash.replace(/^#\/?/, "") === "inicio" || !location.hash) pintarInicio();
+  } catch (e) { aviso(e.message, "error"); }
+}
+
+// Antes de mostrar un diploma: si no tiene nombre completo, se lo pide una vez.
+async function nombreParaDiploma() {
+  let n;
+  try { n = await datos.misNombres(); } catch (_) { return estado.perfil.nombre; }
+  if (n?.nombre_completo) return n.nombre_completo;
+  const v = await formulario("¿Cómo quieres tu nombre en el diploma?", [
+    { nombre: "nombre_completo", etiqueta: "Nombre completo", valor: "", requerido: true, autofocus: true, placeholder: "Ej. Ana Patricia Pérez Chan", ayuda: "Escríbelo completo y con acentos. Lo puedes cambiar después en tu perfil → Mis nombres." },
+  ], "Ver mi diploma");
+  if (!v) return null;
+  try { await datos.guardarNombres("", v.nombre_completo); } catch (e) { aviso(e.message, "error"); }
+  return v.nombre_completo.trim();
+}
+
 function abrirPerfil(r) {
   modal(`
     ${estado.miAvatar ? `<button class="avatar-cuerpo-modal" id="perfil-cuerpo" aria-label="Tu avatar">${avatarCuerpoSVG(estado.miAvatar, 220, { animado: true })}</button>` : ""}
@@ -555,10 +587,11 @@ function abrirPerfil(r) {
     ${pendientesCola() ? `<p class="texto-tenue">${pendientesCola()} avance(s) esperando señal para enviarse.</p>` : ""}
     <button class="btn btn-bloque" data-cerrar="avatar">${icono("user", 18)}${estado.miAvatar ? "Editar mi avatar" : "Crear mi avatar"}</button>
     <button class="btn btn-sec btn-bloque" data-cerrar="libreta">${icono("libreta", 18)}Mi libreta</button>
+    <button class="btn btn-sec btn-bloque" data-cerrar="nombres">${icono("edit", 18)}Mis nombres (app y diplomas)</button>
     <button class="btn btn-sec btn-bloque" data-cerrar="bienvenida">${icono("book", 18)}Cómo funciona la Academia</button>
     <button class="btn btn-peligro btn-bloque" data-cerrar="salir">${icono("logout", 18)}Cerrar sesión</button>
     <button class="btn btn-sec btn-bloque" data-cerrar>Cerrar</button>
-  `).then((v) => { if (v === "salir") salir(); if (v === "bienvenida") mostrarBienvenida(r); if (v === "avatar") ir("/avatar"); if (v === "libreta") ir("/libreta"); });
+  `).then((v) => { if (v === "salir") salir(); if (v === "bienvenida") mostrarBienvenida(r); if (v === "avatar") ir("/avatar"); if (v === "libreta") ir("/libreta"); if (v === "nombres") editarMisNombres(); });
   const cuerpo = modal.actual?.querySelector("#perfil-cuerpo svg");
   if (cuerpo) {
     setTimeout(() => cuerpo.classList.add("av-saluda"), 350);
@@ -760,12 +793,14 @@ async function pintarCurso(id) {
   app.querySelector("#escribir-propuesta")?.addEventListener("click", async () => {
     if (await escribirPropuesta({ id, titulo: d.curso.titulo }, estado.perfil?.usuario)) pintarCurso(id);
   });
-  app.querySelector("#ver-cert")?.addEventListener("click", () => {
+  app.querySelector("#ver-cert")?.addEventListener("click", async () => {
+    const nombreDiploma = vp ? "Nombre del colaborador" : await nombreParaDiploma();
+    if (!nombreDiploma) return;
     const fechas = [...d.progreso.filter((p) => p.completado && orden.some((l) => l.id === p.leccion_id)).map((p) => p.completado_en),
       ...d.intentos.filter((t) => t.aprobado).map((t) => t.creado_en)].filter(Boolean).sort();
     const cuando = fechas.length ? new Date(fechas[fechas.length - 1]) : new Date();
     mostrarCertificado({
-      nombre: vp ? "Nombre del colaborador" : estado.perfil.nombre,
+      nombre: nombreDiploma,
       curso: d.curso.titulo,
       fecha: cuando.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" }),
       segundos: durTotal,

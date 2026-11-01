@@ -4,6 +4,7 @@
 import { icono, esc, modal, aviso, duracion } from "./ui.js";
 
 const W = 2000, H = 1414; // proporción A4 horizontal
+const FIRMA = "MBA. Gustavo Díaz Acosta"; // quien firma los diplomas
 const C = { fondo: "#F7EFE3", fondo2: "#EFE3D2", espresso: "#2B1A14", cafe: "#5A3E31", cobre: "#B8703C", oro: "#C99A45", tenue: "#8A7262" };
 
 function cargarImagen(src) {
@@ -121,7 +122,7 @@ export async function dibujarCertificado({ nombre, curso, fecha, segundos, punta
   x.beginPath(); x.moveTo(W - 700, yPie); x.lineTo(W - 250, yPie); x.stroke();
   x.fillStyle = C.espresso; x.font = `600 30px ${sans}`;
   x.fillText(fecha, 475, yPie - 18);
-  x.fillText("Gustavo", W - 475, yPie - 18);
+  x.fillText(FIRMA, W - 475, yPie - 18);
   x.fillStyle = C.tenue; x.font = `500 24px ${sans}`;
   x.fillText("Felipe Carrillo Puerto, Q. Roo", 475, yPie + 40);
   x.fillText("Mozzafiato · El placer del buen café", W - 475, yPie + 40);

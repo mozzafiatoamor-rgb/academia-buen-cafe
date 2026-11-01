@@ -276,6 +276,9 @@ function crearNube() {
     // ---------- Admin ----------
     adminAvance: () => rpc("academia_admin_avance"),
     adminFicha: (userId) => rpc("academia_admin_ficha", { p_user: userId }),
+    misNombres: () => rpc("academia_mis_nombres"),
+    guardarNombres: (nombre, completo, userId) => rpc("academia_guardar_nombres", { p_nombre: nombre || "", p_nombre_completo: completo || "", p_user: userId || null }),
+    nombresCompletos: () => rpc("academia_nombres_completos"),
     adminReconocer: () => rpc("academia_admin_reconocer"),
     ajustarInsignias: (insignia, aplicar) => rpc("academia_admin_ajustar_insignias", { p_insignia: insignia || null, p_aplicar: !!aplicar }),
     adminPerfiles: () => q(sb.from("academia_perfiles").select("user_id, nombre, usuario, gestor_id, activo, area, sede").eq("rol", "empleado")),

@@ -73,7 +73,9 @@ export async function montarReconocer(caja, avs = {}) {
   caja.innerHTML = `<h2>${icono("gift", 20, 'style="vertical-align:-3px;color:var(--oro)"')} Para reconocer</h2><div class="cargando" style="min-height:80px"><div class="taza-carga"></div></div>`;
   let gente, premios, numeros;
   try {
-    [gente, { premios }, numeros] = await Promise.all([datos.adminReconocer(), datos.adminPremios(), numerosWhats()]);
+    let completos;
+    [gente, { premios }, numeros, completos] = await Promise.all([datos.adminReconocer(), datos.adminPremios(), numerosWhats(), datos.nombresCompletos().catch(() => ({}))]);
+    gente.forEach((g) => (g.nombre_completo = completos[g.user_id] || null));
   } catch (e) {
     caja.innerHTML = `<h2>Para reconocer</h2><p class="texto-tenue" style="margin:0">${esc(falta11(e))}</p>`;
     return;
@@ -164,11 +166,12 @@ function mensajePropuesta(g) {
 
 export function verDiploma(persona, curso) {
   const nombre = String(persona.nombre || "").split(" ")[0];
+  const nombreDiploma = persona.nombre_completo || persona.nombre;
   return mostrarCertificado({
-    titulo: `Diploma de ${persona.nombre}`,
+    titulo: `Diploma de ${nombreDiploma}`,
     tituloCompartir: `Diploma · ${curso.titulo}`,
     textoCompartir: `¡Felicidades ${nombre}! Terminaste el curso "${curso.titulo}" en la Academia del Buen Café. Aquí está tu diploma 🎓`,
-    nombre: persona.nombre,
+    nombre: nombreDiploma,
     curso: curso.titulo,
     fecha: fechaLarga(curso.terminado_en),
     segundos: curso.duracion_seg || 0,
@@ -183,9 +186,10 @@ export function verDiploma(persona, curso) {
 export async function pintarFicha(main, userId) {
   let f, premios = [], avs = {}, numeros = {};
   try {
-    let ideasTodas;
-    [f, { premios }, avs, numeros, ideasTodas] = await Promise.all([datos.adminFicha(userId), datos.adminPremios().catch(() => ({ premios: [] })),
-      datos.avatares().catch(() => ({})), numerosWhats(), datos.adminIdeas().catch(() => [])]);
+    let ideasTodas, completos;
+    [f, { premios }, avs, numeros, ideasTodas, completos] = await Promise.all([datos.adminFicha(userId), datos.adminPremios().catch(() => ({ premios: [] })),
+      datos.avatares().catch(() => ({})), numerosWhats(), datos.adminIdeas().catch(() => []), datos.nombresCompletos().catch(() => ({}))]);
+    f.perfil.nombre_completo = completos[userId] || null;
     f.propuestasPorCurso = {};
     for (const i of ideasTodas.filter((x) => x.user_id === userId && x.curso_id)) f.propuestasPorCurso[i.curso_id] = (f.propuestasPorCurso[i.curso_id] || 0) + 1;
   } catch (e) {
@@ -244,6 +248,7 @@ export async function pintarFicha(main, userId) {
       ${avatarOIniciales(avs[p.user_id], p.nombre, 72)}
       <div style="flex:1;min-width:0">
         <h1 class="titulo-pagina" style="margin:0">${esc(p.nombre)}</h1>
+        ${p.nombre_completo ? `<div style="color:var(--crema-2);font-size:14px">${icono("medal", 14, 'style="vertical-align:-2px;color:var(--oro)"')} En diplomas: <b>${esc(p.nombre_completo)}</b></div>` : `<div class="texto-tenue" style="font-size:12.5px">${icono("medal", 13, 'style="vertical-align:-2px"')} Sin nombre completo para diplomas (se usa "${esc(p.nombre)}")</div>`}
         <span class="texto-tenue">@${esc(p.usuario)} · ${esc(nombreArea(p.area))}${p.sede ? " · " + esc(p.sede) : ""}${p.turno ? " · " + esc(p.turno) : ""}${p.activo ? "" : " · <b>Inactivo</b>"}</span>
       </div>
     </section>
