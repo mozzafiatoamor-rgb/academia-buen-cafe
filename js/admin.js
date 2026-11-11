@@ -2,7 +2,7 @@
 //  ACADEMIA DEL BUEN CAFÉ · Panel de administración
 // =====================================================================
 import { datos, MODO } from "./datos.js";
-import { icono, esc, num, duracion, fechaCorta, hoyISO, haceCuanto, aviso, modal, confirmar, formulario, marcaTitulo, AREAS, SEDES, nombreArea, nombreCategoria, opcionesCategoria, categorias, fijarCategorias, slug } from "./ui.js";
+import { icono, esc, num, duracion, fechaCorta, hoyISO, haceCuanto, aviso, modal, confirmar, formulario, marcaTitulo, AREAS, SEDES, nombreArea, nombreCategoria, opcionesCategoria, categorias, fijarCategorias, slug, enlaceWhats, iniciarEnlacesWhats } from "./ui.js";
 import { subirCursoDesdeCarpeta } from "./subir.js";
 import { panelQuiz, panelMateriales } from "./contenido.js";
 import { pintarConfiguracion } from "./configuracion.js";
@@ -44,6 +44,7 @@ export async function vistaAdmin(app, partes, contexto) {
     </div>
   </div>`;
   fijarMenuMovil(app);
+  iniciarEnlacesWhats();
   pendientesAdmin().then((p) => {
     globosMenu(app, p);
     avisoAlEntrar(p, ctx.ir);
@@ -370,7 +371,7 @@ async function copiar(texto) {
   catch { aviso("No se pudo copiar; selecciónalo a mano", "error"); }
 }
 
-const linkWhats = (msg, numero) => `https://wa.me/${numero ? String(numero).replace(/\D/g, "") : ""}?text=${encodeURIComponent(msg)}`;
+const linkWhats = (msg, numero) => enlaceWhats(msg, numero);
 
 // Ver el avatar de un empleado en grande (cuerpo completo, saluda al abrir).
 function verAvatar(e, avatar) {
@@ -622,7 +623,7 @@ async function altaEnLote(equipo) {
         ${r.con_error ? `<p class="error-form">${r.con_error} con error: ${r.resultados.filter((x) => !x.ok).map((x) => esc(`${x.usuario} (${x.error})`)).join(", ")}</p>` : ""}
         <div class="tabla-caja"><table class="tabla" style="min-width:0"><thead><tr><th>Nombre</th><th>Usuario</th><th>PIN</th><th></th></tr></thead><tbody>
           ${ok.map((x, i) => `<tr><td>${esc(x.nombre)}</td><td>@${esc(x.usuario)}</td><td><b style="color:var(--oro);letter-spacing:2px">${esc(x.pin)}</b></td>
-            <td><a class="mini-btn" target="_blank" rel="noopener" aria-label="WhatsApp" href="https://wa.me/?text=${encodeURIComponent(mensajeAcceso(x.nombre, x.usuario, x.pin))}">${icono("next", 18)}</a></td></tr>`).join("")}
+            <td><a class="mini-btn" target="_blank" rel="noopener" aria-label="WhatsApp" href="${linkWhats(mensajeAcceso(x.nombre, x.usuario, x.pin), null)}">${icono("next", 18)}</a></td></tr>`).join("")}
         </tbody></table></div>
         <p class="texto-tenue" style="margin:0">Los PIN no se vuelven a mostrar. Cópialos ahora.</p>
         <div class="fila-botones"><button class="btn btn-sec" id="copiar-todo">Copiar lista</button><button class="btn" data-cerrar>Listo</button></div>`, { cerrable: false, clase: "modal-ancho" });

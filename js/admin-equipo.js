@@ -3,7 +3,7 @@
 //  listos) y ficha de cada empleado (de dónde salieron sus puntos).
 // =====================================================================
 import { datos } from "./datos.js";
-import { icono, esc, num, duracion, fechaCorta, hoyISO, haceCuanto, aviso, modal, nombreArea } from "./ui.js";
+import { icono, esc, num, duracion, fechaCorta, hoyISO, haceCuanto, aviso, modal, nombreArea, enlaceWhats } from "./ui.js";
 import { avatarOIniciales } from "./avatar.js";
 import { mostrarCertificado, folio } from "./certificado.js";
 
@@ -23,7 +23,7 @@ const nombreMotivo = (m) => (MOTIVOS[m] || [m || "Otro"])[0];
 const iconoMotivo = (m) => (MOTIVOS[m] || [null, "star"])[1];
 const falta11 = (e) => (/academia_admin_ficha|academia_admin_reconocer|Could not find the function|PGRST202/i.test(e?.message || "")
   ? "Falta correr el paso 11 de SQL (ficha del empleado) en Supabase." : e?.message);
-const linkWhats = (msg, numero) => `https://wa.me/${numero ? String(numero).replace(/\D/g, "") : ""}?text=${encodeURIComponent(msg)}`;
+const linkWhats = (msg, numero) => enlaceWhats(msg, numero);
 const urlApp = () => `${location.origin}${location.pathname}`;
 const fechaLarga = (iso) => new Date(iso || Date.now()).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
 const leer = (k) => { try { return JSON.parse(localStorage.getItem(k) || "{}"); } catch (_) { return {}; } };

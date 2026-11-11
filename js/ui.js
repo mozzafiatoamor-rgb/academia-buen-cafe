@@ -265,3 +265,34 @@ export function marcaTitulo(tam = "normal", etiqueta = "h1") {
     <span class="mt-fuerte" aria-hidden="true">del Buen Café</span>
   </${etiqueta}>`;
 }
+
+// ---------------------------------------------------------------------
+//  WhatsApp: elegir con cuál app se abren los mensajes (normal o Business).
+//  En Android se fuerza la app con un enlace "intent"; si no está instalada,
+//  cae al enlace normal wa.me. En iPhone/compu se usa wa.me.
+// ---------------------------------------------------------------------
+const LLAVE_WHATS = "academia-whatsapp-app";
+export function preferenciaWhats() { try { return localStorage.getItem(LLAVE_WHATS) || "normal"; } catch (_) { return "normal"; } }
+export function fijarPreferenciaWhats(v) { try { localStorage.setItem(LLAVE_WHATS, v); } catch (_) { /* nada */ } }
+export const esAndroid = () => /Android/i.test(navigator.userAgent || "");
+export function enlaceWhats(msg, numero) {
+  const tel = numero ? String(numero).replace(/\D/g, "") : "";
+  const web = `https://wa.me/${tel}?text=${encodeURIComponent(msg || "")}`;
+  const pref = preferenciaWhats();
+  if (pref === "sistema" || !esAndroid()) return web;
+  const paquete = pref === "business" ? "com.whatsapp.w4b" : "com.whatsapp";
+  const q = `${tel ? `phone=${tel}&` : ""}text=${encodeURIComponent(msg || "")}`;
+  return `intent://send?${q}#Intent;scheme=whatsapp;package=${paquete};S.browser_fallback_url=${encodeURIComponent(web)};end`;
+}
+// Los enlaces "intent" se abren en la misma pestaña (si no, Android deja una pestaña en blanco).
+let enlacesListos = false;
+export function iniciarEnlacesWhats() {
+  if (enlacesListos) return;
+  enlacesListos = true;
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest?.('a[href^="intent:"]');
+    if (!a) return;
+    e.preventDefault();
+    location.href = a.getAttribute("href");
+  });
+}

@@ -2,7 +2,7 @@
 //  CONFIGURACIÓN (admin): puntos, niveles e insignias
 // =====================================================================
 import { datos } from "./datos.js";
-import { icono, esc, num, duracion, aviso, modal, formulario, confirmar, categorias, nombreCategoria, slug } from "./ui.js";
+import { icono, esc, num, duracion, aviso, modal, formulario, confirmar, categorias, nombreCategoria, slug, preferenciaWhats, fijarPreferenciaWhats, esAndroid } from "./ui.js";
 import { CFG_BASE, cfgPuntos, fijarCfgPuntos, valorCurso, valorAudio, puntosLeccion, nivelesSugeridos } from "./puntos.js";
 
 const ICONOS = [["cup", "Taza"], ["coffee", "Café"], ["flame", "Flama"], ["star", "Estrella"], ["trophy", "Trofeo"], ["medal", "Medalla"],
@@ -48,6 +48,15 @@ export async function pintarConfiguracion(main, pestana = "puntos") {
       <h1 class="titulo-pagina">Configuración</h1>
       <p class="texto-tenue" style="margin:0">Cómo se ganan los puntos, los niveles y las insignias. Los cambios aplican de aquí en adelante; los puntos ya ganados no se tocan (en insignias puedes aplicar el nuevo valor a quienes ya la tienen).</p>
     </div>
+    <section class="panel fila" style="gap:12px;flex-wrap:wrap;align-items:center">
+      <span style="flex:1 1 240px"><b>${icono("send", 16, 'style="vertical-align:-3px;color:var(--oro)"')} Mensajes de WhatsApp en este celular</b>
+        <small class="texto-tenue" style="display:block">Con cuál app se abren los avisos que mandas desde el panel. ${esAndroid() ? "" : "En iPhone y compu lo decide el sistema."}</small></span>
+      <select id="cfg-whats" class="select-chico">
+        <option value="normal">WhatsApp (normal)</option>
+        <option value="business">WhatsApp Business</option>
+        <option value="sistema">Que decida el celular</option>
+      </select>
+    </section>
     <div class="pestanas" role="tablist" style="max-width:560px">
       ${[["puntos", "Puntos"], ["niveles", "Niveles"], ["insignias", "Insignias"]].map(([v, t]) =>
         `<button role="tab" data-tab="${v}" aria-selected="${v === pestana}" class="${v === pestana ? "activo" : ""}">${t}</button>`).join("")}
@@ -60,6 +69,9 @@ export async function pintarConfiguracion(main, pestana = "puntos") {
     main.querySelectorAll("[data-seccion]").forEach((s) => (s.hidden = s.dataset.seccion !== b.dataset.tab));
     history.replaceState(null, "", `${location.pathname}${location.search}#/admin/configuracion/${b.dataset.tab}`);
   }));
+  const selWhats = main.querySelector("#cfg-whats");
+  selWhats.value = preferenciaWhats();
+  selWhats.onchange = () => { fijarPreferenciaWhats(selWhats.value); aviso(`Listo: los mensajes se abrirán en ${selWhats.options[selWhats.selectedIndex].text}`, "ok"); };
   const recargar = (tab) => pintarConfiguracion(main, tab);
   seccionPuntos(main.querySelector('[data-seccion="puntos"]'), catalogo, () => recargar("puntos"));
   seccionNiveles(main.querySelector('[data-seccion="niveles"]'), niveles, catalogo, () => recargar("niveles"));

@@ -781,3 +781,6 @@ button.avatar-grande { border: 0; padding: 0; background: transparent; cursor: p
 .aviso-admin-fila b { color: var(--oro); }
 .resaltar { animation: resaltar 1.6s ease; }
 @keyframes resaltar { 0%, 60% { box-shadow: 0 0 0 3px var(--oro); } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+/* ---------- Elegir app de WhatsApp (v1.20.1) ---------- */
+.select-chico { min-height: 42px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--linea); background: var(--tarjeta); color: var(--crema); font: inherit; font-size: 14px; }
