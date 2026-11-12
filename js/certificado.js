@@ -47,13 +47,84 @@ function partirLineas(x, texto, maxAncho) {
   return lineas;
 }
 
-export async function dibujarCertificado({ nombre, curso, fecha, segundos, puntaje, codigo }) {
+// ---------------------------------------------------------------------
+//  Plantilla ilustrada (img/diploma-plantilla.jpg, 2480 × 1754). Solo se
+//  escriben encima los datos de cada quien. Si no carga, se usa el diseño
+//  dibujado de abajo.
+// ---------------------------------------------------------------------
+const PLANTILLA = "img/diploma-plantilla.jpg";
+const P = { W: 2480, H: 1754, cx: 1240,
+  nombre: { y: 902, ancho: 1240, max: 128 },
+  curso: { y: 1150, ancho: 1060, max: 70 },
+  detalles: { y: 1228 },
+  fecha: { x: 734, y: 1516 }, lugar: { y: 1574 },
+  firma: { x: 1730, y: 1516 },
+  folio: { y: 1594 },
+};
+
+// Texto con un halo color papel para que se lea sobre la ilustración.
+function textoConHalo(x, texto, px, py, halo = "rgba(250, 236, 214, .95)") {
+  x.save();
+  x.shadowColor = halo; x.shadowBlur = 18;
+  for (let i = 0; i < 3; i++) x.fillText(texto, px, py);
+  x.restore();
+  x.fillText(texto, px, py);
+}
+
+async function dibujarConPlantilla({ nombre, curso, fecha, segundos, puntaje, codigo }, fondo) {
+  const c = document.createElement("canvas");
+  c.width = P.W; c.height = P.H;
+  const x = c.getContext("2d");
+  const sans = '"Nunito", system-ui, sans-serif';
+  x.drawImage(fondo, 0, 0, P.W, P.H);
+  x.textAlign = "center"; x.textBaseline = "alphabetic";
+
+  // Nombre completo
+  x.fillStyle = C.espresso;
+  ajustarTexto(x, nombre, P.nombre.ancho, P.nombre.max, `800 {t}px ${sans}`, 50);
+  x.fillText(nombre, P.cx, P.nombre.y);
+
+  // Curso (hasta 2 líneas, la última pegada a la línea)
+  // Una línea si cabe; si no, dos líneas más chicas (y "…" si aún sobra).
+  let tam = P.curso.max;
+  x.font = `800 ${tam}px ${sans}`;
+  let lineas = partirLineas(x, curso, P.curso.ancho);
+  if (lineas.length > 1) {
+    tam = 50; x.font = `800 ${tam}px ${sans}`;
+    lineas = partirLineas(x, curso, P.curso.ancho);
+    if (lineas.length > 2) {
+      let ultima = lineas.slice(1).join(" ");
+      while (x.measureText(ultima + "…").width > P.curso.ancho && ultima.includes(" ")) ultima = ultima.replace(/\s+\S+$/, "");
+      lineas = [lineas[0], ultima + "…"];
+    }
+  }
+  lineas.forEach((l, i) => x.fillText(l, P.cx, P.curso.y - (lineas.length - 1 - i) * (tam + 10)));
+
+  const detalles = [segundos ? `${duracion(segundos)} de formación` : null, puntaje ? `Quiz final: ${puntaje}%` : null].filter(Boolean).join("   ·   ");
+  if (detalles) { x.fillStyle = C.tenue; x.font = `600 32px ${sans}`; x.fillText(detalles, P.cx, P.detalles.y); }
+
+  // Pie: fecha (izquierda) · firma (derecha) · folio (bajo el sello)
+  x.fillStyle = C.espresso; x.font = `700 36px ${sans}`;
+  textoConHalo(x, fecha, P.fecha.x, P.fecha.y);
+  x.fillStyle = C.cafe; x.font = `600 27px ${sans}`;
+  textoConHalo(x, "Felipe Carrillo Puerto, Q. Roo", P.fecha.x, P.lugar.y);
+  x.fillStyle = C.espresso; x.font = `700 36px ${sans}`;
+  textoConHalo(x, FIRMA, P.firma.x, P.firma.y);
+  x.fillStyle = C.cafe; x.font = `600 27px ${sans}`;
+  x.fillText(`Folio ${codigo}`, P.cx, P.folio.y);
+  return c;
+}
+
+export async function dibujarCertificado(datosCert) {
+  const { nombre, curso, fecha, segundos, puntaje, codigo } = datosCert;
   try {
     await Promise.all([
       document.fonts.load('800 96px "Nunito"'), document.fonts.load('600 30px "Nunito"'),
       document.fonts.load('500 30px "Nunito"'), document.fonts.load('700 30px "Nunito"'), document.fonts.load('300 30px "Lato"'), document.fonts.load('900 30px "Lato"'),
     ]);
   } catch (_) { /* usa fuentes del sistema */ }
+  try { return await dibujarConPlantilla(datosCert, await cargarImagen(PLANTILLA)); }
+  catch (e) { console.warn("Plantilla de diploma no disponible, uso el diseño dibujado", e); }
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const x = c.getContext("2d");
@@ -155,16 +226,16 @@ export async function mostrarCertificado(datosCert) {
   const capa = modal.actual;
   try {
     const canvas = await dibujarCertificado(datosCert);
-    const blob = await new Promise((ok) => canvas.toBlob(ok, "image/png"));
+    const blob = await new Promise((ok) => canvas.toBlob(ok, "image/jpeg", 0.9));
     const url = URL.createObjectURL(blob);
-    const nombreArchivo = `Certificado ${datosCert.curso} - ${datosCert.nombre}.png`.replace(/[\\/:*?"<>|]+/g, "");
+    const nombreArchivo = `Certificado ${datosCert.curso} - ${datosCert.nombre}.jpg`.replace(/[\\/:*?"<>|]+/g, "");
     const prev = capa.querySelector("#cert-prev");
     prev.className = "";
     prev.innerHTML = `<img src="${url}" alt="Certificado de ${esc(datosCert.nombre)}" style="width:100%;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.4)">`;
     const desc = capa.querySelector("#cert-desc"), comp = capa.querySelector("#cert-comp");
     desc.disabled = false; comp.disabled = false;
     desc.onclick = () => { const a = document.createElement("a"); a.href = url; a.download = nombreArchivo; document.body.appendChild(a); a.click(); a.remove(); };
-    const archivo = new File([blob], nombreArchivo, { type: "image/png" });
+    const archivo = new File([blob], nombreArchivo, { type: "image/jpeg" });
     if (navigator.canShare?.({ files: [archivo] })) {
       comp.onclick = () => navigator.share({ files: [archivo], title: datosCert.tituloCompartir || "Mi certificado · Academia del Buen Café", text: datosCert.textoCompartir || undefined }).catch(() => {});
     } else {
