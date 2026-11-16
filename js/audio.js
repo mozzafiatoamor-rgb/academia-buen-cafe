@@ -174,6 +174,7 @@ export async function pintarAudiolibro(ctx, id) {
     <section class="reproductor-audio">
       <input type="range" id="a-barra" min="0" max="${b.duracion_seg || 1}" value="0" step="1" aria-label="Posición">
       <div class="fila-entre texto-tenue" style="font-size:12px"><span id="a-tiempo">0:00</span><span id="a-resta">${b.duracion_seg ? "-" + reloj(b.duracion_seg) : ""}</span></div>
+      ${!vp && !b.completado && (b.max_segundo || 0) - (b.segundo_actual || 0) > 60 ? `<button class="chip-tiempo" id="a-ir-max" style="align-self:center">${icono("play", 12)}Ir hasta donde llegaste · ${reloj(b.max_segundo)}</button>` : ""}
       <div class="controles-audio">
         <button class="btn-icono grande" id="a-atras" aria-label="Retroceder 15 segundos">${icono("atras15", 30)}</button>
         <button class="boton-play grande" id="a-play" aria-label="Reproducir">${icono("play", 30)}</button>
@@ -203,13 +204,17 @@ export async function pintarAudiolibro(ctx, id) {
 
   // ---- Elementos ----
   const $ = (s) => ctx.app.querySelector(s);
-  const audio = crearLista(fuente, b.duracion_seg || 0);
+  const inicio = b.completado && b.duracion_seg && (b.segundo_actual || 0) >= b.duracion_seg - 15 ? 0 : (b.segundo_actual || 0);
+  const audio = crearLista(fuente, b.duracion_seg || 0, inicio > 3 ? inicio : 0);
   let dur = Math.round(audio.duration) || b.duracion_seg || 0;
   let vel = Number(leer("academia-audio-vel", "1")) || 1;
-  const inicio = b.completado && b.duracion_seg && (b.segundo_actual || 0) >= b.duracion_seg - 15 ? 0 : (b.segundo_actual || 0);
+  // No se guarda ninguna posición hasta que el audio esté donde se quedó (o la persona mueva la barra).
+  let posLista = inicio <= 3;
+  const moverA = (t) => { posLista = true; audio.currentTime = t; };
   let arrastrando = false;
 
   const pintarTiempo = () => {
+    if (!ctx.app.querySelector("#a-barra")) return; // ya se salió de la pantalla
     const t = audio.currentTime || 0;
     if (!arrastrando) $("#a-barra").value = Math.floor(t);
     $("#a-tiempo").textContent = reloj(t);
@@ -220,13 +225,12 @@ export async function pintarAudiolibro(ctx, id) {
       ctx.app.querySelectorAll(".fila-cap").forEach((el) => el.classList.toggle("activo", Number(el.dataset.cap) === i));
     }
   };
-  const iconoPlay = () => { $("#a-play").innerHTML = icono(audio.paused ? "play" : "pausa", 30); $("#a-play").setAttribute("aria-label", audio.paused ? "Reproducir" : "Pausar"); };
+  const iconoPlay = () => { if (!$("#a-play")) return; $("#a-play").innerHTML = icono(audio.paused ? "play" : "pausa", 30); $("#a-play").setAttribute("aria-label", audio.paused ? "Reproducir" : "Pausar"); };
   const ponerVel = (v) => { vel = v; audio.playbackRate = v; audio.defaultPlaybackRate = v; $("#a-vel").textContent = `${String(v).replace(".", ".")}x`; guardarLS("academia-audio-vel", String(v)); };
   ponerVel(vel);
 
   audio.addEventListener("loadedmetadata", () => {
     if (Number.isFinite(audio.duration) && audio.duration > 0) { dur = Math.round(audio.duration); $("#a-barra").max = dur; }
-    if (inicio > 3 && inicio < dur - 3) audio.currentTime = inicio;
     audio.playbackRate = vel;
     pintarTiempo();
   }, { once: true });
@@ -247,13 +251,14 @@ export async function pintarAudiolibro(ctx, id) {
   const tocar = () => vig.interaccion();
   $("#vista-audio").addEventListener("pointerdown", tocar);
   $("#a-play").onclick = () => (audio.paused ? audio.play().catch((e) => aviso(e.message, "error")) : audio.pause());
-  $("#a-atras").onclick = () => { audio.currentTime = Math.max(0, audio.currentTime - 15); };
-  $("#a-adelante").onclick = () => { audio.currentTime = Math.min(dur || audio.duration || 0, audio.currentTime + 30); };
+  $("#a-atras").onclick = () => moverA(Math.max(0, audio.currentTime - 15));
+  $("#a-adelante").onclick = () => moverA(Math.min(dur || audio.duration || 0, audio.currentTime + 30));
   const barra = $("#a-barra");
   barra.oninput = () => { arrastrando = true; $("#a-tiempo").textContent = reloj(Number(barra.value)); };
-  barra.onchange = () => { arrastrando = false; audio.currentTime = Number(barra.value); };
+  barra.onchange = () => { arrastrando = false; moverA(Number(barra.value)); };
+  $("#a-ir-max")?.addEventListener("click", (e) => { moverA(b.max_segundo); e.currentTarget.remove(); if (audio.paused) audio.play().catch(() => {}); });
   $("#a-vel").onclick = () => ponerVel(VELOCIDADES[(VELOCIDADES.indexOf(vel) + 1) % VELOCIDADES.length] || 1);
-  ctx.app.querySelectorAll("[data-ir-seg]").forEach((el) => (el.onclick = () => { audio.currentTime = Number(el.dataset.irSeg); if (audio.paused) audio.play().catch(() => {}); }));
+  ctx.app.querySelectorAll("[data-ir-seg]").forEach((el) => (el.onclick = () => { moverA(Number(el.dataset.irSeg)); if (audio.paused) audio.play().catch(() => {}); }));
 
   // ---- Temporizador para dormir ----
   let dormir = null; // { hasta: ms } | { finCap: índice }
@@ -310,7 +315,7 @@ export async function pintarAudiolibro(ctx, id) {
         <span style="flex:1;min-width:0;text-align:left">${m.nota ? esc(m.nota) : `<span class="texto-tenue">Sin nota</span>`}</span>
         <button class="mini-btn" aria-label="Borrar marcador" data-borrar-m="${m.id}">${icono("trash", 16)}</button>
       </div>`).join("") : `<p class="texto-tenue" style="margin:4px 0">Toca <b>Marcador</b> para guardar un momento importante y volver a él cuando quieras.</p>`;
-    caja.querySelectorAll("[data-saltar]").forEach((el) => (el.onclick = () => { audio.currentTime = Number(el.dataset.saltar); if (audio.paused) audio.play().catch(() => {}); }));
+    caja.querySelectorAll("[data-saltar]").forEach((el) => (el.onclick = () => { moverA(Number(el.dataset.saltar)); if (audio.paused) audio.play().catch(() => {}); }));
     caja.querySelectorAll("[data-borrar-m]").forEach((el) => (el.onclick = async () => {
       if (!(await confirmar("¿Borrar marcador?", "Se quita de tu lista.", "Borrar"))) return;
       try { await datos.borrarMarcador(el.dataset.borrarM); marcadores = marcadores.filter((m) => m.id !== el.dataset.borrarM); pintarMarcas(); }
@@ -353,9 +358,9 @@ export async function pintarAudiolibro(ctx, id) {
       const accion = (n, fn) => { try { ms.setActionHandler(n, fn); } catch (_) { /* no soportado */ } };
       accion("play", () => { vig.interaccion(); audio.play().catch(() => {}); });
       accion("pause", () => { vig.interaccion(); audio.pause(); });
-      accion("seekbackward", (d) => { vig.interaccion(); audio.currentTime = Math.max(0, audio.currentTime - (d?.seekOffset || 15)); });
-      accion("seekforward", (d) => { vig.interaccion(); audio.currentTime = Math.min(dur, audio.currentTime + (d?.seekOffset || 30)); });
-      accion("seekto", (d) => { vig.interaccion(); if (d?.seekTime !== undefined) audio.currentTime = d.seekTime; });
+      accion("seekbackward", (d) => { vig.interaccion(); moverA(Math.max(0, audio.currentTime - (d?.seekOffset || 15))); });
+      accion("seekforward", (d) => { vig.interaccion(); moverA(Math.min(dur, audio.currentTime + (d?.seekOffset || 30))); });
+      accion("seekto", (d) => { vig.interaccion(); if (d?.seekTime !== undefined) moverA(d.seekTime); });
     } catch (_) { /* navegador sin Media Session */ }
   }
 
@@ -373,6 +378,7 @@ export async function pintarAudiolibro(ctx, id) {
   async function reportar(forzar = false) {
     if (vp || enviando) return;
     const seg = Math.floor(audio.currentTime || 0);
+    if (!posLista) { if (seg >= inicio - 5) posLista = true; else return; }
     if (!forzar && Date.now() - ultimoEnvio < 15000) return;
     if (seg === ultimoEnviado) return;
     enviando = true; ultimoEnvio = Date.now(); ultimoEnviado = seg;
@@ -418,7 +424,7 @@ export async function pintarAudiolibro(ctx, id) {
 
 // Reproduce un audiolibro de uno o varios archivos como si fuera uno solo:
 // el tiempo, la barra y los capítulos son del libro completo.
-function crearLista(fuente, durBase) {
+function crearLista(fuente, durBase, inicio = 0) {
   const el = new Audio();
   el.preload = "metadata";
   let pistas = (fuente.pistas && fuente.pistas.length ? fuente.pistas : [{ url: fuente.url, dur: durBase }]).map((p) => ({ ...p }));
@@ -431,11 +437,13 @@ function crearLista(fuente, durBase) {
   const cargar = (k, t = 0, seguir = false) => { i = k; buscando = { t, seguir }; el.src = pistas[k].url; el.playbackRate = rate; };
   const indice = (t) => { for (let k = pistas.length - 1; k >= 0; k--) if (t >= pistas[k].inicio) return k; return 0; };
 
+  // Algunos celulares (iPhone) ignoran el salto si se hace muy pronto: se reintenta al empezar a sonar.
+  let saltoPendiente = null;
   el.addEventListener("loadedmetadata", () => {
     if (Number.isFinite(el.duration) && el.duration > 0 && Math.abs(el.duration - (Number(pistas[i].dur) || 0)) > 1) { pistas[i].dur = el.duration; calcular(); }
     if (buscando) {
       const { t, seguir } = buscando; buscando = null;
-      if (t > 0) el.currentTime = Math.min(t, Math.max(0, el.duration - 0.5));
+      if (t > 0) { const destino = Math.min(t, Math.max(0, el.duration - 0.5)); el.currentTime = destino; saltoPendiente = destino; }
       el.playbackRate = rate;
       if (seguir) el.play().catch(() => {});
     }
@@ -443,8 +451,14 @@ function crearLista(fuente, durBase) {
   });
   el.addEventListener("ended", () => { if (i < pistas.length - 1) cargar(i + 1, 0, true); else emitir("ended"); });
   el.addEventListener("pause", () => { if (buscando || (el.ended && i < pistas.length - 1)) return; emitir("pause"); });
+  el.addEventListener("timeupdate", () => {
+    if (saltoPendiente !== null) {
+      if (Math.abs(el.currentTime - saltoPendiente) > 3 && el.currentTime < saltoPendiente) { el.currentTime = saltoPendiente; return; }
+      saltoPendiente = null;
+    }
+  });
   ["timeupdate", "play", "error"].forEach((t) => el.addEventListener(t, () => emitir(t)));
-  cargar(0, 0, false);
+  { const t0 = Math.max(0, Number(inicio) || 0), k0 = indice(t0); cargar(k0, t0 - pistas[k0].inicio, false); }
 
   return {
     multi,
@@ -453,6 +467,7 @@ function crearLista(fuente, durBase) {
     set currentTime(t) {
       t = Math.max(0, Number(t) || 0);
       const k = indice(t), local = t - pistas[k].inicio;
+      saltoPendiente = null;
       if (k === i && !buscando) el.currentTime = local;
       else cargar(k, local, buscando ? buscando.seguir : !el.paused);
     },
