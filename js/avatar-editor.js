@@ -8,15 +8,17 @@ import { confeti } from "./fiesta.js";
 import { CATEGORIAS, AVATAR_BASE, avatarSVG, avatarCuerpoSVG, avatarAlAzar, desbloqueada, textoReq } from "./avatar.js";
 
 export async function logrosDe(perfil) {
-  const [ins, niveles] = await Promise.all([
+  const [ins, niveles, compradas] = await Promise.all([
     datos.insignias().catch(() => ({ mias: [] })),
     datos.niveles().catch(() => []),
+    datos.misPiezas().catch(() => []),
   ]);
   return {
     nivel: perfil?.nivel_orden || 1,
     racha: Math.max(perfil?.racha_maxima || 0, perfil?.racha_actual || 0),
     insignias: new Set((ins.mias || []).map((m) => m.insignia_id)),
     niveles: niveles.map((n) => n.nombre),
+    compradas: new Set(compradas || []),
   };
 }
 
@@ -36,14 +38,15 @@ export async function pintarEditorAvatar(ctx) {
     <div class="barra-sup">
       <button class="btn-icono" id="volver" aria-label="Volver">${icono("back")}</button>
       <span class="texto-tenue" style="flex:1">Mi avatar</span>
-      <button class="btn btn-sec btn-chico" id="azar">🎲 Sorpréndeme</button>
+      <button class="btn btn-sec btn-chico" id="ir-tienda">🛍️ Tienda</button>
+      <button class="btn btn-sec btn-chico" id="azar">🎲</button>
     </div>
     <div class="pestanas av-vistas" id="av-vistas" style="max-width:320px;align-self:center;width:100%">
       <button class="activo" data-vista="retrato">Retrato</button><button data-vista="cuerpo">Cuerpo completo</button>
     </div>
     <div class="avatar-escenario"><button id="av-grande" class="avatar-grande" aria-label="Tócame">${avatarSVG(cfg, 200, "", { animado: true })}</button></div>
     <p class="texto-tenue" style="text-align:center;margin:-6px 0 0;font-size:11.5px">Tócalo 👆</p>
-    <p class="texto-tenue" style="text-align:center;margin:0;font-size:13px">Tienes <b style="color:var(--oro)">${libres} de ${total}</b> piezas. ${libres < total ? "Las de candado se ganan subiendo de nivel, con rachas e insignias." : "¡Las tienes todas!"}</p>
+    <p class="texto-tenue" style="text-align:center;margin:0;font-size:13px">Tienes <b style="color:var(--oro)">${libres} de ${total}</b> piezas. ${libres < total ? "Las de candado se ganan subiendo de nivel, con rachas e insignias; las de 🛍️ están en la Tienda." : "¡Las tienes todas!"}</p>
     <div class="chips chips-scroll" id="av-cats">${CATEGORIAS.map((c) => `<button class="chip ${c.id === cat ? "activo" : ""}" data-cat="${c.id}">${esc(c.nombre)}</button>`).join("")}</div>
     <div id="av-colores" class="av-colores"></div>
     <div id="av-ops" class="av-ops"></div>
@@ -67,7 +70,7 @@ export async function pintarEditorAvatar(ctx) {
       return `<button class="av-op ${sel ? "activa" : ""} ${ok ? "" : "bloq"} ${c.cuerpo ? "cuerpo" : ""}" data-op="${o.id}" title="${esc(ok ? o.nombre : textoReq(o, logros.niveles))}">
         ${c.cuerpo ? avatarCuerpoSVG({ ...cfg, [c.id]: o.id }, 110) : avatarSVG({ ...cfg, [c.id]: o.id }, 76)}
         <span>${esc(o.nombre)}</span>
-        ${ok ? "" : `<i class="candado">${icono("lock", 14)}</i>`}
+        ${ok ? "" : o.tienda ? `<i class="candado precio">🛍️ ${o.tienda}</i>` : `<i class="candado">${icono("lock", 14)}</i>`}
       </button>`;
     }).join("");
   };
@@ -87,9 +90,21 @@ export async function pintarEditorAvatar(ctx) {
     cfg[c.color] = Number(b.dataset.col);
     pintarGrande(); pintarOpciones();
   };
-  app.querySelector("#av-ops").onclick = (e) => {
+  app.querySelector("#av-ops").onclick = async (e) => {
     const b = e.target.closest("[data-op]"); if (!b) return;
     const c = CATEGORIAS.find((x) => x.id === cat), o = c.opciones.find((x) => x.id === b.dataset.op);
+    if (!desbloqueada(o, logros) && o.tienda) {
+      const v = await modal(`
+        <div class="pila" style="align-items:center;text-align:center;gap:12px">
+          <div class="avatar-grande" style="pointer-events:none">${avatarSVG({ ...cfg, [c.id]: o.id }, 150)}</div>
+          <h2 class="modal-titulo">${esc(o.nombre)}</h2>
+          <p class="modal-texto">Esta pieza está en la <b>Tienda del avatar</b> por <b style="color:var(--oro)">${o.tienda} puntos</b>.</p>
+          <button class="btn btn-bloque" data-cerrar="tienda">🛍️ Ir a la tienda</button>
+          <button class="btn-texto" data-cerrar>Ahora no</button>
+        </div>`);
+      if (v === "tienda") ctx.ir("/tienda");
+      return;
+    }
     if (!desbloqueada(o, logros)) {
       b.classList.remove("sacude"); void b.offsetWidth; b.classList.add("sacude");
       return aviso(`🔒 ${o.nombre}: ${textoReq(o, logros.niveles)}`);
@@ -111,6 +126,7 @@ export async function pintarEditorAvatar(ctx) {
   };
   app.querySelector("#azar").onclick = () => { cfg = avatarAlAzar(logros, { piel: cfg.piel }); pintarGrande(); pintarOpciones(); };
   app.querySelector("#volver").onclick = () => ctx.ir("/inicio");
+  app.querySelector("#ir-tienda").onclick = () => ctx.ir("/tienda");
   app.querySelector("#guardar").onclick = async (e) => {
     e.currentTarget.disabled = true;
     try {

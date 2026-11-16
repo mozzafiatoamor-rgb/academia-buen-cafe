@@ -41,7 +41,8 @@ export const CATEGORIAS = [
     { id: "redonda", nombre: "Redonda" }, { id: "ovalada", nombre: "Ovalada" }, { id: "cuadrada", nombre: "Cuadrada" }] },
   { id: "detalle", nombre: "Mejillas", opciones: [
     { id: "nada", nombre: "Nada" }, { id: "rubor", nombre: "Rubor" }, { id: "pecas", nombre: "Pecas" },
-    { id: "rubor-pecas", nombre: "Rubor y pecas" }, { id: "lunar", nombre: "Lunar" }, { id: "curita", nombre: "Curita" }] },
+    { id: "rubor-pecas", nombre: "Rubor y pecas" }, { id: "lunar", nombre: "Lunar" }, { id: "curita", nombre: "Curita" },
+    { id: "gato", nombre: "Bigotes de gato", tienda: 20 }] },
   { id: "pelo", nombre: "Pelo", color: "colorPelo", colores: COLORES_PELO, opciones: [
     { id: "corto", nombre: "Corto" }, { id: "picos", nombre: "Picos" }, { id: "copete", nombre: "Copete" },
     { id: "chino", nombre: "Chinos" }, { id: "afro", nombre: "Afro" }, { id: "largo", nombre: "Largo" },
@@ -56,22 +57,28 @@ export const CATEGORIAS = [
     { id: "normales", nombre: "Normales" }, { id: "gruesas", nombre: "Gruesas" }, { id: "arriba", nombre: "Sorpresa" }, { id: "serias", nombre: "Serias" }] },
   { id: "boca", nombre: "Boca", opciones: [
     { id: "sonrisa", nombre: "Sonrisa" }, { id: "sonrisota", nombre: "Carcajada" }, { id: "dientes", nombre: "Dientes" },
-    { id: "lengua", nombre: "Lengua" }, { id: "sorpresa", nombre: "¡Oh!" }, { id: "picara", nombre: "Pícara" }, { id: "neutral", nombre: "Tranqui" }] },
+    { id: "lengua", nombre: "Lengua" }, { id: "sorpresa", nombre: "¡Oh!" }, { id: "picara", nombre: "Pícara" }, { id: "neutral", nombre: "Tranqui" },
+    { id: "chicle", nombre: "Bomba de chicle", tienda: 25 }] },
   { id: "vello", nombre: "Barba", color: "colorPelo", colores: COLORES_PELO, opciones: [
     { id: "nada", nombre: "Nada" }, { id: "bigote", nombre: "Bigote" }, { id: "candado", nombre: "Candado" },
-    { id: "barba", nombre: "Barba" }, { id: "tresdias", nombre: "De 3 días" }, { id: "manubrio", nombre: "Manubrio", req: { racha: 3 } }] },
+    { id: "barba", nombre: "Barba" }, { id: "tresdias", nombre: "De 3 días" }, { id: "manubrio", nombre: "Manubrio", req: { racha: 3 } },
+    { id: "bigotazo", nombre: "Bigotazo", tienda: 20 }] },
   { id: "lentes", nombre: "Lentes", opciones: [
     { id: "nada", nombre: "Nada" }, { id: "redondos", nombre: "Redondos" }, { id: "cuadrados", nombre: "Cuadrados" },
     { id: "sol", nombre: "De sol" }, { id: "aviador", nombre: "Aviador", req: { racha: 7 } },
     { id: "corazon", nombre: "Corazón", req: { nivel: 2 } }, { id: "estrella", nombre: "Estrella rock", req: { nivel: 3 } },
-    { id: "parche", nombre: "Parche pirata" }] },
+    { id: "parche", nombre: "Parche pirata" },
+    { id: "nerd", nombre: "Lentes nerd", tienda: 20 }, { id: "3d", nombre: "Lentes 3D", tienda: 30 }, { id: "monoculo", nombre: "Monóculo", tienda: 35 }] },
   { id: "cabeza", nombre: "Gorros", color: "colorGorro", colores: COLORES_ROPA, opciones: [
     { id: "nada", nombre: "Nada" }, { id: "gorra", nombre: "Gorra" }, { id: "gorra-reves", nombre: "Gorra al revés" },
     { id: "boina", nombre: "Boina" }, { id: "chef", nombre: "Gorro chef" }, { id: "lana", nombre: "Gorro de lana" },
     { id: "audifonos", nombre: "Audífonos" }, { id: "flores", nombre: "Corona de flores" }, { id: "palma", nombre: "Sombrero" },
     { id: "charro", nombre: "Sombrero charro" }, { id: "pirata", nombre: "Pirata" }, { id: "luchador", nombre: "Máscara de luchador" },
     { id: "aureola", nombre: "Aureola", req: { insignia: "a_la_primera", nombre: "A la primera" } },
-    { id: "corona", nombre: "Corona", req: { nivel: 5 } }] },
+    { id: "corona", nombre: "Corona", req: { nivel: 5 } },
+    { id: "fiesta", nombre: "Gorro de fiesta", tienda: 25 }, { id: "antenas", nombre: "Antenas de alien", tienda: 30 },
+    { id: "copa", nombre: "Sombrero de copa", tienda: 40 }, { id: "mago", nombre: "Sombrero de mago", tienda: 50 },
+    { id: "vikingo", nombre: "Casco vikingo", tienda: 60 }] },
   { id: "ropa", nombre: "Ropa", color: "colorRopa", colores: COLORES_ROPA, opciones: [
     { id: "delantal", nombre: "Delantal barista" }, { id: "playera", nombre: "Playera" }, { id: "sudadera", nombre: "Sudadera" },
     { id: "chef", nombre: "Filipina chef" }, { id: "mono", nombre: "Camisa y moño" }, { id: "rayas", nombre: "Rayas" },
@@ -88,15 +95,24 @@ export const CATEGORIAS = [
   { id: "extra", nombre: "Extras", opciones: [
     { id: "nada", nombre: "Nada" }, { id: "taza", nombre: "Taza de café" }, { id: "aretes", nombre: "Aretes" },
     { id: "collar", nombre: "Collar" }, { id: "flor", nombre: "Flor" }, { id: "pin", nombre: "Pin estrella" },
-    { id: "taza-oro", nombre: "Taza de oro", req: { insignia: "barista_certificado", nombre: "Barista certificado" } }] },
+    { id: "taza-oro", nombre: "Taza de oro", req: { insignia: "barista_certificado", nombre: "Barista certificado" } },
+    { id: "dona", nombre: "Dona", tienda: 25 }, { id: "globo", nombre: "Globo", tienda: 30 }] },
   { id: "fondo", nombre: "Fondo", color: "colorFondo", colores: COLORES_FONDO, opciones: [
     { id: "liso", nombre: "Liso" }, { id: "granos", nombre: "Granos de café" }, { id: "rayos", nombre: "Rayos" },
     { id: "lunares", nombre: "Lunares" }, { id: "estrellas", nombre: "Estrellas" },
-    { id: "confeti", nombre: "Confeti", req: { insignia: "a_tiempo", nombre: "A tiempo" } }, { id: "galaxia", nombre: "Galaxia", req: { nivel: 4 } }] },
+    { id: "confeti", nombre: "Confeti", req: { insignia: "a_tiempo", nombre: "A tiempo" } }, { id: "galaxia", nombre: "Galaxia", req: { nivel: 4 } },
+    { id: "corazones", nombre: "Corazones", tienda: 30 }, { id: "playa", nombre: "Playa", tienda: 40 }] },
   { id: "marco", nombre: "Marco", opciones: [
     { id: "nada", nombre: "Nada" }, { id: "cobre", nombre: "Cobre" }, { id: "fuego", nombre: "Fuego", req: { racha: 3 } },
-    { id: "oro", nombre: "Oro", req: { nivel: 3 } }, { id: "arcoiris", nombre: "Arcoíris", req: { nivel: 4 } }, { id: "diamante", nombre: "Diamante", req: { nivel: 5 } }] },
+    { id: "oro", nombre: "Oro", req: { nivel: 3 } }, { id: "arcoiris", nombre: "Arcoíris", req: { nivel: 4 } }, { id: "diamante", nombre: "Diamante", req: { nivel: 5 } },
+    { id: "neon", nombre: "Neón", tienda: 50 }] },
 ];
+
+// Piezas de la Tienda del avatar: { id: "categoria:opcion", categoria, opcion, nombre, costo }
+CATEGORIAS.forEach((c) => c.opciones.forEach((o) => { if (o.tienda) o.pieza = `${c.id}:${o.id}`; }));
+export const TIENDA = CATEGORIAS.flatMap((c) => c.opciones.filter((o) => o.tienda)
+  .map((o) => ({ id: o.pieza, categoria: c.id, opcion: o.id, nombre: o.nombre, costo: o.tienda })));
+export const piezaTienda = (id) => TIENDA.find((t) => t.id === id);
 
 export const AVATAR_BASE = {
   cara: "redonda", piel: 1, detalle: "rubor", pelo: "corto", colorPelo: 1, ojos: "normales", cejas: "normales",
@@ -107,6 +123,7 @@ export const AVATAR_BASE = {
 
 // ¿Está desbloqueada? logros = { nivel, racha, insignias:Set }
 export function desbloqueada(op, logros) {
+  if (op.tienda) return !!logros?.compradas?.has(op.pieza);
   const r = op.req;
   if (!r) return true;
   if (!logros) return false;
@@ -116,6 +133,7 @@ export function desbloqueada(op, logros) {
   return false;
 }
 export function textoReq(op, niveles = []) {
+  if (op.tienda) return `En la Tienda del avatar · ${op.tienda} pts`;
   const r = op.req || {};
   if (r.nivel) return `Llega al nivel ${niveles[r.nivel - 1] || r.nivel}`;
   if (r.racha) return `Logra una racha de ${r.racha} días`;
@@ -147,6 +165,15 @@ function fondo(cfg, soloPatron = false) {
     const est = (x, y, s, col) => `<path transform="translate(${x} ${y}) scale(${s})" d="M0 -6 L1.8 -1.8 L6 0 L1.8 1.8 L0 6 L-1.8 1.8 L-6 0 L-1.8 -1.8 Z" fill="${col}"/>`;
     const pos = [[30, 30, 1.4], [165, 36, 1], [24, 140, 0.9], [176, 120, 1.5], [52, 182, 1], [146, 176, 0.8], [96, 16, 0.9], [184, 74, 0.7], [16, 82, 0.8]];
     p = pos.map(([x, y, s]) => est(x, y, s, cfg.fondo === "galaxia" ? "#FFF7D6" : claro)).join("");
+  } else if (cfg.fondo === "corazones") {
+    const h = (x, y, s) => `<path transform="translate(${x} ${y}) scale(${s})" d="M0 6 C-10 -1 -7 -9 -2.5 -8 C-1 -7.6 0 -6.5 0 -5 C0 -6.5 1 -7.6 2.5 -8 C7 -9 10 -1 0 6 Z" fill="rgba(255,255,255,.28)"/>`;
+    p = [[26, 30, 1.3], [170, 34, 1], [20, 128, 1], [178, 124, 1.4], [58, 180, 1.1], [148, 178, 1.2], [100, 16, .8], [186, 78, .8], [14, 78, .9]].map((a) => h(...a)).join("");
+  } else if (cfg.fondo === "playa") {
+    p = `<circle cx="160" cy="40" r="20" fill="#FFD25A"/><circle cx="160" cy="40" r="28" fill="#FFD25A" opacity=".25"/>
+      <path d="M0 132 C30 124 60 140 100 132 C140 124 170 140 200 132 L200 200 L0 200 Z" fill="#2E9CCA"/>
+      <path d="M0 142 C30 134 60 150 100 142 C140 134 170 150 200 142" stroke="rgba(255,255,255,.55)" stroke-width="3" fill="none"/>
+      <path d="M0 172 C50 160 150 162 200 172 L200 200 L0 200 Z" fill="#F2D49B"/>
+      <path d="M30 40 q6 -5 12 0 q6 -5 12 0" stroke="#FFFFFF" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
   } else if (cfg.fondo === "confeti") {
     const cols = ["#E3B66B", "#E86F9A", "#5B8DEF", "#7FA77A", "#F2E4CF", "#C9824B"];
     p = Array.from({ length: 22 }, (_, i) => {
@@ -157,6 +184,7 @@ function fondo(cfg, soloPatron = false) {
   if (soloPatron) return p;
   const base = cfg.fondo === "galaxia"
     ? `<defs><radialGradient id="gx" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#8B5CF6"/><stop offset=".55" stop-color="#2E1B5B"/><stop offset="1" stop-color="#120A24"/></radialGradient></defs><rect width="200" height="200" fill="url(#gx)"/>`
+    : cfg.fondo === "playa" ? `<rect width="200" height="200" fill="#8FD3F4"/>`
     : `<rect width="200" height="200" fill="${c}"/>`;
   return base + p;
 }
@@ -222,6 +250,7 @@ function boca(cfg) {
     case "lengua": return `<path d="M88 117 Q100 128 112 117" ${T} fill="none" stroke-width="3"/><path d="M99 122 Q100 134 107 132 Q112 128 108 121" fill="#E86F7A" ${T2}/>`;
     case "sorpresa": return `<ellipse cx="100" cy="122" rx="6" ry="7.5" fill="#6B1F1F" ${T2}/>`;
     case "picara": return `<path d="M88 120 Q102 124 113 113" ${T} fill="none" stroke-width="3"/>`;
+    case "chicle": return `<path d="M90 118 Q100 124 110 118" ${T} fill="none" stroke-width="3"/><circle cx="100" cy="128" r="15" fill="#F7A1C4" ${T2}/><circle cx="100" cy="128" r="15" fill="none" stroke="#E86F9A" stroke-width="1.4" opacity=".7"/><ellipse cx="94" cy="122" rx="4.5" ry="3" fill="#fff" opacity=".7"/>`;
     case "neutral": return `<path d="M91 120 L109 120" ${T} stroke-width="3"/>`;
     default: return `<path d="M88 116 Q100 129 112 116" ${T} fill="none" stroke-width="3"/>`;
   }
@@ -232,6 +261,7 @@ function vello(cfg, c, menton) {
   const bigote = `<path d="M84 113 C89 107 97 108 100 112 C103 108 111 107 116 113 C110 117 104 116 100 114 C96 116 90 117 84 113 Z" fill="${o}" ${T2}/>`;
   switch (cfg.vello) {
     case "bigote": return { atras: "", frente: bigote };
+    case "bigotazo": return { atras: "", frente: `<path d="M100 111 C92 104 80 104 74 110 C68 116 60 116 56 110 C56 124 74 128 86 120 C92 116 96 116 100 117 C104 116 108 116 114 120 C126 128 144 124 144 110 C140 116 132 116 126 110 C120 104 108 104 100 111 Z" fill="${o}" ${T2}/>` };
     case "manubrio": return { atras: "", frente: `<path d="M100 112 C94 106 86 108 82 112 C78 116 74 116 72 112 C72 120 82 122 88 116 C92 113 96 114 100 115 C104 114 108 113 112 116 C118 122 128 120 128 112 C126 116 122 116 118 112 C114 108 106 106 100 112 Z" fill="${o}" ${T2}/>` };
     case "candado": return { atras: `<path d="M86 124 C88 ${menton - 2} 112 ${menton - 2} 114 124 C108 128 92 128 86 124 Z" fill="${o}" ${T2}/>`, frente: bigote };
     case "barba": return { atras: `<path d="M56 98 C58 ${menton + 4} 78 ${menton + 8} 100 ${menton + 8} C122 ${menton + 8} 142 ${menton + 4} 144 98 C140 116 130 126 118 126 C110 132 90 132 82 126 C70 126 60 116 56 98 Z" fill="${o}" ${T2}/>`, frente: bigote };
@@ -248,6 +278,7 @@ function detalle(cfg) {
     case "pecas": return pecas;
     case "rubor-pecas": return rubor + pecas;
     case "lunar": return `<circle cx="124" cy="118" r="1.8" fill="#3B2416"/>`;
+    case "gato": return `<path d="M96 106 L104 106 L100 111 Z" fill="#F28BA8" ${T2} stroke-width="1.4"/><g stroke="#2B1A14" stroke-width="1.6" stroke-linecap="round"><path d="M86 112 L62 106 M86 116 L60 116 M86 120 L63 126 M114 112 L138 106 M114 116 L140 116 M114 120 L137 126"/></g>`;
     case "curita": return `<g transform="rotate(-20 128 108)"><rect x="118" y="104" width="20" height="8" rx="3" fill="#F2C9A0" ${T2} stroke-width="1.4"/><rect x="125" y="104" width="6" height="8" fill="#E5AE80" opacity=".6"/></g>`;
     default: return "";
   }
@@ -261,6 +292,9 @@ function lentes(cfg) {
     case "aviador": return `<g fill="rgba(80,60,40,.55)" stroke="#D4A13A" stroke-width="2.4"><path d="M68 90 L95 90 C96 104 90 112 81 112 C70 112 66 102 68 90 Z"/><path d="M105 90 L132 90 C134 102 130 112 119 112 C110 112 104 104 105 90 Z"/></g><path d="M95 91 Q100 88 105 91 M68 91 L56 89 M132 91 L144 89" stroke="#D4A13A" stroke-width="2.4" fill="none"/>`;
     case "corazon": return `<g fill="#E86F9A" fill-opacity=".75" ${T}>${[82, 118].map((x) => `<path transform="translate(${x} 98) scale(1.25)" d="M0 8 C-13 -1 -9 -11 -3.5 -10 C-1.5 -9.6 0 -8 0 -6 C0 -8 1.5 -9.6 3.5 -10 C9 -11 13 -1 0 8 Z"/>`).join("")}</g><path d="M94 95 L106 95 M68 94 L56 91 M132 94 L144 91" ${T}/>`;
     case "estrella": return `<g fill="#F5C542" fill-opacity=".85" ${T}>${[82, 118].map((x) => `<path transform="translate(${x} 98) scale(1.5)" d="M0 -9 L2.6 -3 L9 -2.6 L4 1.6 L5.6 8 L0 4.6 L-5.6 8 L-4 1.6 L-9 -2.6 L-2.6 -3 Z"/>`).join("")}</g><path d="M95 96 L105 96" ${T}/>`;
+    case "nerd": return `<g fill="rgba(255,255,255,.15)" stroke="#1E1512" stroke-width="5" stroke-linejoin="round"><rect x="66" y="87" width="29" height="23" rx="4"/><rect x="105" y="87" width="29" height="23" rx="4"/></g><path d="M95 96 L105 96" stroke="#1E1512" stroke-width="5"/><rect x="95" y="92" width="10" height="9" rx="2" fill="#FFFFFF" ${T2} stroke-width="1.2"/><path d="M66 93 L54 90 M134 93 L146 90" stroke="#1E1512" stroke-width="3.4"/>`;
+    case "3d": return `<rect x="64" y="86" width="72" height="24" rx="5" fill="#F2F0EC" ${T}/><rect x="69" y="90" width="25" height="16" rx="3" fill="#E5484D" fill-opacity=".8"/><rect x="106" y="90" width="25" height="16" rx="3" fill="#22C3D8" fill-opacity=".8"/><path d="M64 94 L54 91 M136 94 L146 91" ${T}/>`;
+    case "monoculo": return `<circle cx="118" cy="98" r="13" fill="rgba(255,255,255,.2)" stroke="#D4A13A" stroke-width="3.4"/><path d="M130 104 C140 118 136 136 128 150" stroke="#D4A13A" stroke-width="1.6" fill="none" stroke-dasharray="2.5 2"/><path d="M110 92 L114 90" stroke="#fff" stroke-width="2" stroke-linecap="round"/>`;
     case "parche": return `<path d="M56 84 C80 76 120 72 146 80" stroke="#1E1512" stroke-width="2.6" fill="none"/><path d="M106 88 C112 84 128 84 131 92 C133 102 126 110 118 110 C110 110 105 102 106 88 Z" fill="#1E1512" ${T2}/>`;
     default: return "";
   }
@@ -283,6 +317,11 @@ function sombrero(cfg, c) {
     case "luchador": return `<path fill-rule="evenodd" d="M100 45 C129 45 149 66 149 96 C149 125 129 145 100 145 C71 145 51 125 51 96 C51 66 71 45 100 45 Z M69 97 C68 86 80 81 92 89 C93 102 85 109 77 107 C72 105 69 101 69 97 Z M131 97 C132 86 120 81 108 89 C107 102 115 109 123 107 C128 105 131 101 131 97 Z M87 117 C91 112 109 112 113 117 C113 127 107 133 100 133 C93 133 87 127 87 117 Z" fill="${c}" ${T}/>
       <g fill="none" stroke="#FFFFFF" stroke-width="3"><path d="M69 97 C68 86 80 81 92 89 C93 102 85 109 77 107 C72 105 69 101 69 97 Z"/><path d="M131 97 C132 86 120 81 108 89 C107 102 115 109 123 107 C128 105 131 101 131 97 Z"/><path d="M87 117 C91 112 109 112 113 117 C113 127 107 133 100 133 C93 133 87 127 87 117 Z"/></g>
       <path d="M100 47 C94 58 94 70 100 80 C106 70 106 58 100 47 Z" fill="#F5C542" ${T2}/><path d="M60 70 C66 76 74 78 82 76 M140 70 C134 76 126 78 118 76" stroke="#FFFFFF" stroke-width="3" fill="none"/>`;
+    case "fiesta": return `<g transform="rotate(14 100 50)"><path d="M78 58 L100 2 L122 58 Z" fill="${c}" ${T}/><g fill="#F5C542"><circle cx="94" cy="44" r="3.4"/><circle cx="106" cy="32" r="3"/><circle cx="104" cy="50" r="3.4"/><circle cx="96" cy="22" r="2.6"/></g><circle cx="100" cy="2" r="7" fill="#E86F9A" ${T2}/><path d="M78 58 L122 58" ${T} stroke-width="4"/></g>`;
+    case "antenas": return `<path d="M56 82 C52 44 148 44 144 82" stroke="#1E1512" stroke-width="8" fill="none"/><path d="M56 82 C52 44 148 44 144 82" stroke="#2FA37A" stroke-width="4.5" fill="none"/><path d="M84 52 L72 20 M116 52 L128 20" stroke="#1E1512" stroke-width="3.4" stroke-linecap="round"/><circle cx="71" cy="17" r="8" fill="#7CE38B" ${T}/><circle cx="129" cy="17" r="8" fill="#7CE38B" ${T}/><circle cx="68" cy="14" r="2.4" fill="#fff" opacity=".8"/><circle cx="126" cy="14" r="2.4" fill="#fff" opacity=".8"/>`;
+    case "copa": return `<ellipse cx="100" cy="60" rx="52" ry="11" fill="#1E1512" ${T}/><path d="M72 60 L72 14 C72 10 128 10 128 14 L128 60 Z" fill="#1E1512" ${T}/><rect x="72" y="44" width="56" height="10" fill="${c}"/><path d="M80 18 L80 40" stroke="rgba(255,255,255,.25)" stroke-width="4" stroke-linecap="round"/>`;
+    case "mago": return `<ellipse cx="100" cy="62" rx="62" ry="13" fill="#3B2A7A" ${T}/><path d="M66 62 C78 44 88 16 118 -2 C112 20 120 42 134 62 Z" fill="#4C3A9E" ${T}/><g fill="#F5C542">${[[92, 44, 1], [110, 26, .8], [116, 50, .9], [100, 14, .6]].map(([x, y, k]) => `<path transform="translate(${x} ${y}) scale(${k})" d="M0 -6 L1.8 -1.8 L6 0 L1.8 1.8 L0 6 L-1.8 1.8 L-6 0 L-1.8 -1.8 Z"/>`).join("")}</g>`;
+    case "vikingo": return `<path d="M60 56 C40 52 30 32 36 12 C44 30 56 38 70 44 Z" fill="#F2E4CF" ${T}/><path d="M140 56 C160 52 170 32 164 12 C156 30 144 38 130 44 Z" fill="#F2E4CF" ${T}/><path d="M54 80 C52 46 74 32 100 32 C126 32 148 46 146 80 Z" fill="#9CA3AF" ${T}/><path d="M100 32 L100 80" stroke="#6B7280" stroke-width="5"/><rect x="50" y="72" width="100" height="13" rx="5" fill="#B7791F" ${T}/><g fill="#F2E4CF">${[62, 80, 120, 138].map((x) => `<circle cx="${x}" cy="78.5" r="2.6"/>`).join("")}</g>`;
     case "aureola": return `<ellipse cx="100" cy="30" rx="32" ry="8" fill="none" stroke="#F5C542" stroke-width="6"/><ellipse cx="100" cy="30" rx="32" ry="8" fill="none" stroke="#FFF2B3" stroke-width="2"/>`;
     case "corona": return `<path d="M64 62 L60 30 L80 46 L100 22 L120 46 L140 30 L136 62 Z" fill="#F5C542" ${T}/><rect x="62" y="58" width="76" height="12" rx="4" fill="#E3A82B" ${T}/><circle cx="100" cy="64" r="4" fill="#E5484D"/><circle cx="80" cy="64" r="3" fill="#5B8DEF"/><circle cx="120" cy="64" r="3" fill="#2FA37A"/>`;
     default: return "";
@@ -313,6 +352,8 @@ function extra(cfg, orejas) {
     case "aretes": return orejas.map((x) => `<circle cx="${x}" cy="${110}" r="3.4" fill="#F5C542" ${T2} stroke-width="1.4"/>`).join("");
     case "collar": return `<path d="M84 152 Q100 172 116 152" stroke="#F5C542" stroke-width="2.6" fill="none"/><circle cx="100" cy="166" r="4" fill="#5B8DEF" ${T2} stroke-width="1.4"/>`;
     case "flor": return `<g transform="translate(138 64)">${[0, 72, 144, 216, 288].map((a) => `<circle cx="${6 * Math.cos(a * Math.PI / 180)}" cy="${6 * Math.sin(a * Math.PI / 180)}" r="5" fill="#E86F9A" ${T2} stroke-width="1.4"/>`).join("")}<circle r="3.4" fill="#F5C542"/></g>`;
+    case "dona": return `<g transform="translate(140 178) rotate(-12)"><circle r="17" fill="#D9A066" ${T}/><path d="M-15 -4 C-12 -16 12 -18 15 -4 C16 4 10 2 8 8 C4 12 -4 10 -8 6 C-12 4 -16 6 -15 -4 Z" fill="#F28BB0"/><circle r="5.5" fill="${"#3A2A22"}" ${T2}/><g stroke-width="2.2" stroke-linecap="round"><path d="M-9 -8 L-6 -10" stroke="#F5C542"/><path d="M6 -10 L9 -7" stroke="#5B8DEF"/><path d="M-11 1 L-8 3" stroke="#7FA77A"/><path d="M2 -14 L5 -13" stroke="#FFFFFF"/></g></g>`;
+    case "globo": return `<path d="M150 200 C142 160 160 120 152 78" stroke="#2B1A14" stroke-width="1.6" fill="none"/><ellipse cx="154" cy="54" rx="19" ry="23" fill="#E5484D" ${T}/><path d="M150 77 L154 72 L158 77 Z" fill="#E5484D" ${T2} stroke-width="1.2"/><ellipse cx="147" cy="46" rx="5" ry="8" fill="#fff" opacity=".4" transform="rotate(20 147 46)"/>`;
     case "pin": return `<path transform="translate(124 178)" d="M0 -8 L2.4 -2.6 L8 -2.2 L3.6 1.4 L5 7.2 L0 4 L-5 7.2 L-3.6 1.4 L-8 -2.2 L-2.4 -2.6 Z" fill="#F5C542" ${T2} stroke-width="1.6"/>`;
     default: return "";
   }
@@ -320,6 +361,7 @@ function extra(cfg, orejas) {
 
 function marco(cfg) {
   switch (cfg.marco) {
+    case "neon": return `<circle cx="100" cy="100" r="95" fill="none" stroke="#FF4FD8" stroke-width="13" opacity=".25"/><circle cx="100" cy="100" r="95" fill="none" stroke="#FF4FD8" stroke-width="6"/><circle cx="100" cy="100" r="88" fill="none" stroke="#5BF1FF" stroke-width="2.4"/>`;
     case "cobre": return `<circle cx="100" cy="100" r="95" fill="none" stroke="#C9824B" stroke-width="8"/>`;
     case "oro": return `<circle cx="100" cy="100" r="95" fill="none" stroke="url(#mk-oro)" stroke-width="9"/><defs><linearGradient id="mk-oro" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFF2B3"/><stop offset=".5" stop-color="#E3B66B"/><stop offset="1" stop-color="#A9742E"/></linearGradient></defs>`;
     case "fuego": return `<circle cx="100" cy="100" r="95" fill="none" stroke="url(#mk-fuego)" stroke-width="9"/><defs><linearGradient id="mk-fuego" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#F59E0B"/><stop offset=".6" stop-color="#E5484D"/><stop offset="1" stop-color="#FDE68A"/></linearGradient></defs>`;

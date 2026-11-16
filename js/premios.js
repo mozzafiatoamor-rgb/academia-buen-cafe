@@ -139,6 +139,11 @@ export async function pintarPremiosEmpleado(ctx) {
       ${canjes.slice(0, 10).map((c) => `<div class="fila-entre tarjeta" style="padding:12px 14px"><div><b style="font-size:14px">${esc(nombrePremio(c.premio_id))}</b><div class="texto-tenue" style="font-size:12px">${num(c.costo)} pts · ${haceCuanto(c.creado_en)}</div></div>
         <span class="pildora ${c.estado === "aprobado" ? "pildora-ok" : c.estado === "rechazado" ? "pildora-alerta" : ""}">${c.estado === "pendiente" ? "En revisión" : c.estado === "aprobado" ? "Aprobado" : "Rechazado"}</span></div>`).join("")}
     </section>` : ""}
+    <button class="tarjeta-borde fila tarjeta-tienda" data-ir="/tienda" style="text-align:left">
+      <span style="font-size:30px;flex:none">🛍️</span>
+      <span style="flex:1;min-width:0"><b style="display:block">Tienda del avatar</b><span class="texto-tenue" style="font-size:12.5px">¿Algo más chiquito? Gorros, lentes y fondos para tu avatar desde 20 pts.</span></span>
+      ${icono("next", 18)}
+    </button>
     <section class="tarjeta pila" style="gap:10px">
       <b>${icono("gift", 18, 'style="vertical-align:-3px;color:var(--oro)"')} ¿Cómo reclamo mi premio?</b>
       <ol class="pasos-canje">

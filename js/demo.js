@@ -5,6 +5,7 @@
 //  Admin demo:    correo "admin@demo", clave "demo1234"
 // =====================================================================
 import { fijarCfgPuntos, puntosLeccion, puntosCurso, puntosQuiz, puntosATiempo } from "./puntos.js";
+import { TIENDA } from "./avatar.js";
 const LLAVE = "academia-demo-v1";
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
 const ahora = () => new Date().toISOString();
@@ -433,7 +434,26 @@ export function crearDemo() {
     },
     async premios() {
       await espera(); const u = exigir();
-      return { premios: db.premios.filter((p) => p.activo).sort((a, b) => a.costo - b.costo), canjes: db.canjes.filter((c) => c.user_id === u.user_id).reverse() };
+      return { premios: db.premios.filter((p) => p.activo).sort((a, b) => a.costo - b.costo), canjes: db.canjes.filter((c) => c.user_id === u.user_id && !String(c.nota || "").startsWith("tienda:")).reverse() };
+    },
+    async tienda() {
+      await espera(); const u = exigir();
+      return deshacer({ piezas: TIENDA.map(({ id, nombre, categoria, costo }) => ({ id, nombre, categoria, costo })),
+        mias: (db.avatar_compras || []).filter((c) => c.user_id === u.user_id).map((c) => c.pieza_id),
+        disponibles: ganados(u.user_id) - gastados(u.user_id) });
+    },
+    async misPiezas() { const u = exigir(); return (db.avatar_compras || []).filter((c) => c.user_id === u.user_id).map((c) => c.pieza_id); },
+    async comprarPieza(pieza) {
+      await espera(); const u = exigir();
+      const t = TIENDA.find((x) => x.id === pieza); if (!t) throw new Error("Esa pieza no está en la tienda");
+      db.avatar_compras = db.avatar_compras || [];
+      if (db.avatar_compras.some((c) => c.user_id === u.user_id && c.pieza_id === pieza)) throw new Error("Ya tienes esa pieza");
+      const disp = ganados(u.user_id) - gastados(u.user_id);
+      if (disp < t.costo) throw new Error(`Te faltan ${t.costo - disp} puntos`);
+      const canje = { id: uid(), user_id: u.user_id, premio_id: "tienda", costo: t.costo, estado: "aprobado", nota: `tienda:${pieza}`, creado_en: ahora(), resuelto_en: ahora() };
+      db.canjes.push(canje);
+      db.avatar_compras.push({ user_id: u.user_id, pieza_id: pieza, costo: t.costo, canje_id: canje.id, creado_en: ahora() });
+      guardar(); return { disponibles: disp - t.costo, costo: t.costo };
     },
     async solicitarCanje(premioId) {
       await espera(); const u = exigir();
@@ -858,7 +878,7 @@ export function crearDemo() {
     async adminPremios() {
       await espera(); exigirAdmin();
       return { premios: [...db.premios].sort((a, b) => a.costo - b.costo),
-               canjes: [...db.canjes].reverse().map((c) => ({ ...c, nombre: db.usuarios.find((u) => u.user_id === c.user_id)?.nombre || "—" })) };
+               canjes: [...db.canjes].filter((c) => !String(c.nota || "").startsWith("tienda:")).reverse().map((c) => ({ ...c, nombre: db.usuarios.find((u) => u.user_id === c.user_id)?.nombre || "—" })) };
     },
     async guardarPremio(p) {
       exigirAdmin();

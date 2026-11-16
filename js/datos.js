@@ -201,8 +201,13 @@ function crearNube() {
         q(sb.from("academia_premios").select("*").eq("activo", true).order("costo")),
         q(sb.from("academia_canjes").select("*").order("creado_en", { ascending: false })),
       ]);
-      return { premios, canjes };
+      // Las compras de la Tienda del avatar se guardan como canjes internos: no se listan aquí.
+      return { premios: premios.filter((p) => !p.interno), canjes: canjes.filter((c) => !String(c.nota || "").startsWith("tienda:")) };
     },
+    // Tienda del avatar
+    tienda: () => rpc("academia_tienda"),
+    comprarPieza: (pieza) => rpc("academia_comprar_pieza", { p_pieza: pieza }),
+    async misPiezas() { return ((await rpc("academia_tienda"))?.mias) || []; },
 
     async niveles() { return q(sb.from("academia_niveles").select("*").order("orden")); },
     async config() {
@@ -480,7 +485,8 @@ function crearNube() {
         q(sb.from("academia_perfiles").select("user_id, nombre")),
       ]);
       const nombre = Object.fromEntries(perfiles.map((p) => [p.user_id, p.nombre]));
-      return { premios, canjes: canjes.map((c) => ({ ...c, nombre: nombre[c.user_id] || "—" })) };
+      return { premios: premios.filter((p) => !p.interno),
+        canjes: canjes.filter((c) => !String(c.nota || "").startsWith("tienda:")).map((c) => ({ ...c, nombre: nombre[c.user_id] || "—" })) };
     },
     async guardarPremio(p) {
       const { id, ...resto } = p;

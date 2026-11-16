@@ -12,6 +12,7 @@ import { pintarAudiolibro, pintarBiblioteca, tarjetaAudio, esNuevoAudio } from "
 import { avatarOIniciales, avatarSVG, avatarCuerpoSVG } from "./avatar.js";
 import { pintarEditorAvatar, invitarAvatar } from "./avatar-editor.js";
 import { pintarPremiosEmpleado, tarjetaMeta, revisarMeta, revisarCanjes } from "./premios.js";
+import { pintarTienda, presentarTienda, vioPresentacionTienda } from "./tienda.js";
 import { pintarLibreta, montarLibretaLeccion, iniciarColaLibreta, revisarIdeas, presentarLibreta, vioPresentacionLibreta,
   propuestasPendientes, tarjetaPropuestas, conectarPropuestas, recordarPropuesta, escribirPropuesta } from "./libreta.js";
 
@@ -68,6 +69,7 @@ async function enrutar() {
       case "ranking": return await pintarRanking();
       case "premios": return await pintarPremiosEmpleado(ctxAudio());
       case "libreta": return await pintarLibreta(ctxAudio());
+      case "tienda": return await pintarTienda(ctxAudio());
       default: return await pintarInicio();
     }
   } catch (e) {
@@ -381,6 +383,12 @@ async function pintarInicio() {
 
     ${(catPremios.premios || []).length ? tarjetaMeta(metaPremio, r.puntos_disponibles) : ""}
 
+    <button class="tarjeta-borde fila tarjeta-tienda" data-ir="/tienda">
+      <span class="tienda-mini" style="flex:none">${avatarSVG({ ...(miAv || {}), cabeza: "fiesta" }, 46)}</span>
+      <span style="flex:1;min-width:0"><b style="display:block;font-size:15px">Tienda del avatar <span class="pildora pildora-oro" style="padding:1px 7px;font-size:10.5px;vertical-align:2px">Nuevo</span></b><span class="texto-tenue" style="font-size:12.5px">Gorros, lentes, globos y más desde 20 pts. Tienes ${num(r.puntos_disponibles)} para gastar.</span></span>
+      ${icono("next", 18)}
+    </button>
+
     <button class="tarjeta-borde fila tarjeta-libreta" data-ir="/libreta">
       <span class="medalla medalla-oro chica" style="flex:none">${icono("libreta", 22)}</span>
       <span style="flex:1;min-width:0"><b style="display:block;font-size:15px">Mi libreta</b><span class="texto-tenue" style="font-size:12.5px">Tus apuntes, notas de voz e ideas para mejorar Mozzafiato.</span></span>
@@ -453,6 +461,7 @@ async function pintarInicio() {
   if (vista) {
     await novedadAudiolibros(r);
     if (!vioPresentacionLibreta(r.usuario) && (await presentarLibreta(r.usuario)) === "libreta") return ir("/libreta");
+    if (!vioPresentacionTienda(r.usuario) && (await presentarTienda(r.usuario, { cfg: miAv })) === "tienda") return ir("/tienda");
   }
   await anunciarNuevos(r, cursos, audios);
   await invitarAvatar(ctxAudio(), r);
